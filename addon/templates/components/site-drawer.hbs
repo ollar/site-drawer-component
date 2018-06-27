@@ -1,0 +1,9 @@
+<aside class="drawer">
+  {{site-drawer-aside}}
+</aside>
+
+<div class="drawer__overlay" {{action 'toggleDrawer'}}></div>
+
+<main class="main-content">
+  {{yield (hash toggleDrawer=(action 'toggleDrawer'))}}
+</main>
