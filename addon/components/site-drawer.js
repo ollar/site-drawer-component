@@ -8,6 +8,7 @@ import layout from '../templates/components/site-drawer';
 export default Component.extend({
   layout,
 
+  classNames: ['site-drawer-component'],
   classNameBindings: ['opened'],
   opened: false,
 
