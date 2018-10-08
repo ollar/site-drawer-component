@@ -1,7 +1,7 @@
 site-drawer-component
 ==============================================================================
 
-[Short description of the addon.]
+Simple site drawer component
 
 Installation
 ------------------------------------------------------------------------------
@@ -14,8 +14,22 @@ ember install site-drawer-component
 Usage
 ------------------------------------------------------------------------------
 
-[Longer description of how to use the addon in apps.]
+Just wrap your content with this component:
 
+application.hbs
+
+```
+{{#site-drawer drawerData as |drawerData|}}
+
+...you main content here...
+
+{{/site-drawer}}
+
+```
+
+drawerData - has 'toggleDrawer' function.
+
+then you need to create 'site-drawer-aside' component and place drawer content in it.
 
 Contributing
 ------------------------------------------------------------------------------
