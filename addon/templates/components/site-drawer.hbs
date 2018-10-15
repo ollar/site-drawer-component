@@ -2,7 +2,7 @@
 {{site-drawer-aside toggleDrawer=(action 'toggleDrawer')}}
 {{!-- aside --}}
 
-<div class="drawer-overlay" {{action 'toggleDrawer'}}></div>
+<a class="drawer-overlay" {{action 'toggleDrawer'}}></a>
 
 <main class="main-content">
   {{yield (hash toggleDrawer=(action 'toggleDrawer'))}}
