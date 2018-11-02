@@ -5,7 +5,7 @@
   "keywords": [
     "ember-addon"
   ],
-  "repository": "github:ollar/site-drawer-component.git",
+  "repository": "github:ollar/site-drawer-component",
   "license": "MIT",
   "author": "ollar",
   "directories": {
