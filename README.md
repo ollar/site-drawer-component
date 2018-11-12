@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/ollar/site-drawer-component.svg?branch=master)](https://travis-ci.com/ollar/site-drawer-component)
+
 site-drawer-component
 ==============================================================================
 
@@ -16,7 +18,8 @@ Usage
 
 Just wrap your content with this component:
 
-application.hbs
+`application.hbs`
+
 
 ```
 {{#site-drawer drawerData as |drawerData|}}
@@ -27,9 +30,9 @@ application.hbs
 
 ```
 
-drawerData - has 'toggleDrawer' function.
+drawerData - has `toggleDrawer`, `closeDrawer`, `openDrawer` functions.
 
-then you need to create 'site-drawer-aside' component and place drawer content in it.
+then you need to create `site-drawer-aside` component and place drawer content in it.
 
 Contributing
 ------------------------------------------------------------------------------
