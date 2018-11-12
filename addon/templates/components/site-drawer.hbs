@@ -1,9 +1,13 @@
 {{!-- aside --}}
-{{site-drawer-aside toggleDrawer=(action 'toggleDrawer')}}
+{{site-drawer-aside
+  toggleDrawer=(action 'toggleDrawer')
+  openDrawer=(action 'openDrawer')
+  closeDrawer=(action 'closeDrawer')
+}}
 {{!-- aside --}}
 
 <a class="drawer-overlay" {{action 'toggleDrawer'}}></a>
 
 <main class="main-content">
-  {{yield (hash toggleDrawer=(action 'toggleDrawer'))}}
+  {{yield (hash toggleDrawer=(action 'toggleDrawer') openDrawer=(action 'openDrawer') closeDrawer=(action 'closeDrawer'))}}
 </main>

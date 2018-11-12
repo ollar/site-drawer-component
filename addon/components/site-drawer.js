@@ -1,7 +1,6 @@
 import Component from '@ember/component';
 import { inject as service } from '@ember/service';
-import { run, schedule } from '@ember/runloop';
-import { computed } from '@ember/object';
+import { schedule } from '@ember/runloop';
 
 import layout from '../templates/components/site-drawer';
 
@@ -13,26 +12,33 @@ export default Component.extend({
   opened: false,
 
   router: service(),
-  session: service(),
-
-  avatarImage: computed('me.model.avatar.[]', function() {
-    return this.getWithDefault('me.model.avatar', []).objectAt(1);
-  }),
 
   init() {
-    this._super(arguments);
+    this._super(...arguments);
 
     const router = this.get('router');
     router.addObserver('currentRouteName', this, 'closeDrawer');
   },
 
+  openDrawer() {
+    schedule('afterRender', () => this.set('opened', true));
+  },
+
   closeDrawer() {
-    run(() => schedule('afterRender', () => this.set('opened', false)));
+    schedule('afterRender', () => this.set('opened', false));
   },
 
   actions: {
     toggleDrawer() {
-      run(() => this.toggleProperty('opened'));
+      this.toggleProperty('opened');
+    },
+
+    openDrawer() {
+      this.openDrawer();
+    },
+
+    closeDrawer() {
+      this.closeDrawer();
     },
   },
 });
