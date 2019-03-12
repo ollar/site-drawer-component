@@ -1,6 +1,6 @@
 {
   "name": "site-drawer-component",
-  "version": "0.0.5",
+  "version": "1.0.0",
   "description": "Simple site drawer component",
   "keywords": [
     "ember-addon"
