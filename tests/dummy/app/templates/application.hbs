@@ -1,6 +1,10 @@
 {{#site-drawer as |drawerData|}}
 
-  <button {{action drawerData.toggleDrawer}}>
+  <button class="open-drawer-button" {{action drawerData.openDrawer}}>
+    open drawer
+  </button>
+
+  <button class="toggle-drawer-button" {{action drawerData.toggleDrawer}}>
     toggle drawer
   </button>
 
