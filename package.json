@@ -3,7 +3,8 @@
   "version": "1.0.1",
   "description": "Simple site drawer component",
   "keywords": [
-    "ember-addon"
+    "ember-addon",
+    "site drawer"
   ],
   "repository": "github:ollar/site-drawer-component",
   "license": "MIT",
