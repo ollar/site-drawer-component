@@ -30,7 +30,7 @@ Just wrap your content with this component:
 
 
 ```
-{{#site-drawer drawerData as |drawerData|}}
+{{#site-drawer as |drawerData|}}
 
 ...you main content here...
 
