@@ -28,17 +28,20 @@ export default class SiteDrawerComponent extends Component {
   }
 
   @action
-  toggleDrawer() {
+  toggleDrawer(event) {
+    event.preventDefault();
     this.opened = !this.opened;
   }
 
   @action
-  openDrawer() {
+  openDrawer(event) {
+    event.preventDefault();
     this._openDrawer();
   }
 
   @action
-  closeDrawer() {
+  closeDrawer(event) {
+    event.preventDefault();
     this._closeDrawer();
   }
 }
