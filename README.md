@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/ollar/site-drawer-component.svg?branch=master)](https://travis-ci.com/ollar/site-drawer-component)
+[![Build Status](https://travis-ci.org/ollar/site-drawer-component.svg?branch=master)](https://travis-ci.org/ollar/site-drawer-component)
 
 site-drawer-component
 ==============================================================================

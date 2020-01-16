@@ -1,44 +1,44 @@
-import Component from '@ember/component';
+import Component from '@glimmer/component';
 import { inject as service } from '@ember/service';
 import { schedule } from '@ember/runloop';
+import { action } from '@ember/object';
+import { tracked } from "@glimmer/tracking";
 
-import layout from '../templates/components/site-drawer';
+export default class SiteDrawerComponent extends Component {
+  @service router;
 
-export default Component.extend({
-  layout,
+  @tracked opened = false;
 
-  classNames: ['site-drawer-component'],
-  classNameBindings: ['opened'],
-  opened: false,
+  constructor() {
+      super(...arguments);
 
-  router: service(),
+      this.router.addObserver('currentRouteName', this, 'closeDrawer');
+  }
 
-  init() {
-    this._super(...arguments);
+  _openDrawer() {
+    schedule('afterRender', () => {
+      this.opened = true;
+    });
+  }
 
-    const router = this.get('router');
-    router.addObserver('currentRouteName', this, 'closeDrawer');
-  },
+  _closeDrawer() {
+    schedule('afterRender', () => {
+      this.opened = false;
+    });
+  }
 
+  @action
+  toggleDrawer() {
+    this.opened = !this.opened;
+  }
+
+  @action
   openDrawer() {
-    schedule('afterRender', () => this.set('opened', true));
-  },
+    this._openDrawer();
+  }
 
+  @action
   closeDrawer() {
-    schedule('afterRender', () => this.set('opened', false));
-  },
-
-  actions: {
-    toggleDrawer() {
-      this.toggleProperty('opened');
-    },
-
-    openDrawer() {
-      this.openDrawer();
-    },
-
-    closeDrawer() {
-      this.closeDrawer();
-    },
-  },
-});
+    this._closeDrawer();
+  }
+}

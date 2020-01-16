@@ -1,0 +1,20 @@
+<div class="site-drawer-component {{if this.opened 'opened'}}">
+    {{!-- aside --}}
+    <SiteDrawerAside
+        @toggleDrawer={{this.toggleDrawer}}
+        @openDrawer={{this.openDrawer}}
+        @closeDrawer={{this.closeDrawer}}
+    />
+    {{!-- aside --}}
+
+    <a class="drawer-overlay" {{on 'click' this.toggleDrawer}} role="button" aria-hidden></a>
+
+    <main class="main-content">
+    {{yield (hash
+                toggleDrawer=(action "toggleDrawer")
+                openDrawer=(action "openDrawer")
+                closeDrawer=(action "closeDrawer")
+            )
+    }}
+    </main>
+</div>
