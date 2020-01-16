@@ -31,12 +31,11 @@ Just wrap your content with this component:
 
 
 ```
-{{#site-drawer as |drawerData|}}
+<SiteDrawer as |drawerData|>
 
 ...you main content here...
 
-{{/site-drawer}}
-
+</SiteDrawer>
 ```
 
 drawerData - has `toggleDrawer`, `closeDrawer`, `openDrawer` functions.
