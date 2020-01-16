@@ -1,12 +1,12 @@
 {{!-- aside --}}
-{{site-drawer-aside
-  toggleDrawer=(action "toggleDrawer")
-  openDrawer=(action "openDrawer")
-  closeDrawer=(action "closeDrawer")
-}}
+<SiteDrawerAside
+    @toggleDrawer={{this.toggleDrawer}}
+    @openDrawer={{this.openDrawer}}
+    @closeDrawer={{this.closeDrawer}}
+/>
 {{!-- aside --}}
 
-<a class="drawer-overlay" {{action "toggleDrawer"}} role="button" aria-hidden></a>
+<a class="drawer-overlay" {{on 'click' this.toggleDrawer}} role="button" aria-hidden></a>
 
 <main class="main-content">
   {{yield (hash

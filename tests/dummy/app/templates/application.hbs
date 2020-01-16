@@ -1,12 +1,11 @@
-{{#site-drawer as |drawerData|}}
+<SiteDrawer as |drawerData|>
+    <button class="open-drawer-button" type="button" {{on 'click' drawerData.openDrawer}}>
+        open drawer
+    </button>
 
-  <button class="open-drawer-button" {{action drawerData.openDrawer}}>
-    open drawer
-  </button>
+    <button class="toggle-drawer-button" type="button" {{on 'click' drawerData.toggleDrawer}}>
+        toggle drawer
+    </button>
 
-  <button class="toggle-drawer-button" {{action drawerData.toggleDrawer}}>
-    toggle drawer
-  </button>
-
-  {{outlet}}
-{{/site-drawer}}
+    {{outlet}}
+</SiteDrawer>
