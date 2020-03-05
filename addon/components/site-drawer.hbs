@@ -1,10 +1,12 @@
 <div class="site-drawer-component {{if this.opened 'opened'}}">
     {{!-- aside --}}
+    <aside class="drawer">
     <SiteDrawerAside
         @toggleDrawer={{this.toggleDrawer}}
         @openDrawer={{this.openDrawer}}
         @closeDrawer={{this.closeDrawer}}
     />
+    </aside>
     {{!-- aside --}}
 
     <a class="drawer-overlay" {{on 'click' this.toggleDrawer}} href="" role="button" aria-hidden></a>
