@@ -1,6 +1,4 @@
 .site-drawer-component {
-    min-height: 100vh;
-    display: flex;
     --drawer-width: 300px;
 }
 
@@ -8,10 +6,10 @@
     transition: transform 0.3s;
 
     width: var(--drawer-width);
+    height: 100vh;
     margin-left: calc(-1 * var(--drawer-width));
 
-    flex-shrink: 0;
-    position: relative;
+    position: absolute;
     z-index: 20;
     transform: translate(0, 0);
 }
@@ -36,10 +34,4 @@
 
 .site-drawer-component.opened .drawer {
     transform: translate(100%, 0);
-}
-
-.site-drawer-component .main-content {
-    flex-shrink: 0;
-    width: 100%;
-    z-index: 1;
 }

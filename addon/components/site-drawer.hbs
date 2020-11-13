@@ -1,22 +1,11 @@
-<div class="site-drawer-component {{if this.opened 'opened'}}">
-    {{!-- aside --}}
-    <aside class="drawer">
-    <SiteDrawerAside
-        @toggleDrawer={{this.toggleDrawer}}
-        @openDrawer={{this.openDrawer}}
-        @closeDrawer={{this.closeDrawer}}
-    />
-    </aside>
-    {{!-- aside --}}
+{{yield (hash
+            aside=(component this.asideComponent toggleDrawer=this.toggleDrawer openDrawer=this.openDrawer closeDrawer=this.closeDrawer opened=this.opened)
+            overlay=(component this.overlayComponent toggleDrawer=this.toggleDrawer)
+            trigger=(component this.triggerComponent toggleDrawer=this.toggleDrawer)
 
-    <a class="drawer-overlay" {{on 'click' this.toggleDrawer}} href="" role="button" aria-hidden></a>
-
-    <main class="main-content">
-    {{yield (hash
-                toggleDrawer=this.toggleDrawer
-                openDrawer=this.openDrawer
-                closeDrawer=this.closeDrawer
-            )
-    }}
-    </main>
-</div>
+            opened=this.opened
+            toggleDrawer=this.toggleDrawer
+            openDrawer=this.openDrawer
+            closeDrawer=this.closeDrawer
+        )
+}}
