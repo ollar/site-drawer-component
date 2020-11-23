@@ -31,14 +31,19 @@ Just wrap your content with this component:
 
 
 ```
-<SiteDrawer as |drawerData|>
+<SiteDrawer as |drawer|>
+    <drawer.overlay />
+    <drawer.aside />
 
-...you main content here...
+    <drawer.trigger>
+        toggle drawer button
+    </drawer.trigger>
 
+    ...you main content here...
 </SiteDrawer>
 ```
 
-drawerData - has `toggleDrawer`, `closeDrawer`, `openDrawer` functions.
+drawer object also has `toggleDrawer`, `closeDrawer`, `openDrawer` functions and `opened` state variable.
 
 then you need to create `site-drawer-aside` component and place drawer content in it.
 
