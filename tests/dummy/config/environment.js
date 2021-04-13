@@ -4,7 +4,7 @@ module.exports = function (environment) {
     let ENV = {
         modulePrefix: 'dummy',
         environment,
-        rootURL: '/',
+        rootURL: '/site-drawer-component/',
         locationType: 'auto',
         EmberENV: {
             FEATURES: {
