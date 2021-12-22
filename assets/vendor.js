@@ -71545,13 +71545,13 @@ define("ember-resolver/features", [], function () {
 
   var __COLOCATED_TEMPLATE__ = Ember.HTMLBars.template(
   /*
-    <button {{on 'click' @toggleDrawer}} ...attributes>
+    <button ...attributes type="button" {{on 'click' @toggleDrawer}}>
       {{yield}}
   </button>
   */
   {
-    "id": "3aLTf9ga",
-    "block": "[[[11,\"button\"],[17,1],[4,[38,0],[\"click\",[30,2]],null],[12],[1,\"\\n    \"],[18,3,null],[1,\"\\n\"],[13]],[\"&attrs\",\"@toggleDrawer\",\"&default\"],false,[\"on\",\"yield\"]]",
+    "id": "jakglIoK",
+    "block": "[[[11,\"button\"],[17,1],[24,4,\"button\"],[4,[38,0],[\"click\",[30,2]],null],[12],[1,\"\\n    \"],[18,3,null],[1,\"\\n\"],[13]],[\"&attrs\",\"@toggleDrawer\",\"&default\"],false,[\"on\",\"yield\"]]",
     "moduleName": "site-drawer-component/components/site-drawer-trigger.hbs",
     "isStrictMode": false
   });
@@ -71788,36 +71788,36 @@ var __ember_auto_import__ =
 /************************************************************************/
 /******/ ({
 
-/***/ "../../../../../tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/app.js":
+/***/ "../../../../../tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js":
 /*!***********************************************************************!*\
-  !*** /tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/app.js ***!
+  !*** /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js ***!
   \***********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    if (arguments.length === 1) {\n      return r('_eai_dyn_' + specifier);\n    } else {\n      return r('_eai_dynt_' + specifier)(Array.prototype.slice.call(arguments, 1))\n    }\n  };\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/app.js?");
+eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    if (arguments.length === 1) {\n      return r('_eai_dyn_' + specifier);\n    } else {\n      return r('_eai_dynt_' + specifier)(Array.prototype.slice.call(arguments, 1))\n    }\n  };\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js?");
 
 /***/ }),
 
-/***/ "../../../../../tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/l.js":
+/***/ "../../../../../tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js":
 /*!*********************************************************************!*\
-  !*** /tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/l.js ***!
+  !*** /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js ***!
   \*********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/l.js?");
+eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js?");
 
 /***/ }),
 
 /***/ 0:
 /*!*******************************************************************************************************************************************!*\
-  !*** multi /tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/l.js /tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/app.js ***!
+  !*** multi /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js ***!
   \*******************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("__webpack_require__(/*! /tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/l.js */\"../../../../../tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/app.js */\"../../../../../tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/app.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/l.js_/tmp/broccoli-1579ZKC9SVJVF2g1/cache-197-bundler/staging/app.js?");
+eval("__webpack_require__(/*! /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js */\"../../../../../tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js */\"../../../../../tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js_/tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js?");
 
 /***/ })
 
