@@ -1,8 +1,8 @@
-.site-drawer-component {
+.drawer-wrapper {
     --drawer-width: 300px;
 }
 
-.site-drawer-component .drawer {
+.drawer-wrapper .drawer {
     transition: transform 0.3s;
 
     width: var(--drawer-width);
@@ -14,11 +14,10 @@
     transform: translate(0, 0);
 }
 
-.site-drawer-component .drawer-overlay {
+.drawer-wrapper .drawer-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
     bottom: 0;
     background-color: rgba(0, 0, 0, 0.2);
     z-index: -10;
@@ -26,12 +25,13 @@
     transition: opacity 0.3s linear, z-index 0.3s linear 0.3s;
 }
 
-.site-drawer-component.opened .drawer-overlay {
+.drawer-wrapper.opened .drawer-overlay {
     transition: opacity 0.3s linear, z-index 0.3s linear 0s;
+    right: 0;
     opacity: 1;
     z-index: 10;
 }
 
-.site-drawer-component.opened .drawer {
+.drawer-wrapper.opened .drawer {
     transform: translate(100%, 0);
 }

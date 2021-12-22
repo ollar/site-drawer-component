@@ -74,7 +74,20 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
     }
   });
 });
-;define("dummy/components/site-drawer-aside", ["exports"], function (_exports) {
+;define("dummy/components/site-drawer", ["exports", "site-drawer-component/components/site-drawer"], function (_exports, _siteDrawer) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(_exports, "default", {
+    enumerable: true,
+    get: function get() {
+      return _siteDrawer.default;
+    }
+  });
+});
+;define("dummy/components/site-drawer/aside", ["exports"], function (_exports) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -93,9 +106,9 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   </aside>
   */
   {
-    "id": "TcLLRvSJ",
+    "id": "KaRKdSF4",
     "block": "[[[10,\"aside\"],[14,0,\"drawer\"],[12],[1,\"\\n    \"],[10,2],[12],[1,\"this is drawer content\"],[13],[1,\"\\n\\n    \"],[11,\"button\"],[24,0,\"close-drawer-button\"],[24,4,\"button\"],[4,[38,0],[\"click\",[30,1]],null],[12],[1,\"\\n    close drawer\\n    \"],[13],[1,\"\\n\"],[13]],[\"@closeDrawer\"],false,[\"on\"]]",
-    "moduleName": "dummy/components/site-drawer-aside.hbs",
+    "moduleName": "dummy/components/site-drawer/aside.hbs",
     "isStrictMode": false
   });
 
@@ -103,7 +116,7 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
 
   _exports.default = _default;
 });
-;define("dummy/components/site-drawer-overlay", ["exports", "site-drawer-component/components/site-drawer-overlay"], function (_exports, _siteDrawerOverlay) {
+;define("dummy/components/site-drawer/overlay", ["exports", "site-drawer-component/components/site-drawer/overlay"], function (_exports, _overlay) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -112,11 +125,11 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   Object.defineProperty(_exports, "default", {
     enumerable: true,
     get: function get() {
-      return _siteDrawerOverlay.default;
+      return _overlay.default;
     }
   });
 });
-;define("dummy/components/site-drawer-trigger", ["exports", "site-drawer-component/components/site-drawer-trigger"], function (_exports, _siteDrawerTrigger) {
+;define("dummy/components/site-drawer/trigger", ["exports", "site-drawer-component/components/site-drawer/trigger"], function (_exports, _trigger) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -125,20 +138,7 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   Object.defineProperty(_exports, "default", {
     enumerable: true,
     get: function get() {
-      return _siteDrawerTrigger.default;
-    }
-  });
-});
-;define("dummy/components/site-drawer", ["exports", "site-drawer-component/components/site-drawer"], function (_exports, _siteDrawer) {
-  "use strict";
-
-  Object.defineProperty(_exports, "__esModule", {
-    value: true
-  });
-  Object.defineProperty(_exports, "default", {
-    enumerable: true,
-    get: function get() {
-      return _siteDrawer.default;
+      return _trigger.default;
     }
   });
 });
@@ -319,17 +319,17 @@ define("dummy/router", ["exports", "dummy/config/environment"], function (_expor
   "use strict";
 
   QUnit.module('ESLint | app');
-  QUnit.test('app/components/site-drawer-overlay.js', function (assert) {
-    assert.expect(1);
-    assert.ok(true, 'app/components/site-drawer-overlay.js should pass ESLint\n\n');
-  });
-  QUnit.test('app/components/site-drawer-trigger.js', function (assert) {
-    assert.expect(1);
-    assert.ok(true, 'app/components/site-drawer-trigger.js should pass ESLint\n\n');
-  });
   QUnit.test('app/components/site-drawer.js', function (assert) {
     assert.expect(1);
     assert.ok(true, 'app/components/site-drawer.js should pass ESLint\n\n');
+  });
+  QUnit.test('app/components/site-drawer/overlay.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'app/components/site-drawer/overlay.js should pass ESLint\n\n');
+  });
+  QUnit.test('app/components/site-drawer/trigger.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'app/components/site-drawer/trigger.js should pass ESLint\n\n');
   });
 });
 ;define("dummy/site-drawer-component/tests/templates.template.lint-test", [], function () {
@@ -344,8 +344,8 @@ define("dummy/router", ["exports", "dummy/config/environment"], function (_expor
   _exports.default = void 0;
 
   var _default = Ember.HTMLBars.template({
-    "id": "uoUfAG3o",
-    "block": "[[[1,[28,[35,0],[\"Site Drawer\"],null]],[1,\"\\n\\n\"],[8,[39,1],null,null,[[\"default\"],[[[[1,\"\\n    \"],[10,0],[15,0,[29,[\"site-drawer-component \",[52,[30,1,[\"opened\"]],\"opened\"]]]],[12],[1,\"\\n        \"],[8,[30,1,[\"overlay\"]],null,null,null],[1,\"\\n        \"],[8,[30,1,[\"aside\"]],null,null,null],[1,\"\\n    \"],[13],[1,\"\\n\\n    \"],[11,\"button\"],[24,0,\"open-drawer-button\"],[24,4,\"button\"],[4,[38,3],[\"click\",[30,1,[\"openDrawer\"]]],null],[12],[1,\"\\n        open drawer\\n    \"],[13],[1,\"\\n    \"],[11,\"button\"],[24,0,\"toggle-drawer-button\"],[24,4,\"button\"],[4,[38,3],[\"click\",[30,1,[\"toggleDrawer\"]]],null],[12],[1,\"\\n        toggle drawer\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[8,[30,1,[\"trigger\"]],[[24,0,\"test\"]],null,[[\"default\"],[[[[1,\"\\n        also trigger\\n    \"]],[]]]]],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\"]],[1]]]]]],[\"drawer\"],false,[\"page-title\",\"site-drawer\",\"if\",\"on\"]]",
+    "id": "dzxO+JML",
+    "block": "[[[1,[28,[35,0],[\"Site Drawer\"],null]],[1,\"\\n\\n\"],[8,[39,1],null,null,[[\"default\"],[[[[1,\"\\n    \"],[8,[30,1,[\"overlay\"]],null,null,null],[1,\"\\n    \"],[8,[30,1,[\"aside\"]],null,null,null],[1,\"\\n\\n    \"],[11,\"button\"],[24,0,\"open-drawer-button\"],[24,4,\"button\"],[4,[38,2],[\"click\",[30,1,[\"openDrawer\"]]],null],[12],[1,\"\\n        open drawer\\n    \"],[13],[1,\"\\n    \"],[11,\"button\"],[24,0,\"toggle-drawer-button\"],[24,4,\"button\"],[4,[38,2],[\"click\",[30,1,[\"toggleDrawer\"]]],null],[12],[1,\"\\n        toggle drawer\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[8,[30,1,[\"trigger\"]],[[24,0,\"test\"]],null,[[\"default\"],[[[[1,\"\\n        also trigger\\n    \"]],[]]]]],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\"]],[1]]]]],[1,\"\\n\"]],[\"drawer\"],false,[\"page-title\",\"site-drawer\",\"on\"]]",
     "moduleName": "dummy/templates/application.hbs",
     "isStrictMode": false
   });

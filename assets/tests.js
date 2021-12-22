@@ -148,41 +148,44 @@ define("dummy/tests/integration/components/overlay-test", ["qunit", "ember-qunit
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                _context.next = 2;
+                this.set('toggleDrawer', function () {
+                  return null;
+                });
+                _context.next = 3;
                 return (0, _testHelpers.render)(Ember.HTMLBars.template(
                 /*
-                  <Overlay />
+                  <SiteDrawer::Overlay @toggleDrawer={{this.toggleDrawer}} />
                 */
                 {
-                  "id": "CUsh+L5d",
-                  "block": "[[[8,[39,0],null,null,null]],[],false,[\"overlay\"]]",
+                  "id": "sv6bJg/9",
+                  "block": "[[[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],null]],[],false,[\"site-drawer/overlay\"]]",
                   "moduleName": "(unknown template module)",
                   "isStrictMode": false
                 }));
 
-              case 2:
+              case 3:
                 assert.equal(this.element.textContent.trim(), ''); // Template block usage:
 
-                _context.next = 5;
+                _context.next = 6;
                 return (0, _testHelpers.render)(Ember.HTMLBars.template(
                 /*
                   
-                      <Overlay>
-                        template block text
-                      </Overlay>
-                    
+                          <SiteDrawer::Overlay @toggleDrawer={{this.toggleDrawer}} >
+                            template block text
+                          </SiteDrawer::Overlay>
+                        
                 */
                 {
-                  "id": "zuqdy3bl",
-                  "block": "[[[1,\"\\n      \"],[8,[39,0],null,null,[[\"default\"],[[[[1,\"\\n        template block text\\n      \"]],[]]]]],[1,\"\\n    \"]],[],false,[\"overlay\"]]",
+                  "id": "8cc9lNGm",
+                  "block": "[[[1,\"\\n          \"],[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],[[\"default\"],[[[[1,\"\\n            template block text\\n          \"]],[]]]]],[1,\"\\n        \"]],[],false,[\"site-drawer/overlay\"]]",
                   "moduleName": "(unknown template module)",
                   "isStrictMode": false
                 }));
 
-              case 5:
+              case 6:
                 assert.equal(this.element.textContent.trim(), 'template block text');
 
-              case 6:
+              case 7:
               case "end":
                 return _context.stop();
             }
@@ -211,41 +214,44 @@ define("dummy/tests/integration/components/trigger-test", ["qunit", "ember-qunit
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                _context.next = 2;
+                this.set('toggleDrawer', function () {
+                  return null;
+                });
+                _context.next = 3;
                 return (0, _testHelpers.render)(Ember.HTMLBars.template(
                 /*
-                  <Trigger />
+                  <SiteDrawer::Trigger @toggleDrawer={{this.toggleDrawer}} />
                 */
                 {
-                  "id": "GhFh1lux",
-                  "block": "[[[8,[39,0],null,null,null]],[],false,[\"trigger\"]]",
+                  "id": "cTtztAuL",
+                  "block": "[[[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],null]],[],false,[\"site-drawer/trigger\"]]",
                   "moduleName": "(unknown template module)",
                   "isStrictMode": false
                 }));
 
-              case 2:
+              case 3:
                 assert.equal(this.element.textContent.trim(), ''); // Template block usage:
 
-                _context.next = 5;
+                _context.next = 6;
                 return (0, _testHelpers.render)(Ember.HTMLBars.template(
                 /*
                   
-                      <Trigger>
-                        template block text
-                      </Trigger>
-                    
+                          <SiteDrawer::Trigger @toggleDrawer={{this.toggleDrawer}}>
+                            template block text
+                          </SiteDrawer::Trigger>
+                        
                 */
                 {
-                  "id": "RLuU2Q5v",
-                  "block": "[[[1,\"\\n      \"],[8,[39,0],null,null,[[\"default\"],[[[[1,\"\\n        template block text\\n      \"]],[]]]]],[1,\"\\n    \"]],[],false,[\"trigger\"]]",
+                  "id": "GZXH3vSU",
+                  "block": "[[[1,\"\\n          \"],[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],[[\"default\"],[[[[1,\"\\n            template block text\\n          \"]],[]]]]],[1,\"\\n        \"]],[],false,[\"site-drawer/trigger\"]]",
                   "moduleName": "(unknown template module)",
                   "isStrictMode": false
                 }));
 
-              case 5:
+              case 6:
                 assert.equal(this.element.textContent.trim(), 'template block text');
 
-              case 6:
+              case 7:
               case "end":
                 return _context.stop();
             }

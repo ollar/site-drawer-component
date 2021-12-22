@@ -71486,80 +71486,6 @@ define("ember-resolver/features", [], function () {
     until: '3.0.0'
   }));
 });
-;define("site-drawer-component/components/site-drawer-aside", ["exports"], function (_exports) {
-  "use strict";
-
-  Object.defineProperty(_exports, "__esModule", {
-    value: true
-  });
-  _exports.default = void 0;
-
-  var __COLOCATED_TEMPLATE__ = Ember.HTMLBars.template(
-  /*
-    <aside class="drawer"  ...attributes>
-      {{yield}}
-  </aside>
-  */
-  {
-    "id": "7rlVTjV1",
-    "block": "[[[11,\"aside\"],[24,0,\"drawer\"],[17,1],[12],[1,\"\\n    \"],[18,2,null],[1,\"\\n\"],[13]],[\"&attrs\",\"&default\"],false,[\"yield\"]]",
-    "moduleName": "site-drawer-component/components/site-drawer-aside.hbs",
-    "isStrictMode": false
-  });
-
-  var _default = Ember._setComponentTemplate(__COLOCATED_TEMPLATE__, Ember._templateOnlyComponent());
-
-  _exports.default = _default;
-});
-;define("site-drawer-component/components/site-drawer-overlay", ["exports"], function (_exports) {
-  "use strict";
-
-  Object.defineProperty(_exports, "__esModule", {
-    value: true
-  });
-  _exports.default = void 0;
-
-  var __COLOCATED_TEMPLATE__ = Ember.HTMLBars.template(
-  /*
-    <a class="drawer-overlay"  ...attributes {{on 'click' @toggleDrawer}} href="" role="button" aria-hidden></a>
-  {{yield}}
-  */
-  {
-    "id": "c4rSuVpq",
-    "block": "[[[11,3],[24,0,\"drawer-overlay\"],[17,1],[24,6,\"\"],[24,\"role\",\"button\"],[24,\"aria-hidden\",\"\"],[4,[38,0],[\"click\",[30,2]],null],[12],[13],[1,\"\\n\"],[18,3,null]],[\"&attrs\",\"@toggleDrawer\",\"&default\"],false,[\"on\",\"yield\"]]",
-    "moduleName": "site-drawer-component/components/site-drawer-overlay.hbs",
-    "isStrictMode": false
-  });
-
-  var _default = Ember._setComponentTemplate(__COLOCATED_TEMPLATE__, Ember._templateOnlyComponent());
-
-  _exports.default = _default;
-});
-;define("site-drawer-component/components/site-drawer-trigger", ["exports"], function (_exports) {
-  "use strict";
-
-  Object.defineProperty(_exports, "__esModule", {
-    value: true
-  });
-  _exports.default = void 0;
-
-  var __COLOCATED_TEMPLATE__ = Ember.HTMLBars.template(
-  /*
-    <button ...attributes type="button" {{on 'click' @toggleDrawer}}>
-      {{yield}}
-  </button>
-  */
-  {
-    "id": "jakglIoK",
-    "block": "[[[11,\"button\"],[17,1],[24,4,\"button\"],[4,[38,0],[\"click\",[30,2]],null],[12],[1,\"\\n    \"],[18,3,null],[1,\"\\n\"],[13]],[\"&attrs\",\"@toggleDrawer\",\"&default\"],false,[\"on\",\"yield\"]]",
-    "moduleName": "site-drawer-component/components/site-drawer-trigger.hbs",
-    "isStrictMode": false
-  });
-
-  var _default = Ember._setComponentTemplate(__COLOCATED_TEMPLATE__, Ember._templateOnlyComponent());
-
-  _exports.default = _default;
-});
 ;function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
 define("site-drawer-component/components/site-drawer", ["exports", "@glimmer/component"], function (_exports, _component) {
@@ -71602,25 +71528,28 @@ define("site-drawer-component/components/site-drawer", ["exports", "@glimmer/com
 
   var __COLOCATED_TEMPLATE__ = Ember.HTMLBars.template(
   /*
-    {{yield (hash
-              aside=(component this.asideComponent
+    <div class="drawer-wrapper {{if this.opened 'opened'}}">
+      {{yield (hash
+                  aside=(component this.asideComponent
+                      toggleDrawer=this.toggleDrawer
+                      openDrawer=this.openDrawer
+                      closeDrawer=this.closeDrawer
+                      opened=this.opened)
+                  overlay=(component this.overlayComponent toggleDrawer=this.toggleDrawer)
+                  trigger=(component this.triggerComponent toggleDrawer=this.toggleDrawer)
+  
+                  opened=this.opened
                   toggleDrawer=this.toggleDrawer
                   openDrawer=this.openDrawer
                   closeDrawer=this.closeDrawer
-                  opened=this.opened)
-              overlay=(component this.overlayComponent toggleDrawer=this.toggleDrawer)
-              trigger=(component this.triggerComponent toggleDrawer=this.toggleDrawer)
+              )
+      }}
+  </div>
   
-              opened=this.opened
-              toggleDrawer=this.toggleDrawer
-              openDrawer=this.openDrawer
-              closeDrawer=this.closeDrawer
-          )
-  }}
   */
   {
-    "id": "4GJf3DGG",
-    "block": "[[[18,1,[[28,[37,1],null,[[\"aside\",\"overlay\",\"trigger\",\"opened\",\"toggleDrawer\",\"openDrawer\",\"closeDrawer\"],[[50,[30,0,[\"asideComponent\"]],0,null,[[\"toggleDrawer\",\"openDrawer\",\"closeDrawer\",\"opened\"],[[30,0,[\"toggleDrawer\"]],[30,0,[\"openDrawer\"]],[30,0,[\"closeDrawer\"]],[30,0,[\"opened\"]]]]],[50,[30,0,[\"overlayComponent\"]],0,null,[[\"toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]]],[50,[30,0,[\"triggerComponent\"]],0,null,[[\"toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]]],[30,0,[\"opened\"]],[30,0,[\"toggleDrawer\"]],[30,0,[\"openDrawer\"]],[30,0,[\"closeDrawer\"]]]]]]]],[\"&default\"],false,[\"yield\",\"hash\",\"component\"]]",
+    "id": "+DEhDx4c",
+    "block": "[[[10,0],[15,0,[29,[\"drawer-wrapper \",[52,[30,0,[\"opened\"]],\"opened\"]]]],[12],[1,\"\\n    \"],[18,1,[[28,[37,2],null,[[\"aside\",\"overlay\",\"trigger\",\"opened\",\"toggleDrawer\",\"openDrawer\",\"closeDrawer\"],[[50,[30,0,[\"asideComponent\"]],0,null,[[\"toggleDrawer\",\"openDrawer\",\"closeDrawer\",\"opened\"],[[30,0,[\"toggleDrawer\"]],[30,0,[\"openDrawer\"]],[30,0,[\"closeDrawer\"]],[30,0,[\"opened\"]]]]],[50,[30,0,[\"overlayComponent\"]],0,null,[[\"toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]]],[50,[30,0,[\"triggerComponent\"]],0,null,[[\"toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]]],[30,0,[\"opened\"]],[30,0,[\"toggleDrawer\"]],[30,0,[\"openDrawer\"]],[30,0,[\"closeDrawer\"]]]]]]],[1,\"\\n\"],[13],[1,\"\\n\"]],[\"&default\"],false,[\"if\",\"yield\",\"hash\",\"component\"]]",
     "moduleName": "site-drawer-component/components/site-drawer.hbs",
     "isStrictMode": false
   });
@@ -71643,11 +71572,11 @@ define("site-drawer-component/components/site-drawer", ["exports", "@glimmer/com
 
       _initializerDefineProperty(_assertThisInitialized(_this), "opened", _descriptor, _assertThisInitialized(_this));
 
-      _defineProperty(_assertThisInitialized(_this), "asideComponent", 'site-drawer-aside');
+      _defineProperty(_assertThisInitialized(_this), "asideComponent", 'site-drawer/aside');
 
-      _defineProperty(_assertThisInitialized(_this), "overlayComponent", 'site-drawer-overlay');
+      _defineProperty(_assertThisInitialized(_this), "overlayComponent", 'site-drawer/overlay');
 
-      _defineProperty(_assertThisInitialized(_this), "triggerComponent", 'site-drawer-trigger');
+      _defineProperty(_assertThisInitialized(_this), "triggerComponent", 'site-drawer/trigger');
 
       return _this;
     }
@@ -71696,6 +71625,80 @@ define("site-drawer-component/components/site-drawer", ["exports", "@glimmer/com
   _exports.default = SiteDrawerComponent;
 
   Ember._setComponentTemplate(__COLOCATED_TEMPLATE__, SiteDrawerComponent);
+});
+;define("site-drawer-component/components/site-drawer/aside", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var __COLOCATED_TEMPLATE__ = Ember.HTMLBars.template(
+  /*
+    <aside class="drawer"  ...attributes>
+      {{yield}}
+  </aside>
+  */
+  {
+    "id": "rqKc2gZD",
+    "block": "[[[11,\"aside\"],[24,0,\"drawer\"],[17,1],[12],[1,\"\\n    \"],[18,2,null],[1,\"\\n\"],[13]],[\"&attrs\",\"&default\"],false,[\"yield\"]]",
+    "moduleName": "site-drawer-component/components/site-drawer/aside.hbs",
+    "isStrictMode": false
+  });
+
+  var _default = Ember._setComponentTemplate(__COLOCATED_TEMPLATE__, Ember._templateOnlyComponent());
+
+  _exports.default = _default;
+});
+;define("site-drawer-component/components/site-drawer/overlay", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var __COLOCATED_TEMPLATE__ = Ember.HTMLBars.template(
+  /*
+    <a class="drawer-overlay"  ...attributes {{on 'click' @toggleDrawer}} href="" role="button" aria-hidden></a>
+  {{yield}}
+  */
+  {
+    "id": "RLw/WPBe",
+    "block": "[[[11,3],[24,0,\"drawer-overlay\"],[17,1],[24,6,\"\"],[24,\"role\",\"button\"],[24,\"aria-hidden\",\"\"],[4,[38,0],[\"click\",[30,2]],null],[12],[13],[1,\"\\n\"],[18,3,null]],[\"&attrs\",\"@toggleDrawer\",\"&default\"],false,[\"on\",\"yield\"]]",
+    "moduleName": "site-drawer-component/components/site-drawer/overlay.hbs",
+    "isStrictMode": false
+  });
+
+  var _default = Ember._setComponentTemplate(__COLOCATED_TEMPLATE__, Ember._templateOnlyComponent());
+
+  _exports.default = _default;
+});
+;define("site-drawer-component/components/site-drawer/trigger", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var __COLOCATED_TEMPLATE__ = Ember.HTMLBars.template(
+  /*
+    <button ...attributes type="button" {{on 'click' @toggleDrawer}}>
+      {{yield}}
+  </button>
+  */
+  {
+    "id": "K57NIRnI",
+    "block": "[[[11,\"button\"],[17,1],[24,4,\"button\"],[4,[38,0],[\"click\",[30,2]],null],[12],[1,\"\\n    \"],[18,3,null],[1,\"\\n\"],[13]],[\"&attrs\",\"@toggleDrawer\",\"&default\"],false,[\"on\",\"yield\"]]",
+    "moduleName": "site-drawer-component/components/site-drawer/trigger.hbs",
+    "isStrictMode": false
+  });
+
+  var _default = Ember._setComponentTemplate(__COLOCATED_TEMPLATE__, Ember._templateOnlyComponent());
+
+  _exports.default = _default;
 });
 ;
 ;
@@ -71788,36 +71791,36 @@ var __ember_auto_import__ =
 /************************************************************************/
 /******/ ({
 
-/***/ "../../../../../tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js":
+/***/ "../../../../../tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/app.js":
 /*!***********************************************************************!*\
-  !*** /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js ***!
+  !*** /tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/app.js ***!
   \***********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    if (arguments.length === 1) {\n      return r('_eai_dyn_' + specifier);\n    } else {\n      return r('_eai_dynt_' + specifier)(Array.prototype.slice.call(arguments, 1))\n    }\n  };\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js?");
+eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    if (arguments.length === 1) {\n      return r('_eai_dyn_' + specifier);\n    } else {\n      return r('_eai_dynt_' + specifier)(Array.prototype.slice.call(arguments, 1))\n    }\n  };\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/app.js?");
 
 /***/ }),
 
-/***/ "../../../../../tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js":
+/***/ "../../../../../tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/l.js":
 /*!*********************************************************************!*\
-  !*** /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js ***!
+  !*** /tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/l.js ***!
   \*********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js?");
+eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/l.js?");
 
 /***/ }),
 
 /***/ 0:
 /*!*******************************************************************************************************************************************!*\
-  !*** multi /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js ***!
+  !*** multi /tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/l.js /tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/app.js ***!
   \*******************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("__webpack_require__(/*! /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js */\"../../../../../tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js */\"../../../../../tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/l.js_/tmp/broccoli-1636e3i7lqICpbjt/cache-193-bundler/staging/app.js?");
+eval("__webpack_require__(/*! /tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/l.js */\"../../../../../tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/app.js */\"../../../../../tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/app.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/l.js_/tmp/broccoli-1636T7RtyFzchmgI/cache-193-bundler/staging/app.js?");
 
 /***/ })
 
