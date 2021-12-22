@@ -2,7 +2,13 @@
 
 <SiteDrawer as |drawer|>
     <drawer.overlay />
-    <drawer.aside />
+    <drawer.aside>
+        <p>this is drawer content</p>
+
+        <button class="close-drawer-button" type="button" {{on 'click' drawer.closeDrawer}}>
+        close drawer
+        </button>
+    </drawer.aside>
 
     <button class="open-drawer-button" type="button" {{on 'click' drawer.openDrawer}}>
         open drawer

@@ -33,7 +33,10 @@ Just wrap your content with this component:
 ```
 <SiteDrawer as |drawer|>
     <drawer.overlay />
-    <drawer.aside />
+    <drawer.aside>
+        drawer content here
+        You can place everything you need here
+    </drawer.aside>
 
     <drawer.trigger>
         toggle drawer button
@@ -44,8 +47,6 @@ Just wrap your content with this component:
 ```
 
 drawer object also has `toggleDrawer`, `closeDrawer`, `openDrawer` functions and `opened` state variable.
-
-then you need to create `site-drawer/aside` component and place drawer content in it.
 
 Contributing
 ------------------------------------------------------------------------------
