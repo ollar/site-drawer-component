@@ -5,9 +5,9 @@ import { tracked } from '@glimmer/tracking';
 export default class SiteDrawerComponent extends Component {
     @tracked opened = false;
 
-    asideComponent = 'site-drawer-aside';
-    overlayComponent = 'site-drawer-overlay';
-    triggerComponent = 'site-drawer-trigger';
+    asideComponent = 'site-drawer/aside';
+    overlayComponent = 'site-drawer/overlay';
+    triggerComponent = 'site-drawer/trigger';
 
     _openDrawer() {
         this.opened = true;

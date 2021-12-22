@@ -7,19 +7,20 @@ module('Integration | Component | overlay', function (hooks) {
     setupRenderingTest(hooks);
 
     test('it renders', async function (assert) {
-        // Set any properties with this.set('myProperty', 'value');
-        // Handle any actions with this.set('myAction', function(val) { ... });
+        this.set('toggleDrawer', () => null);
 
-        await render(hbs`<Overlay />`);
+        await render(
+            hbs`<SiteDrawer::Overlay @toggleDrawer={{this.toggleDrawer}} />`
+        );
 
         assert.equal(this.element.textContent.trim(), '');
 
         // Template block usage:
         await render(hbs`
-      <Overlay>
-        template block text
-      </Overlay>
-    `);
+          <SiteDrawer::Overlay @toggleDrawer={{this.toggleDrawer}} >
+            template block text
+          </SiteDrawer::Overlay>
+        `);
 
         assert.equal(this.element.textContent.trim(), 'template block text');
     });

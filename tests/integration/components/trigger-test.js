@@ -7,19 +7,20 @@ module('Integration | Component | trigger', function (hooks) {
     setupRenderingTest(hooks);
 
     test('it renders', async function (assert) {
-        // Set any properties with this.set('myProperty', 'value');
-        // Handle any actions with this.set('myAction', function(val) { ... });
+        this.set('toggleDrawer', () => null);
 
-        await render(hbs`<Trigger />`);
+        await render(
+            hbs`<SiteDrawer::Trigger @toggleDrawer={{this.toggleDrawer}} />`
+        );
 
         assert.equal(this.element.textContent.trim(), '');
 
         // Template block usage:
         await render(hbs`
-      <Trigger>
-        template block text
-      </Trigger>
-    `);
+          <SiteDrawer::Trigger @toggleDrawer={{this.toggleDrawer}}>
+            template block text
+          </SiteDrawer::Trigger>
+        `);
 
         assert.equal(this.element.textContent.trim(), 'template block text');
     });

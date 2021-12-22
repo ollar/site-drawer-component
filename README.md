@@ -45,7 +45,7 @@ Just wrap your content with this component:
 
 drawer object also has `toggleDrawer`, `closeDrawer`, `openDrawer` functions and `opened` state variable.
 
-then you need to create `site-drawer-aside` component and place drawer content in it.
+then you need to create `site-drawer/aside` component and place drawer content in it.
 
 Contributing
 ------------------------------------------------------------------------------

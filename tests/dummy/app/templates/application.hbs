@@ -1,10 +1,8 @@
 {{page-title "Site Drawer"}}
 
 <SiteDrawer as |drawer|>
-    <div class="site-drawer-component {{if drawer.opened 'opened'}}">
-        <drawer.overlay />
-        <drawer.aside />
-    </div>
+    <drawer.overlay />
+    <drawer.aside />
 
     <button class="open-drawer-button" type="button" {{on 'click' drawer.openDrawer}}>
         open drawer
