@@ -72831,13 +72831,13 @@ define("ember-resolver/features", [], function () {
   /*
     <div class="drawer-wrapper {{if this.opened 'opened'}}">
       {{yield (hash
-                  aside=(component this.asideComponent
+                  aside=(component 'site-drawer/aside'
                       toggleDrawer=this.toggleDrawer
                       openDrawer=this.openDrawer
                       closeDrawer=this.closeDrawer
                       opened=this.opened)
-                  overlay=(component this.overlayComponent toggleDrawer=this.toggleDrawer)
-                  trigger=(component this.triggerComponent toggleDrawer=this.toggleDrawer)
+                  overlay=(component 'site-drawer/overlay' toggleDrawer=this.toggleDrawer)
+                  trigger=(component 'site-drawer/trigger' toggleDrawer=this.toggleDrawer)
   
                   opened=this.opened
                   toggleDrawer=this.toggleDrawer
@@ -72849,8 +72849,8 @@ define("ember-resolver/features", [], function () {
   
   */
   {
-    "id": "+DEhDx4c",
-    "block": "[[[10,0],[15,0,[29,[\"drawer-wrapper \",[52,[30,0,[\"opened\"]],\"opened\"]]]],[12],[1,\"\\n    \"],[18,1,[[28,[37,2],null,[[\"aside\",\"overlay\",\"trigger\",\"opened\",\"toggleDrawer\",\"openDrawer\",\"closeDrawer\"],[[50,[30,0,[\"asideComponent\"]],0,null,[[\"toggleDrawer\",\"openDrawer\",\"closeDrawer\",\"opened\"],[[30,0,[\"toggleDrawer\"]],[30,0,[\"openDrawer\"]],[30,0,[\"closeDrawer\"]],[30,0,[\"opened\"]]]]],[50,[30,0,[\"overlayComponent\"]],0,null,[[\"toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]]],[50,[30,0,[\"triggerComponent\"]],0,null,[[\"toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]]],[30,0,[\"opened\"]],[30,0,[\"toggleDrawer\"]],[30,0,[\"openDrawer\"]],[30,0,[\"closeDrawer\"]]]]]]],[1,\"\\n\"],[13],[1,\"\\n\"]],[\"&default\"],false,[\"if\",\"yield\",\"hash\",\"component\"]]",
+    "id": "+L1RBuus",
+    "block": "[[[10,0],[15,0,[29,[\"drawer-wrapper \",[52,[30,0,[\"opened\"]],\"opened\"]]]],[12],[1,\"\\n    \"],[18,1,[[28,[37,2],null,[[\"aside\",\"overlay\",\"trigger\",\"opened\",\"toggleDrawer\",\"openDrawer\",\"closeDrawer\"],[[50,\"site-drawer/aside\",0,null,[[\"toggleDrawer\",\"openDrawer\",\"closeDrawer\",\"opened\"],[[30,0,[\"toggleDrawer\"]],[30,0,[\"openDrawer\"]],[30,0,[\"closeDrawer\"]],[30,0,[\"opened\"]]]]],[50,\"site-drawer/overlay\",0,null,[[\"toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]]],[50,\"site-drawer/trigger\",0,null,[[\"toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]]],[30,0,[\"opened\"]],[30,0,[\"toggleDrawer\"]],[30,0,[\"openDrawer\"]],[30,0,[\"closeDrawer\"]]]]]]],[1,\"\\n\"],[13],[1,\"\\n\"]],[\"&default\"],false,[\"if\",\"yield\",\"hash\",\"component\"]]",
     "moduleName": "site-drawer-component/components/site-drawer.hbs",
     "isStrictMode": false
   });
@@ -72860,12 +72860,6 @@ define("ember-resolver/features", [], function () {
       super(...arguments);
 
       _initializerDefineProperty(this, "opened", _descriptor, this);
-
-      _defineProperty(this, "asideComponent", 'site-drawer/aside');
-
-      _defineProperty(this, "overlayComponent", 'site-drawer/overlay');
-
-      _defineProperty(this, "triggerComponent", 'site-drawer/trigger');
     }
 
     _openDrawer() {
@@ -73069,36 +73063,36 @@ var __ember_auto_import__ =
 /************************************************************************/
 /******/ ({
 
-/***/ "../../../../../tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/app.js":
+/***/ "../../../../../tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/app.js":
 /*!***********************************************************************!*\
-  !*** /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/app.js ***!
+  !*** /tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/app.js ***!
   \***********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    if (arguments.length === 1) {\n      return r('_eai_dyn_' + specifier);\n    } else {\n      return r('_eai_dynt_' + specifier)(Array.prototype.slice.call(arguments, 1))\n    }\n  };\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/app.js?");
+eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    if (arguments.length === 1) {\n      return r('_eai_dyn_' + specifier);\n    } else {\n      return r('_eai_dynt_' + specifier)(Array.prototype.slice.call(arguments, 1))\n    }\n  };\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/app.js?");
 
 /***/ }),
 
-/***/ "../../../../../tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js":
+/***/ "../../../../../tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/l.js":
 /*!*********************************************************************!*\
-  !*** /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js ***!
+  !*** /tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/l.js ***!
   \*********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js?");
+eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/l.js?");
 
 /***/ }),
 
 /***/ 0:
 /*!*******************************************************************************************************************************************!*\
-  !*** multi /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/app.js ***!
+  !*** multi /tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/l.js /tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/app.js ***!
   \*******************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("__webpack_require__(/*! /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js */\"../../../../../tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/app.js */\"../../../../../tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/app.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js_/tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/app.js?");
+eval("__webpack_require__(/*! /tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/l.js */\"../../../../../tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/app.js */\"../../../../../tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/app.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/l.js_/tmp/broccoli-1655OvpTO9XWSXIT/cache-201-bundler/staging/app.js?");
 
 /***/ })
 
