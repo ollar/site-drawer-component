@@ -8,25 +8,25 @@ module('Acceptance | drawer', function (hooks) {
     test('has drawer', async function (assert) {
         await visit('/');
 
-        assert.ok(find('.site-drawer-component'));
+        assert.ok(find('.drawer-wrapper'));
     });
 
     test('toggle drawer', async function (assert) {
         await visit('/');
         await click('.toggle-drawer-button');
-        assert.ok(find('.site-drawer-component.opened'));
+        assert.ok(find('.drawer-wrapper.opened'));
 
         await click('.toggle-drawer-button');
-        assert.notOk(find('.site-drawer-component.opened'));
+        assert.notOk(find('.drawer-wrapper.opened'));
     });
 
     test('open drawer', async function (assert) {
         await visit('/');
         await click('.open-drawer-button');
-        assert.ok(find('.site-drawer-component.opened'));
+        assert.ok(find('.drawer-wrapper.opened'));
 
         await click('.open-drawer-button');
-        assert.ok(find('.site-drawer-component.opened'));
+        assert.ok(find('.drawer-wrapper.opened'));
     });
 
     test('close drawer', async function (assert) {
@@ -35,6 +35,6 @@ module('Acceptance | drawer', function (hooks) {
         await click('.toggle-drawer-button');
         await click('.close-drawer-button');
 
-        assert.notOk(find('.site-drawer-component.opened'));
+        assert.notOk(find('.drawer-wrapper.opened'));
     });
 });
