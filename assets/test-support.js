@@ -8,17 +8,28 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   3.26.1
+ * @version   3.28.9
  */
-/*globals process */
-var define, require, Ember; // Used in @ember/-internals/environment/lib/global.js
+/* eslint-disable no-var */
 
-
-mainContext = this; // eslint-disable-line no-undef
+/* globals global globalThis self */
+var define, require;
 
 (function () {
-  var registry;
-  var seen;
+  var globalObj = typeof globalThis !== 'undefined' ? globalThis : typeof self !== 'undefined' ? self : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : null;
+
+  if (globalObj === null) {
+    throw new Error('unable to locate global object');
+  }
+
+  if (typeof globalObj.define === 'function' && typeof globalObj.require === 'function') {
+    define = globalObj.define;
+    require = globalObj.require;
+    return;
+  }
+
+  var registry = Object.create(null);
+  var seen = Object.create(null);
 
   function missingModule(name, referrerName) {
     if (referrerName) {
@@ -59,7 +70,7 @@ mainContext = this; // eslint-disable-line no-undef
       } else if (deps[i] === 'require') {
         reified[i] = require;
       } else {
-        reified[i] = internalRequire(deps[i], name);
+        reified[i] = require(deps[i], name);
       }
     }
 
@@ -67,57 +78,28 @@ mainContext = this; // eslint-disable-line no-undef
     return exports;
   }
 
-  var isNode = typeof window === 'undefined' && typeof process !== 'undefined' && {}.toString.call(process) === '[object process]';
+  require = function (name) {
+    return internalRequire(name, null);
+  }; // eslint-disable-next-line no-unused-vars
 
-  if (!isNode) {
-    Ember = this.Ember = this.Ember || {};
-  }
 
-  if (typeof Ember === 'undefined') {
-    Ember = {};
-  }
-
-  if (typeof Ember.__loader === 'undefined') {
-    registry = Object.create(null);
-    seen = Object.create(null);
-
-    define = function define(name, deps, callback) {
-      var value = {};
-
-      if (!callback) {
-        value.deps = [];
-        value.callback = deps;
-      } else {
-        value.deps = deps;
-        value.callback = callback;
-      }
-
-      registry[name] = value;
+  define = function (name, deps, callback) {
+    registry[name] = {
+      deps: deps,
+      callback: callback
     };
-
-    require = function require(name) {
-      return internalRequire(name, null);
-    }; // setup `require` module
+  }; // setup `require` module
 
 
-    require['default'] = require;
+  require['default'] = require;
 
-    require.has = function registryHas(moduleName) {
-      return Boolean(registry[moduleName]) || Boolean(registry[moduleName + '/index']);
-    };
+  require.has = function registryHas(moduleName) {
+    return Boolean(registry[moduleName]) || Boolean(registry[moduleName + '/index']);
+  };
 
-    require._eak_seen = registry;
-    Ember.__loader = {
-      define: define,
-      require: require,
-      registry: registry
-    };
-  } else {
-    define = Ember.__loader.define;
-    require = Ember.__loader.require;
-  }
+  require._eak_seen = require.entries = registry;
 })();
-define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment", "@ember/error", "@ember/debug/lib/deprecate", "@ember/debug/lib/testing", "@ember/debug/lib/warn", "@ember/debug/lib/capture-render-tree"], function (_exports, _browserEnvironment, _error, _deprecate2, _testing, _warn2, _captureRenderTree) {
+define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment", "@ember/error", "@ember/debug/lib/deprecate", "@ember/debug/lib/testing", "@ember/debug/lib/warn", "@ember/-internals/utils", "@ember/debug/lib/capture-render-tree"], function (_exports, _browserEnvironment, _error, _deprecate2, _testing, _warn2, _utils, _captureRenderTree) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -125,38 +107,44 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
   });
   Object.defineProperty(_exports, "registerDeprecationHandler", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _deprecate2.registerHandler;
     }
   });
   Object.defineProperty(_exports, "isTesting", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _testing.isTesting;
     }
   });
   Object.defineProperty(_exports, "setTesting", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _testing.setTesting;
     }
   });
   Object.defineProperty(_exports, "registerWarnHandler", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _warn2.registerHandler;
+    }
+  });
+  Object.defineProperty(_exports, "inspect", {
+    enumerable: true,
+    get: function () {
+      return _utils.inspect;
     }
   });
   Object.defineProperty(_exports, "captureRenderTree", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _captureRenderTree.default;
     }
   });
   _exports._warnIfUsingStrippedFeatureFlags = _exports.getDebugFunction = _exports.setDebugFunction = _exports.deprecateFunc = _exports.runInDebug = _exports.debugFreeze = _exports.debugSeal = _exports.deprecate = _exports.debug = _exports.warn = _exports.info = _exports.assert = void 0;
 
   // These are the default production build versions:
-  var noop = function noop() {};
+  var noop = () => {};
 
   var assert = noop;
   _exports.assert = assert;
@@ -179,7 +167,7 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
   var getDebugFunction = noop;
   _exports.getDebugFunction = getDebugFunction;
 
-  var deprecateFunc = function deprecateFunc() {
+  var deprecateFunc = function () {
     return arguments[arguments.length - 1];
   };
 
@@ -188,7 +176,7 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
   if (true
   /* DEBUG */
   ) {
-    _exports.setDebugFunction = setDebugFunction = function setDebugFunction(type, callback) {
+    _exports.setDebugFunction = setDebugFunction = function (type, callback) {
       switch (type) {
         case 'assert':
           return _exports.assert = assert = callback;
@@ -219,7 +207,7 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
       }
     };
 
-    _exports.getDebugFunction = getDebugFunction = function getDebugFunction(type) {
+    _exports.getDebugFunction = getDebugFunction = function (type) {
       switch (type) {
         case 'assert':
           return assert;
@@ -288,7 +276,7 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
     */
     setDebugFunction('assert', function assert(desc, test) {
       if (!test) {
-        throw new _error.default("Assertion Failed: " + desc);
+        throw new _error.default(`Assertion Failed: ${desc}`);
       }
     });
     /**
@@ -308,9 +296,9 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
     setDebugFunction('debug', function debug(message) {
       /* eslint-disable no-console */
       if (console.debug) {
-        console.debug("DEBUG: " + message);
+        console.debug(`DEBUG: ${message}`);
       } else {
-        console.log("DEBUG: " + message);
+        console.log(`DEBUG: ${message}`);
       }
       /* eslint-ensable no-console */
 
@@ -325,11 +313,8 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
     */
 
     setDebugFunction('info', function info() {
-      var _console;
-
-      (_console = console).info.apply(_console, arguments);
+      console.info(...arguments);
       /* eslint-disable-line no-console */
-
     });
     /**
      @module @ember/debug
@@ -363,9 +348,7 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
       }
 
       if (args.length === 3) {
-        var message = args[0],
-            options = args[1],
-            func = args[2];
+        var [message, options, func] = args;
         return function () {
           deprecate(message, false, options);
 
@@ -376,8 +359,7 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
           return func.apply(this, args);
         };
       } else {
-        var _message = args[0],
-            _func = args[1];
+        var [_message, _func] = args;
         return function () {
           deprecate(_message);
           return _func.apply(this, arguments);
@@ -440,7 +422,7 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
   /* DEBUG */
   && !(0, _testing.isTesting)()) {
     if (typeof window !== 'undefined' && (_browserEnvironment.isFirefox || _browserEnvironment.isChrome) && window.addEventListener) {
-      window.addEventListener('load', function () {
+      window.addEventListener('load', () => {
         if (document.documentElement && document.documentElement.dataset && !document.documentElement.dataset.emberExtension) {
           var downloadURL;
 
@@ -450,7 +432,7 @@ define("@ember/debug/index", ["exports", "@ember/-internals/browser-environment"
             downloadURL = 'https://addons.mozilla.org/en-US/firefox/addon/ember-inspector/';
           }
 
-          debug("For more advanced debugging, install the Ember Inspector from " + downloadURL);
+          debug(`For more advanced debugging, install the Ember Inspector from ${downloadURL}`);
         }
       }, false);
     }
@@ -482,7 +464,7 @@ define("@ember/debug/lib/capture-render-tree", ["exports", "@glimmer/util"], fun
     @since 3.14.0
   */
   function captureRenderTree(app) {
-    var renderer = (0, _util.expect)(app.lookup('renderer:-dom'), "BUG: owner is missing renderer");
+    var renderer = (0, _util.expect)(app.lookup('renderer:-dom'), `BUG: owner is missing renderer`);
     return renderer.debugRenderTree.capture();
   }
 });
@@ -537,7 +519,7 @@ define("@ember/debug/lib/deprecate", ["exports", "@ember/-internals/environment"
     @param handler {Function} A function to handle deprecation calls.
     @since 2.1.0
   */
-  var registerHandler = function registerHandler() {};
+  var registerHandler = () => {};
 
   _exports.registerHandler = registerHandler;
   var missingOptionsDeprecation;
@@ -547,19 +529,15 @@ define("@ember/debug/lib/deprecate", ["exports", "@ember/-internals/environment"
   var missingOptionsUntilDeprecation;
   _exports.missingOptionsUntilDeprecation = missingOptionsUntilDeprecation;
 
-  var missingOptionsForDeprecation = function missingOptionsForDeprecation() {
-    return '';
-  };
+  var missingOptionsForDeprecation = () => '';
 
   _exports.missingOptionsForDeprecation = missingOptionsForDeprecation;
 
-  var missingOptionsSinceDeprecation = function missingOptionsSinceDeprecation() {
-    return '';
-  };
+  var missingOptionsSinceDeprecation = () => '';
 
   _exports.missingOptionsSinceDeprecation = missingOptionsSinceDeprecation;
 
-  var deprecate = function deprecate() {};
+  var deprecate = () => {};
 
   var FOR_MISSING_DEPRECATIONS = new Set();
   _exports.FOR_MISSING_DEPRECATIONS = FOR_MISSING_DEPRECATIONS;
@@ -577,11 +555,11 @@ define("@ember/debug/lib/deprecate", ["exports", "@ember/-internals/environment"
       var message = _message;
 
       if (options && options.id) {
-        message = message + (" [deprecation id: " + options.id + "]");
+        message = message + ` [deprecation id: ${options.id}]`;
       }
 
       if (options && options.url) {
-        message += " See " + options.url + " for more details.";
+        message += ` See ${options.url} for more details.`;
       }
 
       return message;
@@ -589,16 +567,14 @@ define("@ember/debug/lib/deprecate", ["exports", "@ember/-internals/environment"
 
     registerHandler(function logDeprecationToConsole(message, options) {
       var updatedMessage = formatMessage(message, options);
-      console.warn("DEPRECATION: " + updatedMessage); // eslint-disable-line no-console
+      console.warn(`DEPRECATION: ${updatedMessage}`); // eslint-disable-line no-console
     });
     var captureErrorForStack;
 
     if (new Error().stack) {
-      captureErrorForStack = function captureErrorForStack() {
-        return new Error();
-      };
+      captureErrorForStack = () => new Error();
     } else {
-      captureErrorForStack = function captureErrorForStack() {
+      captureErrorForStack = () => {
         try {
           __fail__.fail();
         } catch (e) {
@@ -623,11 +599,11 @@ define("@ember/debug/lib/deprecate", ["exports", "@ember/-internals/environment"
             stack = error.stack.replace(/(?:\n@:0)?\s+$/m, '').replace(/^\(/gm, '{anonymous}(').split('\n');
           }
 
-          stackStr = "\n    " + stack.slice(2).join('\n    ');
+          stackStr = `\n    ${stack.slice(2).join('\n    ')}`;
         }
 
         var updatedMessage = formatMessage(message, options);
-        console.warn("DEPRECATION: " + updatedMessage + stackStr); // eslint-disable-line no-console
+        console.warn(`DEPRECATION: ${updatedMessage}${stackStr}`); // eslint-disable-line no-console
       } else {
         next(message, options);
       }
@@ -644,12 +620,12 @@ define("@ember/debug/lib/deprecate", ["exports", "@ember/-internals/environment"
     _exports.missingOptionsIdDeprecation = missingOptionsIdDeprecation = 'When calling `deprecate` you must provide `id` in options.';
     _exports.missingOptionsUntilDeprecation = missingOptionsUntilDeprecation = 'When calling `deprecate` you must provide `until` in options.';
 
-    _exports.missingOptionsForDeprecation = missingOptionsForDeprecation = function missingOptionsForDeprecation(id) {
-      return "When calling `deprecate` you must provide `for` in options. Missing options.for in \"" + id + "\" deprecation";
+    _exports.missingOptionsForDeprecation = missingOptionsForDeprecation = id => {
+      return `When calling \`deprecate\` you must provide \`for\` in options. Missing options.for in "${id}" deprecation`;
     };
 
-    _exports.missingOptionsSinceDeprecation = missingOptionsSinceDeprecation = function missingOptionsSinceDeprecation(id) {
-      return "When calling `deprecate` you must provide `since` in options. Missing options.since in \"" + id + "\" deprecation";
+    _exports.missingOptionsSinceDeprecation = missingOptionsSinceDeprecation = id => {
+      return `When calling \`deprecate\` you must provide \`since\` in options. Missing options.since in "${id}" deprecation`;
     };
     /**
      @module @ember/debug
@@ -728,11 +704,11 @@ define("@ember/debug/lib/handlers", ["exports"], function (_exports) {
   var HANDLERS = {};
   _exports.HANDLERS = HANDLERS;
 
-  var registerHandler = function registerHandler() {};
+  var registerHandler = () => {};
 
   _exports.registerHandler = registerHandler;
 
-  var invoke = function invoke() {};
+  var invoke = () => {};
 
   _exports.invoke = invoke;
 
@@ -740,9 +716,9 @@ define("@ember/debug/lib/handlers", ["exports"], function (_exports) {
   /* DEBUG */
   ) {
     _exports.registerHandler = registerHandler = function registerHandler(type, callback) {
-      var nextHandler = HANDLERS[type] || function () {};
+      var nextHandler = HANDLERS[type] || (() => {});
 
-      HANDLERS[type] = function (message, options) {
+      HANDLERS[type] = (message, options) => {
         callback(message, options, nextHandler);
       };
     };
@@ -786,11 +762,11 @@ define("@ember/debug/lib/warn", ["exports", "@ember/debug/index", "@ember/debug/
   });
   _exports.missingOptionsDeprecation = _exports.missingOptionsIdDeprecation = _exports.registerHandler = _exports.default = void 0;
 
-  var registerHandler = function registerHandler() {};
+  var registerHandler = () => {};
 
   _exports.registerHandler = registerHandler;
 
-  var warn = function warn() {};
+  var warn = () => {};
 
   var missingOptionsDeprecation;
   _exports.missingOptionsDeprecation = missingOptionsDeprecation;
@@ -836,7 +812,7 @@ define("@ember/debug/lib/warn", ["exports", "@ember/debug/index", "@ember/debug/
 
     registerHandler(function logWarning(message) {
       /* eslint-disable no-console */
-      console.warn("WARNING: " + message);
+      console.warn(`WARNING: ${message}`);
       /* eslint-enable no-console */
     });
     _exports.missingOptionsDeprecation = missingOptionsDeprecation = 'When calling `warn` you ' + 'must provide an `options` hash as the third parameter.  ' + '`options` should include an `id` property.';
@@ -890,25 +866,25 @@ define("ember-testing/index", ["exports", "ember-testing/lib/test", "ember-testi
   });
   Object.defineProperty(_exports, "Test", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _test.default;
     }
   });
   Object.defineProperty(_exports, "Adapter", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _adapter.default;
     }
   });
   Object.defineProperty(_exports, "setupForTesting", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setup_for_testing.default;
     }
   });
   Object.defineProperty(_exports, "QUnitAdapter", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _qunit.default;
     }
   });
@@ -968,9 +944,10 @@ define("ember-testing/lib/adapters/adapter", ["exports", "@ember/-internals/runt
       @method exception
       @param {String} error The exception to be raised.
     */
-    exception: function exception(error) {
+    exception(error) {
       throw error;
     }
+
   });
 
   _exports.default = _default;
@@ -999,10 +976,11 @@ define("ember-testing/lib/adapters/qunit", ["exports", "@ember/-internals/utils"
     @public
   */
   var _default = _adapter.default.extend({
-    init: function init() {
+    init() {
       this.doneCallbacks = [];
     },
-    asyncStart: function asyncStart() {
+
+    asyncStart() {
       if (typeof QUnit.stop === 'function') {
         // very old QUnit version
         QUnit.stop();
@@ -1010,7 +988,8 @@ define("ember-testing/lib/adapters/qunit", ["exports", "@ember/-internals/utils"
         this.doneCallbacks.push(QUnit.config.current ? QUnit.config.current.assert.async() : null);
       }
     },
-    asyncEnd: function asyncEnd() {
+
+    asyncEnd() {
       // checking for QUnit.stop here (even though we _need_ QUnit.start) because
       // QUnit.start() still exists in QUnit 2.x (it just throws an error when calling
       // inside a test context)
@@ -1024,9 +1003,11 @@ define("ember-testing/lib/adapters/qunit", ["exports", "@ember/-internals/utils"
         }
       }
     },
-    exception: function exception(error) {
+
+    exception(error) {
       QUnit.config.current.assert.ok(false, (0, _utils.inspect)(error));
     }
+
   });
 
   _exports.default = _default;
@@ -1212,7 +1193,7 @@ define("ember-testing/lib/ext/application", ["@ember/application", "ember-testin
        @method setupForTesting
       @public
     */
-    setupForTesting: function setupForTesting() {
+    setupForTesting() {
       (0, _setup_for_testing.default)();
       this.testing = true;
       this.resolveRegistration('router:main').reopen({
@@ -1246,7 +1227,7 @@ define("ember-testing/lib/ext/application", ["@ember/application", "ember-testin
        @method injectTestHelpers
       @public
     */
-    injectTestHelpers: function injectTestHelpers(helperContainer) {
+    injectTestHelpers(helperContainer) {
       if (helperContainer) {
         this.helperContainer = helperContainer;
       } else {
@@ -1254,11 +1235,12 @@ define("ember-testing/lib/ext/application", ["@ember/application", "ember-testin
       }
 
       this.reopen({
-        willDestroy: function willDestroy() {
-          this._super.apply(this, arguments);
+        willDestroy() {
+          this._super(...arguments);
 
           this.removeTestHelpers();
         }
+
       });
       this.testHelpers = {};
 
@@ -1281,7 +1263,7 @@ define("ember-testing/lib/ext/application", ["@ember/application", "ember-testin
        @public
       @method removeTestHelpers
     */
-    removeTestHelpers: function removeTestHelpers() {
+    removeTestHelpers() {
       if (!this.helperContainer) {
         return;
       }
@@ -1293,6 +1275,7 @@ define("ember-testing/lib/ext/application", ["@ember/application", "ember-testin
         delete this.originalMethods[name];
       }
     }
+
   }); // This method is no longer needed
   // But still here for backwards compatibility
   // of helper chaining
@@ -1324,7 +1307,7 @@ define("ember-testing/lib/ext/application", ["@ember/application", "ember-testin
           args[_key2] = arguments[_key2];
         }
 
-        return fn.apply(app, [app].concat(args));
+        return fn.apply(app, [app, ...args]);
       };
     }
 
@@ -1333,17 +1316,13 @@ define("ember-testing/lib/ext/application", ["@ember/application", "ember-testin
         args[_key3] = arguments[_key3];
       }
 
-      var lastPromise = (0, _run.default)(function () {
-        return (0, _promise.resolve)((0, _promise.getLastPromise)());
-      }); // wait for last helper's promise to resolve and then
+      var lastPromise = (0, _run.default)(() => (0, _promise.resolve)((0, _promise.getLastPromise)())); // wait for last helper's promise to resolve and then
       // execute. To be safe, we need to tell the adapter we're going
       // asynchronous here, because fn may not be invoked before we
       // return.
 
       (0, _adapter.asyncStart)();
-      return lastPromise.then(function () {
-        return fn.apply(app, [app].concat(args));
-      }).finally(_adapter.asyncEnd);
+      return lastPromise.then(() => fn.apply(app, [app, ...args])).finally(_adapter.asyncEnd);
     };
   }
 });
@@ -1357,17 +1336,15 @@ define("ember-testing/lib/ext/rsvp", ["exports", "@ember/-internals/runtime", "@
 
   _runtime.RSVP.configure('async', function (callback, promise) {
     // if schedule will cause autorun, we need to inform adapter
-    if ((0, _debug.isTesting)() && !_runloop.backburner.currentInstance) {
+    if ((0, _debug.isTesting)() && !_runloop._backburner.currentInstance) {
       (0, _adapter.asyncStart)();
 
-      _runloop.backburner.schedule('actions', function () {
+      _runloop._backburner.schedule('actions', () => {
         (0, _adapter.asyncEnd)();
         callback(promise);
       });
     } else {
-      _runloop.backburner.schedule('actions', function () {
-        return callback(promise);
-      });
+      _runloop._backburner.schedule('actions', () => callback(promise));
     }
   });
 
@@ -1407,8 +1384,10 @@ define("ember-testing/lib/helpers/-is-form-control", ["exports"], function (_exp
   */
 
   function isFormControl(element) {
-    var tagName = element.tagName,
-        type = element.type;
+    var {
+      tagName,
+      type
+    } = element;
 
     if (type === 'hidden') {
       return false;
@@ -1763,7 +1742,7 @@ define("ember-testing/lib/helpers/key_event", ["exports"], function (_exports) {
     }
 
     return app.testHelpers.triggerEvent(selector, context, type, {
-      keyCode: keyCode,
+      keyCode,
       which: keyCode
     });
   }
@@ -1835,7 +1814,7 @@ define("ember-testing/lib/helpers/pause_test", ["exports", "@ember/-internals/ru
 
   function pauseTest() {
     (0, _debug.info)('Testing paused. Use `resumeTest()` to continue.');
-    return new _runtime.RSVP.Promise(function (resolve) {
+    return new _runtime.RSVP.Promise(resolve => {
       resume = resolve;
     }, 'TestAdapter paused promise');
   }
@@ -1939,7 +1918,7 @@ define("ember-testing/lib/helpers/visit", ["exports", "@ember/runloop"], functio
     var router = app.__container__.lookup('router:main');
 
     var shouldHandleURL = false;
-    app.boot().then(function () {
+    app.boot().then(() => {
       router.location.setURL(url);
 
       if (shouldHandleURL) {
@@ -2005,7 +1984,7 @@ define("ember-testing/lib/helpers/wait", ["exports", "ember-testing/lib/test/wai
       var router = app.__container__.lookup('router:main'); // Every 10ms, poll for the async thing to have finished
 
 
-      var watcher = setInterval(function () {
+      var watcher = setInterval(() => {
         // 1. If the router is loading, keep polling
         var routerIsLoading = router._routerMicrolib && Boolean(router._routerMicrolib.activeTransition);
 
@@ -2019,7 +1998,7 @@ define("ember-testing/lib/helpers/wait", ["exports", "ember-testing/lib/test/wai
         } // 3. If there are scheduled timers or we are inside of a run loop, keep polling
 
 
-        if ((0, _runloop.hasScheduledTimers)() || (0, _runloop.getCurrentRunLoop)()) {
+        if ((0, _runloop._hasScheduledTimers)() || (0, _runloop._getCurrentRunLoop)()) {
           return;
         }
 
@@ -2043,11 +2022,13 @@ define("ember-testing/lib/initializers", ["@ember/application"], function (_appl
     if (!Application.initializers[name]) {
       Application.initializer({
         name: name,
-        initialize: function initialize(application) {
+
+        initialize(application) {
           if (application.testing) {
             application.deferReadiness();
           }
         }
+
       });
     }
   });
@@ -2129,12 +2110,13 @@ define("ember-testing/lib/support", ["@ember/debug", "@ember/-internals/views", 
         if (!this.checked && !$.event.special.click) {
           $.event.special.click = {
             // For checkbox, fire native event so checked state will be right
-            trigger: function trigger() {
+            trigger() {
               if (this.nodeName === 'INPUT' && this.type === 'checkbox' && this.click) {
                 this.click();
                 return false;
               }
             }
+
           };
         }
       }); // Try again to verify that the patch took effect or blow up.
@@ -2489,7 +2471,7 @@ define("ember-testing/lib/test/pending_requests", ["exports"], function (_export
     }, 0);
   }
 });
-define("ember-testing/lib/test/promise", ["exports", "ember-babel", "@ember/-internals/runtime", "ember-testing/lib/test/run"], function (_exports, _emberBabel, _runtime, _run) {
+define("ember-testing/lib/test/promise", ["exports", "@ember/-internals/runtime", "ember-testing/lib/test/run"], function (_exports, _runtime, _run) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -2501,35 +2483,23 @@ define("ember-testing/lib/test/promise", ["exports", "ember-babel", "@ember/-int
   _exports.default = void 0;
   var lastPromise;
 
-  var TestPromise = /*#__PURE__*/function (_RSVP$Promise) {
-    (0, _emberBabel.inheritsLoose)(TestPromise, _RSVP$Promise);
-
-    function TestPromise() {
-      var _this;
-
-      _this = _RSVP$Promise.apply(this, arguments) || this;
-      lastPromise = (0, _emberBabel.assertThisInitialized)(_this);
-      return _this;
+  class TestPromise extends _runtime.RSVP.Promise {
+    constructor() {
+      super(...arguments);
+      lastPromise = this;
     }
 
-    var _proto = TestPromise.prototype;
-
-    _proto.then = function then(_onFulfillment) {
-      var _RSVP$Promise$prototy;
-
-      var onFulfillment = typeof _onFulfillment === 'function' ? function (result) {
-        return isolate(_onFulfillment, result);
-      } : undefined;
+    then(_onFulfillment) {
+      var onFulfillment = typeof _onFulfillment === 'function' ? result => isolate(_onFulfillment, result) : undefined;
 
       for (var _len = arguments.length, args = new Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
         args[_key - 1] = arguments[_key];
       }
 
-      return (_RSVP$Promise$prototy = _RSVP$Promise.prototype.then).call.apply(_RSVP$Promise$prototy, [this, onFulfillment].concat(args));
-    };
+      return super.then(onFulfillment, ...args);
+    }
 
-    return TestPromise;
-  }(_runtime.RSVP.Promise);
+  }
   /**
     This returns a thenable tailored for testing.  It catches failed
     `onSuccess` callbacks and invokes the `Ember.Test.adapter.exception`
@@ -2548,7 +2518,7 @@ define("ember-testing/lib/test/promise", ["exports", "ember-babel", "@ember/-int
   _exports.default = TestPromise;
 
   function promise(resolver, label) {
-    var fullLabel = "Ember.Test.promise: " + (label || '<Unknown Promise>');
+    var fullLabel = `Ember.Test.promise: ${label || '<Unknown Promise>'}`;
     return new TestPromise(resolver, fullLabel);
   }
   /**
@@ -2590,11 +2560,7 @@ define("ember-testing/lib/test/promise", ["exports", "ember-babel", "@ember/-int
     if (value && value instanceof TestPromise || !promise) {
       return value;
     } else {
-      return (0, _run.default)(function () {
-        return resolve(promise).then(function () {
-          return value;
-        });
-      });
+      return (0, _run.default)(() => resolve(promise).then(() => value));
     }
   }
 });
@@ -2607,7 +2573,7 @@ define("ember-testing/lib/test/run", ["exports", "@ember/runloop"], function (_e
   _exports.default = run;
 
   function run(fn) {
-    if (!(0, _runloop.getCurrentRunLoop)()) {
+    if (!(0, _runloop._getCurrentRunLoop)()) {
       return (0, _runloop.run)(fn);
     } else {
       return fn();
@@ -2754,55 +2720,23 @@ define("ember-testing/lib/test/waiters", ["exports"], function (_exports) {
     return -1;
   }
 });
-
-          var testing = require('ember-testing');
-          Ember.Test = testing.Test;
-          Ember.Test.Adapter = testing.Adapter;
-          Ember.Test.QUnitAdapter = testing.QUnitAdapter;
-          Ember.setupForTesting = testing.setupForTesting;
-        
+require('ember-testing');
 }());
 
-/* globals require, Ember, jQuery */
-(function () {
-  if (typeof jQuery !== 'undefined') {
-    var _Ember;
-
-    if (typeof Ember !== 'undefined') {
-      _Ember = Ember;
-    } else {
-      _Ember = require('ember').default;
-    }
-
-    var pendingRequests;
-
-    if (Ember.__loader.registry['ember-testing/test/pending_requests']) {
-      // Ember <= 3.1
-      pendingRequests = Ember.__loader.require('ember-testing/test/pending_requests');
-    } else if (Ember.__loader.registry['ember-testing/lib/test/pending_requests']) {
-      // Ember >= 3.2
-      pendingRequests = Ember.__loader.require('ember-testing/lib/test/pending_requests');
-    }
-
-    if (pendingRequests) {
-      // This exists to ensure that the AJAX listeners setup by Ember itself
-      // (which as of 2.17 are not properly torn down) get cleared and released
-      // when the application is destroyed. Without this, any AJAX requests
-      // that happen _between_ acceptance tests will always share
-      // `pendingRequests`.
-      _Ember.Application.reopen({
-        willDestroy: function willDestroy() {
-          jQuery(document).off('ajaxSend', pendingRequests.incrementPendingRequests);
-          jQuery(document).off('ajaxComplete', pendingRequests.decrementPendingRequests);
-          pendingRequests.clearPendingRequests();
-
-          this._super.apply(this, arguments);
-        }
-      });
-    }
+(function() {
+  var key = '_embroider_macros_runtime_config';
+  if (!window[key]) {
+    window[key] = [];
   }
+  window[key].push(function(m) {
+    m.setGlobalConfig(
+      '@embroider/macros',
+      Object.assign({}, m.getGlobalConfig()['@embroider/macros'], { isTesting: true })
+    );
+  });
 })();
-define("@ember/test-helpers/-internal/build-registry", ["exports", "require"], function (_exports, _require) {
+
+define("@ember/test-helpers/-internal/build-registry", ["exports", "@ember/application/instance", "@ember/application", "@ember/object", "require", "ember"], function (_exports, _instance, _application, _object, _require, _ember) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -2818,29 +2752,43 @@ define("@ember/test-helpers/-internal/build-registry", ["exports", "require"], f
    * @param {Object} container  the container to modify
    */
   function exposeRegistryMethodsWithoutDeprecations(container) {
-    var methods = ['register', 'unregister', 'resolve', 'normalize', 'typeInjection', 'injection', 'factoryInjection', 'factoryTypeInjection', 'has', 'options', 'optionsForType'];
+    let methods = ['register', 'unregister', 'resolve', 'normalize', 'typeInjection', 'injection', 'factoryInjection', 'factoryTypeInjection', 'has', 'options', 'optionsForType'];
 
-    var _loop = function _loop(i, l) {
-      var method = methods[i];
+    for (let i = 0, l = methods.length; i < l; i++) {
+      let method = methods[i];
 
       if (method in container) {
         container[method] = function () {
-          var _container$_registry;
-
-          return (_container$_registry = container._registry)[method].apply(_container$_registry, arguments);
+          return container._registry[method](...arguments);
         };
       }
-    };
-
-    for (var i = 0, l = methods.length; i < l; i++) {
-      _loop(i, l);
     }
   }
 
-  var RegistryProxyMixin = Ember._RegistryProxyMixin;
-  var ContainerProxyMixin = Ember._ContainerProxyMixin;
-  var Owner = Ember.Object.extend(RegistryProxyMixin, ContainerProxyMixin, {
-    _emberTestHelpersMockOwner: true
+  const RegistryProxyMixin = _ember.default._RegistryProxyMixin;
+  const ContainerProxyMixin = _ember.default._ContainerProxyMixin;
+
+  const Owner = _object.default.extend(RegistryProxyMixin, ContainerProxyMixin, {
+    _emberTestHelpersMockOwner: true,
+
+    /**
+     * Unregister a factory and its instance.
+     *
+     * Overrides `RegistryProxy#unregister` in order to clear any cached instances
+     * of the unregistered factory.
+     *
+     * @param {string} fullName Name of the factory to unregister.
+     *
+     * @see {@link https://github.com/emberjs/ember.js/pull/12680}
+     * @see {@link https://github.com/emberjs/ember.js/blob/v4.5.0-alpha.5/packages/%40ember/engine/instance.ts#L152-L167}
+     */
+    unregister(fullName) {
+      this.__container__.reset(fullName); // We overwrote this method from RegistryProxyMixin.
+
+
+      this.__registry__.unregister(fullName);
+    }
+
   });
   /**
    * @private
@@ -2848,30 +2796,36 @@ define("@ember/test-helpers/-internal/build-registry", ["exports", "require"], f
    * @returns {Object} owner, container, registry
    */
 
+
   function _default(resolver) {
-    var fallbackRegistry, registry, container;
-    var namespace = Ember.Object.create({
+    let fallbackRegistry, registry, container;
+
+    let namespace = _object.default.create({
       Resolver: {
-        create: function create() {
+        create() {
           return resolver;
         }
+
       }
     });
-    fallbackRegistry = Ember.Application.buildRegistry(namespace); // TODO: only do this on Ember < 3.13
 
-    fallbackRegistry.register('component-lookup:main', Ember.ComponentLookup);
-    registry = new Ember.Registry({
+    fallbackRegistry = _application.default.buildRegistry(namespace); // TODO: only do this on Ember < 3.13
+
+    fallbackRegistry.register('component-lookup:main', _ember.default.ComponentLookup);
+    registry = new _ember.default.Registry({
       fallback: fallbackRegistry
     });
-    Ember.ApplicationInstance.setupRegistry(registry); // these properties are set on the fallback registry by `buildRegistry`
+
+    _instance.default.setupRegistry(registry); // these properties are set on the fallback registry by `buildRegistry`
     // and on the primary registry within the ApplicationInstance constructor
     // but we need to manually recreate them since ApplicationInstance's are not
     // exposed externally
 
+
     registry.normalizeFullName = fallbackRegistry.normalizeFullName;
     registry.makeToString = fallbackRegistry.makeToString;
     registry.describe = fallbackRegistry.describe;
-    var owner = Owner.create({
+    let owner = Owner.create({
       __registry__: registry,
       __container__: null
     });
@@ -2887,14 +2841,14 @@ define("@ember/test-helpers/-internal/build-registry", ["exports", "require"], f
       // available on the globalContext and hence ember-data wouldn't be setup
       // correctly for the tests; that's why we import and call setupContainer
       // here; also see https://github.com/emberjs/data/issues/4071 for context
-      var setupContainer = (0, _require.default)("ember-data/setup-container")['default'];
+      let setupContainer = (0, _require.default)("ember-data/setup-container")['default'];
       setupContainer(registry || container);
     }
 
     return {
-      registry: registry,
-      container: container,
-      owner: owner
+      registry,
+      container,
+      owner
     };
   }
 });
@@ -2906,7 +2860,7 @@ define("@ember/test-helpers/-internal/debug-info-helpers", ["exports"], function
   });
   _exports.default = registerDebugInfoHelper;
   _exports.debugInfoHelpers = void 0;
-  var debugInfoHelpers = new Set();
+  const debugInfoHelpers = new Set();
   /**
    * Registers a custom debug info helper to augment the output for test isolation validation.
    *
@@ -2933,7 +2887,7 @@ define("@ember/test-helpers/-internal/debug-info-helpers", ["exports"], function
     debugInfoHelpers.add(debugHelper);
   }
 });
-define("@ember/test-helpers/-internal/debug-info", ["exports", "@ember/test-helpers/-internal/debug-info-helpers", "@ember/test-waiters"], function (_exports, _debugInfoHelpers, _testWaiters) {
+define("@ember/test-helpers/-internal/debug-info", ["exports", "@ember/runloop", "@ember/test-helpers/-internal/debug-info-helpers", "@ember/test-waiters"], function (_exports, _runloop, _debugInfoHelpers, _testWaiters) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -2943,16 +2897,12 @@ define("@ember/test-helpers/-internal/debug-info", ["exports", "@ember/test-help
   _exports.getDebugInfo = getDebugInfo;
   _exports.TestDebugInfo = void 0;
 
-  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+  function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-  function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
-
-  function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
-
-  var PENDING_AJAX_REQUESTS = 'Pending AJAX requests';
-  var PENDING_TEST_WAITERS = 'Pending test waiters';
-  var SCHEDULED_ASYNC = 'Scheduled async';
-  var SCHEDULED_AUTORUN = 'Scheduled autorun';
+  const PENDING_AJAX_REQUESTS = 'Pending AJAX requests';
+  const PENDING_TEST_WAITERS = 'Pending test waiters';
+  const SCHEDULED_ASYNC = 'Scheduled async';
+  const SCHEDULED_AUTORUN = 'Scheduled autorun';
   /**
    * Determins if the `getDebugInfo` method is available in the
    * running verison of backburner.
@@ -2961,7 +2911,7 @@ define("@ember/test-helpers/-internal/debug-info", ["exports", "@ember/test-help
    */
 
   function backburnerDebugInfoAvailable() {
-    return typeof Ember.run.backburner.getDebugInfo === 'function';
+    return typeof _runloop._backburner.getDebugInfo === 'function';
   }
   /**
    * Retrieves debug information from backburner's current deferred actions queue (runloop instance).
@@ -2973,7 +2923,7 @@ define("@ember/test-helpers/-internal/debug-info", ["exports", "@ember/test-help
 
 
   function getDebugInfo() {
-    return Ember.run.backburner.DEBUG === true && backburnerDebugInfoAvailable() ? Ember.run.backburner.getDebugInfo() : null;
+    return _runloop._backburner.DEBUG === true && backburnerDebugInfoAvailable() ? _runloop._backburner.getDebugInfo() : null;
   }
   /**
    * Encapsulates debug information for an individual test. Aggregates information
@@ -2988,130 +2938,292 @@ define("@ember/test-helpers/-internal/debug-info", ["exports", "@ember/test-help
    */
 
 
-  var TestDebugInfo = /*#__PURE__*/function () {
-    function TestDebugInfo(settledState) {
-      var debugInfo = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getDebugInfo();
+  class TestDebugInfo {
+    constructor(settledState) {
+      let debugInfo = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : getDebugInfo();
 
-      _classCallCheck(this, TestDebugInfo);
+      _defineProperty(this, "_summaryInfo", undefined);
 
-      this._summaryInfo = undefined;
       this._settledState = settledState;
       this._debugInfo = debugInfo;
     }
 
-    _createClass(TestDebugInfo, [{
-      key: "toConsole",
-      value: function toConsole() {
-        var _console = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : console;
+    get summary() {
+      if (!this._summaryInfo) {
+        this._summaryInfo = { ...this._settledState
+        };
 
-        var summary = this.summary;
-
-        if (summary.hasPendingRequests) {
-          _console.log(PENDING_AJAX_REQUESTS);
+        if (this._debugInfo) {
+          this._summaryInfo.autorunStackTrace = this._debugInfo.autorun && this._debugInfo.autorun.stack;
+          this._summaryInfo.pendingTimersCount = this._debugInfo.timers.length;
+          this._summaryInfo.hasPendingTimers = this._settledState.hasPendingTimers && this._summaryInfo.pendingTimersCount > 0;
+          this._summaryInfo.pendingTimersStackTraces = this._debugInfo.timers.map(timer => timer.stack);
+          this._summaryInfo.pendingScheduledQueueItemCount = this._debugInfo.instanceStack.filter(q => q).reduce((total, item) => {
+            Object.keys(item).forEach(queueName => {
+              total += item[queueName].length;
+            });
+            return total;
+          }, 0);
+          this._summaryInfo.pendingScheduledQueueItemStackTraces = this._debugInfo.instanceStack.filter(q => q).reduce((stacks, deferredActionQueues) => {
+            Object.keys(deferredActionQueues).forEach(queue => {
+              deferredActionQueues[queue].forEach(queueItem => queueItem.stack && stacks.push(queueItem.stack));
+            });
+            return stacks;
+          }, []);
         }
 
-        if (summary.hasPendingLegacyWaiters) {
+        if (this._summaryInfo.hasPendingTestWaiters) {
+          this._summaryInfo.pendingTestWaiterInfo = (0, _testWaiters.getPendingWaiterState)();
+        }
+      }
+
+      return this._summaryInfo;
+    }
+
+    toConsole() {
+      let _console = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : console;
+
+      let summary = this.summary;
+
+      if (summary.hasPendingRequests) {
+        _console.log(PENDING_AJAX_REQUESTS);
+      }
+
+      if (summary.hasPendingLegacyWaiters) {
+        _console.log(PENDING_TEST_WAITERS);
+      }
+
+      if (summary.hasPendingTestWaiters) {
+        if (!summary.hasPendingLegacyWaiters) {
           _console.log(PENDING_TEST_WAITERS);
         }
 
-        if (summary.hasPendingTestWaiters) {
-          if (!summary.hasPendingLegacyWaiters) {
-            _console.log(PENDING_TEST_WAITERS);
+        Object.keys(summary.pendingTestWaiterInfo.waiters).forEach(waiterName => {
+          let waiterDebugInfo = summary.pendingTestWaiterInfo.waiters[waiterName];
+
+          if (Array.isArray(waiterDebugInfo)) {
+            _console.group(waiterName);
+
+            waiterDebugInfo.forEach(debugInfo => {
+              _console.log(`${debugInfo.label ? debugInfo.label : 'stack'}: ${debugInfo.stack}`);
+            });
+
+            _console.groupEnd();
+          } else {
+            _console.log(waiterName);
           }
-
-          Object.keys(summary.pendingTestWaiterInfo.waiters).forEach(function (waiterName) {
-            var waiterDebugInfo = summary.pendingTestWaiterInfo.waiters[waiterName];
-
-            if (Array.isArray(waiterDebugInfo)) {
-              _console.group(waiterName);
-
-              waiterDebugInfo.forEach(function (debugInfo) {
-                _console.log("".concat(debugInfo.label ? debugInfo.label : 'stack', ": ").concat(debugInfo.stack));
-              });
-
-              _console.groupEnd();
-            } else {
-              _console.log(waiterName);
-            }
-          });
-        }
-
-        if (summary.hasPendingTimers || summary.pendingScheduledQueueItemCount > 0) {
-          _console.group(SCHEDULED_ASYNC);
-
-          summary.pendingTimersStackTraces.forEach(function (timerStack) {
-            _console.log(timerStack);
-          });
-          summary.pendingScheduledQueueItemStackTraces.forEach(function (scheduleQueueItemStack) {
-            _console.log(scheduleQueueItemStack);
-          });
-
-          _console.groupEnd();
-        }
-
-        if (summary.hasRunLoop && summary.pendingTimersCount === 0 && summary.pendingScheduledQueueItemCount === 0) {
-          _console.log(SCHEDULED_AUTORUN);
-
-          if (summary.autorunStackTrace) {
-            _console.log(summary.autorunStackTrace);
-          }
-        }
-
-        _debugInfoHelpers.debugInfoHelpers.forEach(function (helper) {
-          helper.log();
         });
       }
-    }, {
-      key: "_formatCount",
-      value: function _formatCount(title, count) {
-        return "".concat(title, ": ").concat(count);
+
+      if (summary.hasPendingTimers || summary.pendingScheduledQueueItemCount > 0) {
+        _console.group(SCHEDULED_ASYNC);
+
+        summary.pendingTimersStackTraces.forEach(timerStack => {
+          _console.log(timerStack);
+        });
+        summary.pendingScheduledQueueItemStackTraces.forEach(scheduleQueueItemStack => {
+          _console.log(scheduleQueueItemStack);
+        });
+
+        _console.groupEnd();
       }
-    }, {
-      key: "summary",
-      get: function get() {
-        if (!this._summaryInfo) {
-          this._summaryInfo = Ember.assign({}, this._settledState);
 
-          if (this._debugInfo) {
-            this._summaryInfo.autorunStackTrace = this._debugInfo.autorun && this._debugInfo.autorun.stack;
-            this._summaryInfo.pendingTimersCount = this._debugInfo.timers.length;
-            this._summaryInfo.hasPendingTimers = this._settledState.hasPendingTimers && this._summaryInfo.pendingTimersCount > 0;
-            this._summaryInfo.pendingTimersStackTraces = this._debugInfo.timers.map(function (timer) {
-              return timer.stack;
-            });
-            this._summaryInfo.pendingScheduledQueueItemCount = this._debugInfo.instanceStack.filter(function (q) {
-              return q;
-            }).reduce(function (total, item) {
-              Object.keys(item).forEach(function (queueName) {
-                total += item[queueName].length;
-              });
-              return total;
-            }, 0);
-            this._summaryInfo.pendingScheduledQueueItemStackTraces = this._debugInfo.instanceStack.filter(function (q) {
-              return q;
-            }).reduce(function (stacks, deferredActionQueues) {
-              Object.keys(deferredActionQueues).forEach(function (queue) {
-                deferredActionQueues[queue].forEach(function (queueItem) {
-                  return queueItem.stack && stacks.push(queueItem.stack);
-                });
-              });
-              return stacks;
-            }, []);
-          }
+      if (summary.hasRunLoop && summary.pendingTimersCount === 0 && summary.pendingScheduledQueueItemCount === 0) {
+        _console.log(SCHEDULED_AUTORUN);
 
-          if (this._summaryInfo.hasPendingTestWaiters) {
-            this._summaryInfo.pendingTestWaiterInfo = (0, _testWaiters.getPendingWaiterState)();
-          }
+        if (summary.autorunStackTrace) {
+          _console.log(summary.autorunStackTrace);
         }
-
-        return this._summaryInfo;
       }
-    }]);
 
-    return TestDebugInfo;
-  }();
+      _debugInfoHelpers.debugInfoHelpers.forEach(helper => {
+        helper.log();
+      });
+    }
+
+    _formatCount(title, count) {
+      return `${title}: ${count}`;
+    }
+
+  }
 
   _exports.TestDebugInfo = TestDebugInfo;
+});
+define("@ember/test-helpers/-internal/deprecations", ["exports", "@ember/debug", "@ember/test-helpers/-internal/is-promise"], function (_exports, _debug, _isPromise) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.getDeprecationsForContext = getDeprecationsForContext;
+  _exports.getDeprecationsDuringCallbackForContext = getDeprecationsDuringCallbackForContext;
+  const DEPRECATIONS = new WeakMap();
+  /**
+   *
+   * Provides the list of deprecation failures associated with a given base context;
+   *
+   * @private
+   * @param {BaseContext} [context] the test context
+   * @return {Array<DeprecationFailure>} the Deprecation Failures associated with the corresponding BaseContext;
+   */
+
+  function getDeprecationsForContext(context) {
+    if (!context) {
+      throw new TypeError(`[@ember/test-helpers] could not get deprecations for an invalid test context: '${context}'`);
+    }
+
+    let deprecations = DEPRECATIONS.get(context);
+
+    if (!Array.isArray(deprecations)) {
+      deprecations = [];
+      DEPRECATIONS.set(context, deprecations);
+    }
+
+    return deprecations;
+  }
+  /**
+   *
+   * Provides the list of deprecation failures associated with a given base
+   * context which occure while a callback is executed. This callback can be
+   * synchonous, or it can be an async function.
+   *
+   * @private
+   * @param {BaseContext} [context] the test context
+   * @param {CallableFunction} [callback] The callback that when executed will have its DeprecationFailure recorded
+   * @return {Array<DeprecationFailure>} The Deprecation Failures associated with the corresponding baseContext which occured while the CallbackFunction was executed
+   */
+
+
+  function getDeprecationsDuringCallbackForContext(context, callback) {
+    if (!context) {
+      throw new TypeError(`[@ember/test-helpers] could not get deprecations for an invalid test context: '${context}'`);
+    }
+
+    const deprecations = getDeprecationsForContext(context);
+    const previousLength = deprecations.length;
+    const result = callback();
+
+    if ((0, _isPromise.default)(result)) {
+      return Promise.resolve(result).then(() => {
+        return deprecations.slice(previousLength); // only return deprecations created as a result of the callback
+      });
+    } else {
+      return deprecations.slice(previousLength); // only return deprecations created as a result of the callback
+    }
+  } // This provides (when the environment supports) queryParam support for deprecations:
+  // * squelch deprecations by name via: `/tests/index.html?disabledDeprecations=this-property-fallback,some-other-thing`
+  // * enable a debuggger when a deprecation by a specific name is encountered via: `/tests/index.html?debugDeprecations=some-other-thing` when the
+
+
+  if (typeof URLSearchParams !== 'undefined') {
+    let queryParams = new URLSearchParams(document.location.search.substring(1));
+    const disabledDeprecations = queryParams.get('disabledDeprecations');
+    const debugDeprecations = queryParams.get('debugDeprecations'); // When using `/tests/index.html?disabledDeprecations=this-property-fallback,some-other-thing`
+    // those deprecations will be squelched
+
+    if (disabledDeprecations) {
+      (0, _debug.registerDeprecationHandler)((message, options, next) => {
+        if (!disabledDeprecations.includes(options.id)) {
+          next.apply(null, [message, options]);
+        }
+      });
+    } // When using `/tests/index.html?debugDeprecations=some-other-thing` when the
+    // `some-other-thing` deprecation is triggered, this `debugger` will be hit`
+
+
+    if (debugDeprecations) {
+      (0, _debug.registerDeprecationHandler)((message, options, next) => {
+        if (debugDeprecations.includes(options.id)) {
+          debugger; // eslint-disable-line no-debugger
+        }
+
+        next.apply(null, [message, options]);
+      });
+    }
+  }
+});
+define("@ember/test-helpers/-internal/ember-internals", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.lookupCurriedComponentDefinition = lookupCurriedComponentDefinition;
+
+  function runtimeResolver(owner) {
+    let resolver = owner.lookup('renderer:-dom')._runtimeResolver;
+
+    if (resolver) {
+      return resolver;
+    }
+
+    let entry = Object.entries(owner.__container__.cache).find(e => e[0].startsWith('template-compiler:main-'));
+
+    if (entry) {
+      return entry[1].resolver.resolver;
+    }
+
+    throw new Error(`@embroider/util couldn't locate the runtime resolver on this ember version`);
+  }
+
+  function lookupCurriedComponentDefinition(name, owner) {
+    let resolver = runtimeResolver(owner);
+
+    if (typeof resolver.lookupComponentHandle === 'function') {
+      let handle = resolver.lookupComponentHandle(name, contextForLookup(owner));
+
+      if (handle != null) {
+        return new CurriedComponentDefinition(resolver.resolve(handle), null);
+      }
+    } // here we're doing the same thing the internal currying does, in order to
+    // generate a sane error message (even though we don't actually use
+    // resolvedDefinition as part of our return value).
+
+
+    let resolvedDefinition = resolver.lookupComponent(name, owner);
+
+    if (!resolvedDefinition) {
+      throw new Error(`Attempted to resolve \`${name}\` via ensureSafeComponent, but nothing was found.`);
+    }
+
+    return curry(0, name, owner, {
+      named: {},
+      positional: []
+    });
+  }
+});
+define("@ember/test-helpers/-internal/get-component-manager", ["exports", "@embroider/macros/es-compat", "@embroider/macros/runtime", "ember"], function (_exports, _esCompat, _runtime, _ember) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+  let getComponentManager;
+
+  if ((0, _runtime.macroCondition)(true)) {
+    let _getComponentManager = //@ts-ignore
+    (0, _esCompat.default)(require("@glimmer/manager")).getInternalComponentManager;
+
+    getComponentManager = (definition, owner) => {
+      return _getComponentManager(definition, true);
+    };
+  } else if ((0, _runtime.macroCondition)(true)) {
+    let _getComponentManager = _ember.default.__loader.require('@glimmer/manager').getInternalComponentManager;
+
+    getComponentManager = (definition, owner) => {
+      return _getComponentManager(definition, true);
+    };
+  } else {
+    let _getComponentManager = _ember.default.__loader.require('@glimmer/runtime').getComponentManager;
+
+    getComponentManager = (definition, owner) => {
+      return _getComponentManager(owner, definition);
+    };
+  }
+
+  var _default = getComponentManager;
+  _exports.default = _default;
 });
 define("@ember/test-helpers/-internal/helper-hooks", ["exports", "@ember/test-helpers/-utils"], function (_exports, _utils) {
   "use strict";
@@ -3121,7 +3233,7 @@ define("@ember/test-helpers/-internal/helper-hooks", ["exports", "@ember/test-he
   });
   _exports.registerHook = registerHook;
   _exports.runHooks = runHooks;
-  var registeredHooks = new Map();
+  const registeredHooks = new Map();
   /**
    * @private
    * @param {string} helperName The name of the test helper in which to run the hook.
@@ -3130,7 +3242,7 @@ define("@ember/test-helpers/-internal/helper-hooks", ["exports", "@ember/test-he
    */
 
   function getHelperKey(helperName, label) {
-    return "".concat(helperName, ":").concat(label);
+    return `${helperName}:${label}`;
   }
   /**
    * Registers a hook function to be run during the invocation of a test helper.
@@ -3146,8 +3258,8 @@ define("@ember/test-helpers/-internal/helper-hooks", ["exports", "@ember/test-he
 
 
   function registerHook(helperName, label, hook) {
-    var helperKey = getHelperKey(helperName, label);
-    var hooksForHelper = registeredHooks.get(helperKey);
+    let helperKey = getHelperKey(helperName, label);
+    let hooksForHelper = registeredHooks.get(helperKey);
 
     if (hooksForHelper === undefined) {
       hooksForHelper = new Set();
@@ -3156,9 +3268,10 @@ define("@ember/test-helpers/-internal/helper-hooks", ["exports", "@ember/test-he
 
     hooksForHelper.add(hook);
     return {
-      unregister: function unregister() {
+      unregister() {
         hooksForHelper.delete(hook);
       }
+
     };
   }
   /**
@@ -3178,13 +3291,60 @@ define("@ember/test-helpers/-internal/helper-hooks", ["exports", "@ember/test-he
       args[_key - 2] = arguments[_key];
     }
 
-    var hooks = registeredHooks.get(getHelperKey(helperName, label)) || new Set();
-    var promises = [];
-    hooks.forEach(function (hook) {
-      var hookResult = hook.apply(void 0, args);
+    let hooks = registeredHooks.get(getHelperKey(helperName, label)) || new Set();
+    let promises = [];
+    hooks.forEach(hook => {
+      let hookResult = hook(...args);
       promises.push(hookResult);
     });
-    return _utils.Promise.all(promises).then(function () {});
+    return _utils.Promise.all(promises).then(() => {});
+  }
+});
+define("@ember/test-helpers/-internal/is-component", ["exports", "@embroider/macros/runtime", "@ember/test-helpers/-internal/get-component-manager"], function (_exports, _runtime, _getComponentManager) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * We should ultimately get a new API from @glimmer/runtime that provides this functionality
+   * (see https://github.com/emberjs/rfcs/pull/785 for more info).
+   * @private
+   * @param {Object} maybeComponent The thing you think might be a component
+   * @param {Object} owner Owner, we need this for old versions of getComponentManager
+   * @returns {boolean} True if it's a component, false if not
+   */
+  function isComponent(maybeComponent, owner) {
+    if ((0, _runtime.macroCondition)(true)) {
+      return !!(0, _getComponentManager.default)(maybeComponent, owner);
+    } else {
+      return !!(0, _getComponentManager.default)(maybeComponent, owner) || ['@ember/component', '@ember/component/template-only'].includes(maybeComponent.toString());
+    }
+  }
+
+  var _default = isComponent;
+  _exports.default = _default;
+});
+define("@ember/test-helpers/-internal/is-promise", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = _default;
+
+  /**
+   *
+   * detect if a value appears to be a promise
+   *
+   * @private
+   * @param {any} [maybePromise] the value being considered to be a promise
+   * @return {boolean} true if the value appears to be a promise, or false otherwise
+   */
+  function _default(maybePromise) {
+    return maybePromise !== null && (typeof maybePromise === 'object' || typeof maybePromise === 'function') && typeof maybePromise.then === 'function';
   }
 });
 define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (_exports) {
@@ -3195,7 +3355,9 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
   });
   _exports.default = void 0;
 
-  function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
+  // @ts-nocheck
+
+  /* eslint-disable */
 
   /* globals globalThis global setImmediate */
 
@@ -3243,7 +3405,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
     'use strict';
     /** @suppress {undefinedVars} */
 
-    var globalNS = function () {
+    let globalNS = function () {
       // the only reliable means to get the global object is
       // `Function('return this')()`
       // However, this causes CSP violations in Chrome apps.
@@ -3279,7 +3441,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
 
 
     function finallyConstructor(callback) {
-      var constructor = this.constructor;
+      let constructor = this.constructor;
       return this.then(function (value) {
         // @ts-ignore
         return constructor.resolve(callback()).then(function () {
@@ -3295,19 +3457,19 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
     }
 
     function allSettled(arr) {
-      var P = this;
+      let P = this;
       return new P(function (resolve, reject) {
         if (!(arr && typeof arr.length !== 'undefined')) {
-          return reject(new TypeError(_typeof(arr) + ' ' + arr + ' is not iterable(cannot read property Symbol(Symbol.iterator))'));
+          return reject(new TypeError(typeof arr + ' ' + arr + ' is not iterable(cannot read property Symbol(Symbol.iterator))'));
         }
 
-        var args = Array.prototype.slice.call(arr);
+        let args = Array.prototype.slice.call(arr);
         if (args.length === 0) return resolve([]);
-        var remaining = args.length;
+        let remaining = args.length;
 
         function res(i, val) {
-          if (val && (_typeof(val) === 'object' || typeof val === 'function')) {
-            var then = val.then;
+          if (val && (typeof val === 'object' || typeof val === 'function')) {
+            let then = val.then;
 
             if (typeof then === 'function') {
               then.call(val, function (val) {
@@ -3336,7 +3498,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
           }
         }
 
-        for (var i = 0; i < args.length; i++) {
+        for (let i = 0; i < args.length; i++) {
           res(i, args[i]);
         }
       });
@@ -3344,7 +3506,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
     // other code modifying setTimeout (like sinon.useFakeTimers())
 
 
-    var setTimeoutFunc = setTimeout;
+    let setTimeoutFunc = setTimeout;
 
     function isArray(x) {
       return Boolean(x && typeof x.length !== 'undefined');
@@ -3396,14 +3558,14 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
       self._handled = true;
 
       Promise._immediateFn(function () {
-        var cb = self._state === 1 ? deferred.onFulfilled : deferred.onRejected;
+        let cb = self._state === 1 ? deferred.onFulfilled : deferred.onRejected;
 
         if (cb === null) {
           (self._state === 1 ? resolve : reject)(deferred.promise, self._value);
           return;
         }
 
-        var ret;
+        let ret;
 
         try {
           ret = cb(self._value);
@@ -3421,8 +3583,8 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
         // Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
         if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.');
 
-        if (newValue && (_typeof(newValue) === 'object' || typeof newValue === 'function')) {
-          var then = newValue.then;
+        if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
+          let then = newValue.then;
 
           if (newValue instanceof Promise) {
             self._state = 3;
@@ -3458,7 +3620,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
         });
       }
 
-      for (var i = 0, len = self._deferreds.length; i < len; i++) {
+      for (let i = 0, len = self._deferreds.length; i < len; i++) {
         handle(self, self._deferreds[i]);
       }
 
@@ -3483,7 +3645,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
 
 
     function doResolve(fn, self) {
-      var done = false;
+      let done = false;
 
       try {
         fn(function (value) {
@@ -3508,7 +3670,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
 
     Promise.prototype.then = function (onFulfilled, onRejected) {
       // @ts-ignore
-      var prom = new this.constructor(noop);
+      let prom = new this.constructor(noop);
       handle(this, new Handler(onFulfilled, onRejected, prom));
       return prom;
     };
@@ -3521,14 +3683,14 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
           return reject(new TypeError('Promise.all accepts an array'));
         }
 
-        var args = Array.prototype.slice.call(arr);
+        let args = Array.prototype.slice.call(arr);
         if (args.length === 0) return resolve([]);
-        var remaining = args.length;
+        let remaining = args.length;
 
         function res(i, val) {
           try {
-            if (val && (_typeof(val) === 'object' || typeof val === 'function')) {
-              var then = val.then;
+            if (val && (typeof val === 'object' || typeof val === 'function')) {
+              let then = val.then;
 
               if (typeof then === 'function') {
                 then.call(val, function (val) {
@@ -3548,7 +3710,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
           }
         }
 
-        for (var i = 0; i < args.length; i++) {
+        for (let i = 0; i < args.length; i++) {
           res(i, args[i]);
         }
       });
@@ -3557,7 +3719,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
     Promise.allSettled = allSettled;
 
     Promise.resolve = function (value) {
-      if (value && _typeof(value) === 'object' && value.constructor === Promise) {
+      if (value && typeof value === 'object' && value.constructor === Promise) {
         return value;
       }
 
@@ -3578,7 +3740,7 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
           return reject(new TypeError('Promise.race accepts an array'));
         }
 
-        for (var i = 0, len = arr.length; i < len; i++) {
+        for (let i = 0, len = arr.length; i < len; i++) {
           Promise.resolve(arr[i]).then(resolve, reject);
         }
       });
@@ -3604,6 +3766,125 @@ define("@ember/test-helpers/-internal/promise-polyfill", ["exports"], function (
 
   _exports.default = _default;
 });
+define("@ember/test-helpers/-internal/render-settled", ["exports", "@embroider/macros/es-compat", "@embroider/macros/runtime", "ember"], function (_exports, _esCompat, _runtime, _ember) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+  let renderSettled;
+
+  if ((0, _runtime.macroCondition)(false)) {
+    //@ts-ignore
+    renderSettled = (0, _esCompat.default)(require("@ember/renderer")).renderSettled;
+  } else if ((0, _runtime.macroCondition)(true)) {
+    //@ts-ignore
+    renderSettled = (0, _esCompat.default)(require("@ember/-internals/glimmer")).renderSettled;
+  } else if ((0, _runtime.macroCondition)(true)) {
+    renderSettled = _ember.default.__loader.require('@ember/-internals/glimmer').renderSettled;
+  } else {
+    renderSettled = _ember.default.__loader.require('ember-glimmer').renderSettled;
+  }
+
+  var _default = renderSettled;
+  _exports.default = _default;
+});
+define("@ember/test-helpers/-internal/warnings", ["exports", "@ember/debug", "@ember/test-helpers/-internal/is-promise"], function (_exports, _debug, _isPromise) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.getWarningsForContext = getWarningsForContext;
+  _exports.getWarningsDuringCallbackForContext = getWarningsDuringCallbackForContext;
+  // the WARNINGS data structure which is used to weakly associated warnings with
+  // the test context their occured within
+  const WARNINGS = new WeakMap();
+  /**
+   *
+   * Provides the list of warnings associated with a given base context;
+   *
+   * @private
+   * @param {BaseContext} [context] the test context
+   * @return {Array<Warning>} the warnings associated with the corresponding BaseContext;
+   */
+
+  function getWarningsForContext(context) {
+    if (!context) {
+      throw new TypeError(`[@ember/test-helpers] could not get warnings for an invalid test context: '${context}'`);
+    }
+
+    let warnings = WARNINGS.get(context);
+
+    if (!Array.isArray(warnings)) {
+      warnings = [];
+      WARNINGS.set(context, warnings);
+    }
+
+    return warnings;
+  }
+  /**
+   *
+   * Provides the list of warnings associated with a given test context which
+   * occured only while a the provided callback is executed. This callback can be
+   * synchonous, or it can be an async function.
+   *
+   * @private
+   * @param {BaseContext} [context] the test context
+   * @param {CallableFunction} [callback] The callback that when executed will have its warnings recorded
+   * @return {Array<Warning>} The warnings associated with the corresponding baseContext which occured while the CallbackFunction was executed
+   */
+
+
+  function getWarningsDuringCallbackForContext(context, callback) {
+    if (!context) {
+      throw new TypeError(`[@ember/test-helpers] could not get warnings for an invalid test context: '${context}'`);
+    }
+
+    const warnings = getWarningsForContext(context);
+    const previousLength = warnings.length;
+    const result = callback();
+
+    if ((0, _isPromise.default)(result)) {
+      return Promise.resolve(result).then(() => {
+        return warnings.slice(previousLength); // only return warnings created as a result of the callback
+      });
+    } else {
+      return warnings.slice(previousLength); // only return warnings created as a result of the callback
+    }
+  } // This provides (when the environment supports) queryParam support for warnings:
+  // * squelch warnings by name via: `/tests/index.html?disabledWarnings=this-property-fallback,some-other-thing`
+  // * enable a debuggger when a warning by a specific name is encountered via: `/tests/index.html?debugWarnings=some-other-thing` when the
+
+
+  if (typeof URLSearchParams !== 'undefined') {
+    const queryParams = new URLSearchParams(document.location.search.substring(1));
+    const disabledWarnings = queryParams.get('disabledWarnings');
+    const debugWarnings = queryParams.get('debugWarnings'); // When using `/tests/index.html?disabledWarnings=this-property-fallback,some-other-thing`
+    // those warnings will be squelched
+
+    if (disabledWarnings) {
+      (0, _debug.registerWarnHandler)((message, options, next) => {
+        if (!disabledWarnings.includes(options.id)) {
+          next.apply(null, [message, options]);
+        }
+      });
+    } // When using `/tests/index.html?debugWarnings=some-other-thing` when the
+    // `some-other-thing` warning is triggered, this `debugger` will be hit`
+
+
+    if (debugWarnings) {
+      (0, _debug.registerWarnHandler)((message, options, next) => {
+        if (debugWarnings.includes(options.id)) {
+          debugger; // eslint-disable-line no-debugger
+        }
+
+        next.apply(null, [message, options]);
+      });
+    }
+  }
+});
 define("@ember/test-helpers/-tuple", ["exports"], function (_exports) {
   "use strict";
 
@@ -3621,7 +3902,7 @@ define("@ember/test-helpers/-tuple", ["exports"], function (_exports) {
     return args;
   }
 });
-define("@ember/test-helpers/-utils", ["exports", "@ember/test-helpers/-internal/promise-polyfill"], function (_exports, _promisePolyfill) {
+define("@ember/test-helpers/-utils", ["exports", "rsvp", "@ember/test-helpers/-internal/promise-polyfill", "@ember/test-helpers/dom/-is-form-control"], function (_exports, _rsvp, _promisePolyfill, _isFormControl) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -3629,18 +3910,20 @@ define("@ember/test-helpers/-utils", ["exports", "@ember/test-helpers/-internal/
   });
   _exports.runDestroyablesFor = runDestroyablesFor;
   _exports.isNumeric = isNumeric;
+  _exports.isVisible = isVisible;
+  _exports.isDisabled = isDisabled;
   _exports.futureTick = _exports.nextTick = _exports.Promise = void 0;
-  var HAS_PROMISE = typeof Promise === 'function' && // @ts-ignore this is checking if someone has explicitly done `window.Promise = window.Promise || Ember.RSVP.Promise
-  Promise !== Ember.RSVP.Promise;
 
-  var _Promise = HAS_PROMISE ? Promise : _promisePolyfill.default;
+  /* globals Promise */
+  const HAS_PROMISE = typeof Promise === 'function' && // @ts-ignore this is checking if someone has explicitly done `window.Promise = window.Promise || Ember.RSVP.Promise
+  Promise !== _rsvp.default.Promise;
+
+  const _Promise = HAS_PROMISE ? Promise : _promisePolyfill.default;
 
   _exports.Promise = _Promise;
-  var nextTick = HAS_PROMISE ? function (cb) {
-    return Promise.resolve().then(cb);
-  } : Ember.RSVP.asap;
+  const nextTick = HAS_PROMISE ? cb => Promise.resolve().then(cb) : _rsvp.default.asap;
   _exports.nextTick = nextTick;
-  var futureTick = setTimeout;
+  const futureTick = setTimeout;
   /**
    Retrieves an array of destroyables from the specified property on the object
    provided, iterates that array invoking each function, then deleting the
@@ -3654,13 +3937,13 @@ define("@ember/test-helpers/-utils", ["exports", "@ember/test-helpers/-internal/
   _exports.futureTick = futureTick;
 
   function runDestroyablesFor(object, property) {
-    var destroyables = object[property];
+    let destroyables = object[property];
 
     if (!destroyables) {
       return;
     }
 
-    for (var i = 0; i < destroyables.length; i++) {
+    for (let i = 0; i < destroyables.length; i++) {
       destroyables[i]();
     }
 
@@ -3678,6 +3961,35 @@ define("@ember/test-helpers/-utils", ["exports", "@ember/test-helpers/-internal/
   function isNumeric(n) {
     return !isNaN(parseFloat(n)) && isFinite(Number(n));
   }
+  /**
+    Checks if an element is considered visible by the focus area spec.
+  
+    @private
+    @param {Element} element the element to check
+    @returns {boolean} `true` when the element is visible, `false` otherwise
+  */
+
+
+  function isVisible(element) {
+    let styles = window.getComputedStyle(element);
+    return styles.display !== 'none' && styles.visibility !== 'hidden';
+  }
+  /**
+    Checks if an element is disabled.
+  
+    @private
+    @param {Element} element the element to check
+    @returns {boolean} `true` when the element is disabled, `false` otherwise
+  */
+
+
+  function isDisabled(element) {
+    if ((0, _isFormControl.default)(element)) {
+      return element.disabled;
+    }
+
+    return false;
+  }
 });
 define("@ember/test-helpers/application", ["exports", "@ember/test-helpers/resolver"], function (_exports, _resolver) {
   "use strict";
@@ -3688,7 +4000,7 @@ define("@ember/test-helpers/application", ["exports", "@ember/test-helpers/resol
   _exports.setApplication = setApplication;
   _exports.getApplication = getApplication;
 
-  var __application__;
+  let __application__;
   /**
     Stores the provided application instance so that tests being ran will be aware of the application under test.
   
@@ -3704,8 +4016,8 @@ define("@ember/test-helpers/application", ["exports", "@ember/test-helpers/resol
     __application__ = application;
 
     if (!(0, _resolver.getResolver)()) {
-      var Resolver = application.Resolver;
-      var resolver = Resolver.create({
+      let Resolver = application.Resolver;
+      let resolver = Resolver.create({
         namespace: application
       });
       (0, _resolver.setResolver)(resolver);
@@ -3752,18 +4064,16 @@ define("@ember/test-helpers/build-owner", ["exports", "@ember/test-helpers/-util
   */
   function buildOwner(application, resolver) {
     if (application) {
-      return application.boot().then(function (app) {
-        return app.buildInstance().boot();
-      });
+      return application.boot().then(app => app.buildInstance().boot());
     }
 
     if (!resolver) {
       throw new Error('You must set up the ember-test-helpers environment with either `setResolver` or `setApplication` before running any tests.');
     }
 
-    var _legacyBuildRegistry = (0, _buildRegistry.default)(resolver),
-        owner = _legacyBuildRegistry.owner;
-
+    let {
+      owner
+    } = (0, _buildRegistry.default)(resolver);
     return _utils.Promise.resolve(owner);
   }
 });
@@ -3784,7 +4094,7 @@ define("@ember/test-helpers/dom/-get-element", ["exports", "@ember/test-helpers/
   */
   function getElement(target) {
     if (typeof target === 'string') {
-      var rootElement = (0, _getRootElement.default)();
+      let rootElement = (0, _getRootElement.default)();
       return rootElement.querySelector(target);
     } else if ((0, _target.isElement)(target) || (0, _target.isDocument)(target)) {
       return target;
@@ -3815,7 +4125,7 @@ define("@ember/test-helpers/dom/-get-elements", ["exports", "@ember/test-helpers
   */
   function getElements(target) {
     if (typeof target === 'string') {
-      var rootElement = (0, _getRootElement.default)();
+      let rootElement = (0, _getRootElement.default)();
       return rootElement.querySelectorAll(target);
     } else {
       throw new Error('Must use a selector string');
@@ -3853,7 +4163,7 @@ define("@ember/test-helpers/dom/-guard-for-maxlength", ["exports"], function (_e
   });
   _exports.default = guardForMaxlength;
   // ref: https://html.spec.whatwg.org/multipage/input.html#concept-input-apply
-  var constrainedInputTypes = ['text', 'search', 'url', 'tel', 'email', 'password'];
+  const constrainedInputTypes = ['text', 'search', 'url', 'tel', 'email', 'password'];
   /**
     @private
     @param {Element} element - the element to check
@@ -3873,10 +4183,10 @@ define("@ember/test-helpers/dom/-guard-for-maxlength", ["exports"], function (_e
 
 
   function guardForMaxlength(element, text, testHelper) {
-    var maxlength = element.getAttribute('maxlength');
+    const maxlength = element.getAttribute('maxlength');
 
     if (isMaxLengthConstrained(element) && maxlength && text && text.length > Number(maxlength)) {
-      throw new Error("Can not `".concat(testHelper, "` with text: '").concat(text, "' that exceeds maxlength: '").concat(maxlength, "'."));
+      throw new Error(`Can not \`${testHelper}\` with text: '${text}' that exceeds maxlength: '${maxlength}'.`);
     }
   }
 });
@@ -3887,7 +4197,9 @@ define("@ember/test-helpers/dom/-is-focusable", ["exports", "@ember/test-helpers
     value: true
   });
   _exports.default = isFocusable;
-  var FOCUSABLE_TAGS = ['A']; // eslint-disable-next-line require-jsdoc
+  // For reference:
+  // https://html.spec.whatwg.org/multipage/interaction.html#the-tabindex-attribute
+  const FOCUSABLE_TAGS = ['A', 'SUMMARY']; // eslint-disable-next-line require-jsdoc
 
   function isFocusableElement(element) {
     return FOCUSABLE_TAGS.indexOf(element.tagName) > -1;
@@ -3926,7 +4238,7 @@ define("@ember/test-helpers/dom/-is-form-control", ["exports", "@ember/test-help
     value: true
   });
   _exports.default = isFormControl;
-  var FORM_CONTROL_TAGS = ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'];
+  const FORM_CONTROL_TAGS = ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'];
   /**
     @private
     @param {Element} element the element to check
@@ -3963,18 +4275,6 @@ define("@ember/test-helpers/dom/-logging", ["exports"], function (_exports) {
   _exports.log = log;
   _exports.elementToString = elementToString;
 
-  function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread(); }
-
-  function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-
-  function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
-
-  function _iterableToArray(iter) { if (typeof Symbol !== "undefined" && Symbol.iterator in Object(iter)) return Array.from(iter); }
-
-  function _arrayWithoutHoles(arr) { if (Array.isArray(arr)) return _arrayLikeToArray(arr); }
-
-  function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
-
   /**
    * Logs a debug message to the console if the `testHelperLogging` query
    * parameter is set.
@@ -3990,7 +4290,7 @@ define("@ember/test-helpers/dom/-logging", ["exports"], function (_exports) {
       }
 
       // eslint-disable-next-line no-console
-      console.log("".concat(helperName, "(").concat([elementToString(target)].concat(_toConsumableArray(args.filter(Boolean))).join(', '), ")"));
+      console.log(`${helperName}(${[elementToString(target), ...args.filter(Boolean)].join(', ')})`);
     }
   }
   /**
@@ -4015,7 +4315,7 @@ define("@ember/test-helpers/dom/-logging", ["exports"], function (_exports) {
 
 
   function elementToString(el) {
-    var desc;
+    let desc;
 
     if (el instanceof NodeList) {
       if (el.length === 0) {
@@ -4023,7 +4323,7 @@ define("@ember/test-helpers/dom/-logging", ["exports"], function (_exports) {
       }
 
       desc = Array.prototype.slice.call(el, 0, 5).map(elementToString).join(', ');
-      return el.length > 5 ? "".concat(desc, "... (+").concat(el.length - 5, " more)") : desc;
+      return el.length > 5 ? `${desc}... (+${el.length - 5} more)` : desc;
     }
 
     if (!(el instanceof HTMLElement || el instanceof SVGElement)) {
@@ -4033,16 +4333,16 @@ define("@ember/test-helpers/dom/-logging", ["exports"], function (_exports) {
     desc = el.tagName.toLowerCase();
 
     if (el.id) {
-      desc += "#".concat(el.id);
+      desc += `#${el.id}`;
     }
 
     if (el.className && !(el.className instanceof SVGAnimatedString)) {
-      desc += ".".concat(String(el.className).replace(/\s+/g, '.'));
+      desc += `.${String(el.className).replace(/\s+/g, '.')}`;
     }
 
     Array.prototype.forEach.call(el.attributes, function (attr) {
       if (attr.name !== 'class' && attr.name !== 'id') {
-        desc += "[".concat(attr.name).concat(attr.value ? "=\"".concat(attr.value, "\"]") : ']');
+        desc += `[${attr.name}${attr.value ? `="${attr.value}"]` : ']'}`;
       }
     });
     return desc;
@@ -4093,9 +4393,9 @@ define("@ember/test-helpers/dom/-to-array", ["exports"], function (_exports) {
     @returns {Array} an array
   */
   function toArray(nodelist) {
-    var array = new Array(nodelist.length);
+    let array = new Array(nodelist.length);
 
-    for (var i = 0; i < nodelist.length; i++) {
+    for (let i = 0; i < nodelist.length; i++) {
       array[i] = nodelist[i];
     }
 
@@ -4110,24 +4410,25 @@ define("@ember/test-helpers/dom/blur", ["exports", "@ember/test-helpers/dom/-get
   });
   _exports.__blur__ = __blur__;
   _exports.default = blur;
-  (0, _helperHooks.registerHook)('blur', 'start', function (target) {
+  (0, _helperHooks.registerHook)('blur', 'start', target => {
     (0, _logging.log)('blur', target);
   });
   /**
     @private
     @param {Element} element the element to trigger events on
     @param {Element} relatedTarget the element that is focused after blur
+    @return {Promise<Event | void>} resolves when settled
   */
 
   function __blur__(element) {
-    var relatedTarget = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+    let relatedTarget = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
 
     if (!(0, _isFocusable.default)(element)) {
-      throw new Error("".concat(element, " is not focusable"));
+      throw new Error(`${element} is not focusable`);
     }
 
-    var browserIsNotFocused = document.hasFocus && !document.hasFocus();
-    var needsCustomEventOptions = relatedTarget !== null;
+    let browserIsNotFocused = document.hasFocus && !document.hasFocus();
+    let needsCustomEventOptions = relatedTarget !== null;
 
     if (!needsCustomEventOptions) {
       // makes `document.activeElement` be `body`.
@@ -4138,15 +4439,13 @@ define("@ember/test-helpers/dom/blur", ["exports", "@ember/test-helpers/dom/-get
     // fire `blur` event via native event.
 
 
-    if (browserIsNotFocused || needsCustomEventOptions) {
-      var options = {
-        relatedTarget: relatedTarget
-      };
-      (0, _fireEvent.default)(element, 'blur', Ember.assign({
-        bubbles: false
-      }, options));
-      (0, _fireEvent.default)(element, 'focusout', options);
-    }
+    let options = {
+      relatedTarget
+    };
+    return browserIsNotFocused || needsCustomEventOptions ? _utils.Promise.resolve().then(() => (0, _fireEvent.default)(element, 'blur', {
+      bubbles: false,
+      ...options
+    })).then(() => (0, _fireEvent.default)(element, 'focusout', options)) : _utils.Promise.resolve();
   }
   /**
     Unfocus the specified target.
@@ -4176,25 +4475,19 @@ define("@ember/test-helpers/dom/blur", ["exports", "@ember/test-helpers/dom/-get
 
 
   function blur() {
-    var target = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : document.activeElement;
-    return _utils.Promise.resolve().then(function () {
-      return (0, _helperHooks.runHooks)('blur', 'start', target);
-    }).then(function () {
-      var element = (0, _getElement.default)(target);
+    let target = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : document.activeElement;
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('blur', 'start', target)).then(() => {
+      let element = (0, _getElement.default)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `blur('".concat(target, "')`."));
+        throw new Error(`Element not found when calling \`blur('${target}')\`.`);
       }
 
-      __blur__(element);
-
-      return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('blur', 'end', target);
-    });
+      return __blur__(element).then(() => (0, _settled.default)());
+    }).then(() => (0, _helperHooks.runHooks)('blur', 'end', target));
   }
 });
-define("@ember/test-helpers/dom/click", ["exports", "@ember/test-helpers/dom/-get-window-or-element", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/dom/focus", "@ember/test-helpers/settled", "@ember/test-helpers/dom/-is-focusable", "@ember/test-helpers/-utils", "@ember/test-helpers/dom/-is-form-control", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _getWindowOrElement, _fireEvent, _focus, _settled, _isFocusable, _utils, _isFormControl, _logging, _helperHooks) {
+define("@ember/test-helpers/dom/click", ["exports", "@ember/test-helpers/dom/-get-window-or-element", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/dom/focus", "@ember/test-helpers/settled", "@ember/test-helpers/-utils", "@ember/test-helpers/dom/-is-form-control", "@ember/test-helpers/dom/-target", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _getWindowOrElement, _fireEvent, _focus, _settled, _utils, _isFormControl, _target, _logging, _helperHooks) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -4203,9 +4496,9 @@ define("@ember/test-helpers/dom/click", ["exports", "@ember/test-helpers/dom/-ge
   _exports.__click__ = __click__;
   _exports.default = click;
   _exports.DEFAULT_CLICK_OPTIONS = void 0;
-  var PRIMARY_BUTTON = 1;
-  var MAIN_BUTTON_PRESSED = 0;
-  (0, _helperHooks.registerHook)('click', 'start', function (target) {
+  const PRIMARY_BUTTON = 1;
+  const MAIN_BUTTON_PRESSED = 0;
+  (0, _helperHooks.registerHook)('click', 'start', target => {
     (0, _logging.log)('click', target);
   });
   /**
@@ -4213,7 +4506,7 @@ define("@ember/test-helpers/dom/click", ["exports", "@ember/test-helpers/dom/-ge
    * See https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons for available options.
    */
 
-  var DEFAULT_CLICK_OPTIONS = {
+  const DEFAULT_CLICK_OPTIONS = {
     buttons: PRIMARY_BUTTON,
     button: MAIN_BUTTON_PRESSED
   };
@@ -4221,19 +4514,13 @@ define("@ember/test-helpers/dom/click", ["exports", "@ember/test-helpers/dom/-ge
     @private
     @param {Element} element the element to click on
     @param {MouseEventInit} options the options to be merged into the mouse events
+    @return {Promise<Event | void>} resolves when settled
   */
 
   _exports.DEFAULT_CLICK_OPTIONS = DEFAULT_CLICK_OPTIONS;
 
   function __click__(element, options) {
-    (0, _fireEvent.default)(element, 'mousedown', options);
-
-    if ((0, _isFocusable.default)(element)) {
-      (0, _focus.__focus__)(element);
-    }
-
-    (0, _fireEvent.default)(element, 'mouseup', options);
-    (0, _fireEvent.default)(element, 'click', options);
+    return _utils.Promise.resolve().then(() => (0, _fireEvent.default)(element, 'mousedown', options)).then(mouseDownEvent => !(0, _target.isWindow)(element) && !mouseDownEvent?.defaultPrevented ? (0, _focus.__focus__)(element) : _utils.Promise.resolve()).then(() => (0, _fireEvent.default)(element, 'mouseup', options)).then(() => (0, _fireEvent.default)(element, 'click', options));
   }
   /**
     Clicks on the specified target.
@@ -4283,35 +4570,31 @@ define("@ember/test-helpers/dom/click", ["exports", "@ember/test-helpers/dom/-ge
 
 
   function click(target) {
-    var _options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    let _options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
-    var options = Ember.assign({}, DEFAULT_CLICK_OPTIONS, _options);
-    return _utils.Promise.resolve().then(function () {
-      return (0, _helperHooks.runHooks)('click', 'start', target, _options);
-    }).then(function () {
+    let options = { ...DEFAULT_CLICK_OPTIONS,
+      ..._options
+    };
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('click', 'start', target, _options)).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `click`.');
       }
 
-      var element = (0, _getWindowOrElement.getWindowOrElement)(target);
+      let element = (0, _getWindowOrElement.getWindowOrElement)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `click('".concat(target, "')`."));
+        throw new Error(`Element not found when calling \`click('${target}')\`.`);
       }
 
       if ((0, _isFormControl.default)(element) && element.disabled) {
-        throw new Error("Can not `click` disabled ".concat(element));
+        throw new Error(`Can not \`click\` disabled ${element}`);
       }
 
-      __click__(element, options);
-
-      return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('click', 'end', target, _options);
-    });
+      return __click__(element, options).then(_settled.default);
+    }).then(() => (0, _helperHooks.runHooks)('click', 'end', target, _options));
   }
 });
-define("@ember/test-helpers/dom/double-click", ["exports", "@ember/test-helpers/dom/-get-window-or-element", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/dom/focus", "@ember/test-helpers/settled", "@ember/test-helpers/dom/-is-focusable", "@ember/test-helpers/-utils", "@ember/test-helpers/dom/click", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/dom/-is-form-control", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _getWindowOrElement, _fireEvent, _focus, _settled, _isFocusable, _utils, _click, _logging, _isFormControl, _helperHooks) {
+define("@ember/test-helpers/dom/double-click", ["exports", "@ember/test-helpers/dom/-get-window-or-element", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/dom/focus", "@ember/test-helpers/settled", "@ember/test-helpers/-utils", "@ember/test-helpers/dom/click", "@ember/test-helpers/dom/-target", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/dom/-is-form-control", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _getWindowOrElement, _fireEvent, _focus, _settled, _utils, _click, _target, _logging, _isFormControl, _helperHooks) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -4319,28 +4602,20 @@ define("@ember/test-helpers/dom/double-click", ["exports", "@ember/test-helpers/
   });
   _exports.__doubleClick__ = __doubleClick__;
   _exports.default = doubleClick;
-  (0, _helperHooks.registerHook)('doubleClick', 'start', function (target) {
+  (0, _helperHooks.registerHook)('doubleClick', 'start', target => {
     (0, _logging.log)('doubleClick', target);
   });
   /**
     @private
     @param {Element} element the element to double-click on
     @param {MouseEventInit} options the options to be merged into the mouse events
+    @returns {Promise<Event | void>} resolves when settled
   */
 
   function __doubleClick__(element, options) {
-    (0, _fireEvent.default)(element, 'mousedown', options);
-
-    if ((0, _isFocusable.default)(element)) {
-      (0, _focus.__focus__)(element);
-    }
-
-    (0, _fireEvent.default)(element, 'mouseup', options);
-    (0, _fireEvent.default)(element, 'click', options);
-    (0, _fireEvent.default)(element, 'mousedown', options);
-    (0, _fireEvent.default)(element, 'mouseup', options);
-    (0, _fireEvent.default)(element, 'click', options);
-    (0, _fireEvent.default)(element, 'dblclick', options);
+    return _utils.Promise.resolve().then(() => (0, _fireEvent.default)(element, 'mousedown', options)).then(mouseDownEvent => {
+      return !(0, _target.isWindow)(element) && !mouseDownEvent?.defaultPrevented ? (0, _focus.__focus__)(element) : _utils.Promise.resolve();
+    }).then(() => (0, _fireEvent.default)(element, 'mouseup', options)).then(() => (0, _fireEvent.default)(element, 'click', options)).then(() => (0, _fireEvent.default)(element, 'mousedown', options)).then(() => (0, _fireEvent.default)(element, 'mouseup', options)).then(() => (0, _fireEvent.default)(element, 'click', options)).then(() => (0, _fireEvent.default)(element, 'dblclick', options));
   }
   /**
     Double-clicks on the specified target.
@@ -4398,32 +4673,28 @@ define("@ember/test-helpers/dom/double-click", ["exports", "@ember/test-helpers/
 
 
   function doubleClick(target) {
-    var _options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    let _options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
-    var options = Ember.assign({}, _click.DEFAULT_CLICK_OPTIONS, _options);
-    return _utils.Promise.resolve().then(function () {
-      return (0, _helperHooks.runHooks)('doubleClick', 'start', target, _options);
-    }).then(function () {
+    let options = { ..._click.DEFAULT_CLICK_OPTIONS,
+      ..._options
+    };
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('doubleClick', 'start', target, _options)).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `doubleClick`.');
       }
 
-      var element = (0, _getWindowOrElement.getWindowOrElement)(target);
+      let element = (0, _getWindowOrElement.getWindowOrElement)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `doubleClick('".concat(target, "')`."));
+        throw new Error(`Element not found when calling \`doubleClick('${target}')\`.`);
       }
 
       if ((0, _isFormControl.default)(element) && element.disabled) {
-        throw new Error("Can not `doubleClick` disabled ".concat(element));
+        throw new Error(`Can not \`doubleClick\` disabled ${element}`);
       }
 
-      __doubleClick__(element, options);
-
-      return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('doubleClick', 'end', target, _options);
-    });
+      return __doubleClick__(element, options).then(_settled.default);
+    }).then(() => (0, _helperHooks.runHooks)('doubleClick', 'end', target, _options));
   }
 });
 define("@ember/test-helpers/dom/fill-in", ["exports", "@ember/test-helpers/dom/-get-element", "@ember/test-helpers/dom/-is-form-control", "@ember/test-helpers/dom/-guard-for-maxlength", "@ember/test-helpers/dom/focus", "@ember/test-helpers/settled", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/-utils", "@ember/test-helpers/dom/-target", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _getElement, _isFormControl, _guardForMaxlength, _focus, _settled, _fireEvent, _utils, _target, _logging, _helperHooks) {
@@ -4433,7 +4704,7 @@ define("@ember/test-helpers/dom/fill-in", ["exports", "@ember/test-helpers/dom/-
     value: true
   });
   _exports.default = fillIn;
-  (0, _helperHooks.registerHook)('fillIn', 'start', function (target, text) {
+  (0, _helperHooks.registerHook)('fillIn', 'start', (target, text) => {
     (0, _logging.log)('fillIn', target, text);
   });
   /**
@@ -4444,7 +4715,7 @@ define("@ember/test-helpers/dom/fill-in", ["exports", "@ember/test-helpers/dom/-
     @public
     @param {string|Element} target the element or selector to enter text into
     @param {string} text the text to fill into the target element
-    @return {Promise<void>} resolves when the application is settled
+    @return {Promise<Element | void>} resolves when the application is settled
   
     @example
     <caption>
@@ -4455,17 +4726,15 @@ define("@ember/test-helpers/dom/fill-in", ["exports", "@ember/test-helpers/dom/-
   */
 
   function fillIn(target, text) {
-    return _utils.Promise.resolve().then(function () {
-      return (0, _helperHooks.runHooks)('fillIn', 'start', target, text);
-    }).then(function () {
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('fillIn', 'start', target, text)).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `fillIn`.');
       }
 
-      var element = (0, _getElement.default)(target);
+      let element = (0, _getElement.default)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `fillIn('".concat(target, "')`."));
+        throw new Error(`Element not found when calling \`fillIn('${target}')\`.`);
       }
 
       if (typeof text === 'undefined' || text === null) {
@@ -4474,29 +4743,27 @@ define("@ember/test-helpers/dom/fill-in", ["exports", "@ember/test-helpers/dom/-
 
       if ((0, _isFormControl.default)(element)) {
         if (element.disabled) {
-          throw new Error("Can not `fillIn` disabled '".concat(target, "'."));
+          throw new Error(`Can not \`fillIn\` disabled '${target}'.`);
         }
 
         if ('readOnly' in element && element.readOnly) {
-          throw new Error("Can not `fillIn` readonly '".concat(target, "'."));
+          throw new Error(`Can not \`fillIn\` readonly '${target}'.`);
         }
 
         (0, _guardForMaxlength.default)(element, text, 'fillIn');
-        (0, _focus.__focus__)(element);
-        element.value = text;
+        return (0, _focus.__focus__)(element).then(() => {
+          element.value = text;
+          return element;
+        });
       } else if ((0, _target.isContentEditable)(element)) {
-        (0, _focus.__focus__)(element);
-        element.innerHTML = text;
+        return (0, _focus.__focus__)(element).then(() => {
+          element.innerHTML = text;
+          return element;
+        });
       } else {
         throw new Error('`fillIn` is only usable on form controls or contenteditable elements.');
       }
-
-      (0, _fireEvent.default)(element, 'input');
-      (0, _fireEvent.default)(element, 'change');
-      return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('fillIn', 'end', target, text);
-    });
+    }).then(element => (0, _fireEvent.default)(element, 'input').then(() => (0, _fireEvent.default)(element, 'change')).then(_settled.default)).then(() => (0, _helperHooks.runHooks)('fillIn', 'end', target, text));
   }
 });
 define("@ember/test-helpers/dom/find-all", ["exports", "@ember/test-helpers/dom/-get-elements", "@ember/test-helpers/ie-11-polyfills"], function (_exports, _getElements, _ie11Polyfills) {
@@ -4556,7 +4823,7 @@ define("@ember/test-helpers/dom/find", ["exports", "@ember/test-helpers/dom/-get
     return (0, _getElement.default)(selector);
   }
 });
-define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/dom/-target", "@ember/test-helpers/-tuple"], function (_exports, _target, _tuple) {
+define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/dom/-target", "@ember/test-helpers/-tuple", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _target, _tuple, _logging, _helperHooks) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -4566,23 +4833,26 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
   _exports.isMouseEventType = isMouseEventType;
   _exports.isFileSelectionEventType = isFileSelectionEventType;
   _exports.isFileSelectionInput = isFileSelectionInput;
+  _exports._buildKeyboardEvent = _buildKeyboardEvent;
   _exports.default = _exports.KEYBOARD_EVENT_TYPES = void 0;
+  (0, _helperHooks.registerHook)('fireEvent', 'start', target => {
+    (0, _logging.log)('fireEvent', target);
+  }); // eslint-disable-next-line require-jsdoc
 
-  // eslint-disable-next-line require-jsdoc
-  var MOUSE_EVENT_CONSTRUCTOR = function () {
+  const MOUSE_EVENT_CONSTRUCTOR = (() => {
     try {
       new MouseEvent('test');
       return true;
     } catch (e) {
       return false;
     }
-  }();
+  })();
 
-  var DEFAULT_EVENT_OPTIONS = {
+  const DEFAULT_EVENT_OPTIONS = {
     bubbles: true,
     cancelable: true
   };
-  var KEYBOARD_EVENT_TYPES = (0, _tuple.default)('keydown', 'keypress', 'keyup'); // eslint-disable-next-line require-jsdoc
+  const KEYBOARD_EVENT_TYPES = (0, _tuple.default)('keydown', 'keypress', 'keyup'); // eslint-disable-next-line require-jsdoc
 
   _exports.KEYBOARD_EVENT_TYPES = KEYBOARD_EVENT_TYPES;
 
@@ -4590,13 +4860,13 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
     return KEYBOARD_EVENT_TYPES.indexOf(eventType) > -1;
   }
 
-  var MOUSE_EVENT_TYPES = (0, _tuple.default)('click', 'mousedown', 'mouseup', 'dblclick', 'mouseenter', 'mouseleave', 'mousemove', 'mouseout', 'mouseover'); // eslint-disable-next-line require-jsdoc
+  const MOUSE_EVENT_TYPES = (0, _tuple.default)('click', 'mousedown', 'mouseup', 'dblclick', 'mouseenter', 'mouseleave', 'mousemove', 'mouseout', 'mouseover'); // eslint-disable-next-line require-jsdoc
 
   function isMouseEventType(eventType) {
     return MOUSE_EVENT_TYPES.indexOf(eventType) > -1;
   }
 
-  var FILE_SELECTION_EVENT_TYPES = (0, _tuple.default)('change'); // eslint-disable-next-line require-jsdoc
+  const FILE_SELECTION_EVENT_TYPES = (0, _tuple.default)('change'); // eslint-disable-next-line require-jsdoc
 
   function isFileSelectionEventType(eventType) {
     return FILE_SELECTION_EVENT_TYPES.indexOf(eventType) > -1;
@@ -4618,46 +4888,50 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
 
 
   function fireEvent(element, eventType) {
-    var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
-
-    if (!element) {
-      throw new Error('Must pass an element to `fireEvent`');
-    }
-
-    var event;
-
-    if (isKeyboardEventType(eventType)) {
-      event = buildKeyboardEvent(eventType, options);
-    } else if (isMouseEventType(eventType)) {
-      var rect;
-
-      if (element instanceof Window && element.document.documentElement) {
-        rect = element.document.documentElement.getBoundingClientRect();
-      } else if ((0, _target.isDocument)(element)) {
-        rect = element.documentElement.getBoundingClientRect();
-      } else if ((0, _target.isElement)(element)) {
-        rect = element.getBoundingClientRect();
-      } else {
-        return;
+    let options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+    return Promise.resolve().then(() => (0, _helperHooks.runHooks)('fireEvent', 'start', element)).then(() => (0, _helperHooks.runHooks)(`fireEvent:${eventType}`, 'start', element)).then(() => {
+      if (!element) {
+        throw new Error('Must pass an element to `fireEvent`');
       }
 
-      var x = rect.left + 1;
-      var y = rect.top + 1;
-      var simulatedCoordinates = {
-        screenX: x + 5,
-        screenY: y + 95,
-        clientX: x,
-        clientY: y
-      };
-      event = buildMouseEvent(eventType, Ember.assign(simulatedCoordinates, options));
-    } else if (isFileSelectionEventType(eventType) && isFileSelectionInput(element)) {
-      event = buildFileEvent(eventType, element, options);
-    } else {
-      event = buildBasicEvent(eventType, options);
-    }
+      let event;
 
-    element.dispatchEvent(event);
-    return event;
+      if (isKeyboardEventType(eventType)) {
+        event = _buildKeyboardEvent(eventType, options);
+      } else if (isMouseEventType(eventType)) {
+        let rect;
+
+        if (element instanceof Window && element.document.documentElement) {
+          rect = element.document.documentElement.getBoundingClientRect();
+        } else if ((0, _target.isDocument)(element)) {
+          rect = element.documentElement.getBoundingClientRect();
+        } else if ((0, _target.isElement)(element)) {
+          rect = element.getBoundingClientRect();
+        } else {
+          return;
+        }
+
+        let x = rect.left + 1;
+        let y = rect.top + 1;
+        let simulatedCoordinates = {
+          screenX: x + 5,
+          // Those numbers don't really mean anything.
+          screenY: y + 95,
+          // They're just to make the screenX/Y be different of clientX/Y..
+          clientX: x,
+          clientY: y,
+          ...options
+        };
+        event = buildMouseEvent(eventType, simulatedCoordinates);
+      } else if (isFileSelectionEventType(eventType) && isFileSelectionInput(element)) {
+        event = buildFileEvent(eventType, element, options);
+      } else {
+        event = buildBasicEvent(eventType, options);
+      }
+
+      element.dispatchEvent(event);
+      return event;
+    }).then(event => (0, _helperHooks.runHooks)(`fireEvent:${eventType}`, 'end', element).then(() => event)).then(event => (0, _helperHooks.runHooks)('fireEvent', 'end', element).then(() => event));
   }
 
   var _default = fireEvent; // eslint-disable-next-line require-jsdoc
@@ -4665,26 +4939,32 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
   _exports.default = _default;
 
   function buildBasicEvent(type) {
-    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-    var event = document.createEvent('Events');
-    var bubbles = options.bubbles !== undefined ? options.bubbles : true;
-    var cancelable = options.cancelable !== undefined ? options.cancelable : true;
+    let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    let event = document.createEvent('Events');
+    let bubbles = options.bubbles !== undefined ? options.bubbles : true;
+    let cancelable = options.cancelable !== undefined ? options.cancelable : true;
     delete options.bubbles;
     delete options.cancelable; // bubbles and cancelable are readonly, so they can be
     // set when initializing event
 
     event.initEvent(type, bubbles, cancelable);
-    Ember.assign(event, options);
+
+    for (let prop in options) {
+      event[prop] = options[prop];
+    }
+
     return event;
   } // eslint-disable-next-line require-jsdoc
 
 
   function buildMouseEvent(type) {
-    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-    var event;
-    var eventOpts = Ember.assign({
-      view: window
-    }, DEFAULT_EVENT_OPTIONS, options);
+    let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    let event;
+    let eventOpts = {
+      view: window,
+      ...DEFAULT_EVENT_OPTIONS,
+      ...options
+    };
 
     if (MOUSE_EVENT_CONSTRUCTOR) {
       event = new MouseEvent(type, eventOpts);
@@ -4698,14 +4978,17 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
     }
 
     return event;
-  } // eslint-disable-next-line require-jsdoc
+  } // @private
+  // eslint-disable-next-line require-jsdoc
 
 
-  function buildKeyboardEvent(type) {
-    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-    var eventOpts = Ember.assign({}, DEFAULT_EVENT_OPTIONS, options);
-    var event;
-    var eventMethodName;
+  function _buildKeyboardEvent(type) {
+    let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    let eventOpts = { ...DEFAULT_EVENT_OPTIONS,
+      ...options
+    };
+    let event;
+    let eventMethodName;
 
     try {
       event = new KeyboardEvent(type, eventOpts); // Property definitions are required for B/C for keyboard event usage
@@ -4718,14 +5001,16 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
       // https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent
 
       Object.defineProperty(event, 'keyCode', {
-        get: function get() {
+        get() {
           return parseInt(eventOpts.keyCode);
         }
+
       });
       Object.defineProperty(event, 'which', {
-        get: function get() {
+        get() {
           return parseInt(eventOpts.which);
         }
+
       });
       return event;
     } catch (e) {// left intentionally blank
@@ -4756,9 +5041,9 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
 
 
   function buildFileEvent(type, element) {
-    var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
-    var event = buildBasicEvent(type);
-    var files = options.files;
+    let options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+    let event = buildBasicEvent(type);
+    let files = options.files;
 
     if (Array.isArray(options)) {
       throw new Error('Please pass an object with a files array to `triggerEvent` instead of passing the `options` param as an array to.');
@@ -4766,23 +5051,26 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
 
     if (Array.isArray(files)) {
       Object.defineProperty(files, 'item', {
-        value: function value(index) {
+        value(index) {
           return typeof index === 'number' ? this[index] : null;
         },
+
         configurable: true
       });
       Object.defineProperty(element, 'files', {
         value: files,
         configurable: true
       });
-      var elementProto = Object.getPrototypeOf(element);
-      var valueProp = Object.getOwnPropertyDescriptor(elementProto, 'value');
+      let elementProto = Object.getPrototypeOf(element);
+      let valueProp = Object.getOwnPropertyDescriptor(elementProto, 'value');
       Object.defineProperty(element, 'value', {
         configurable: true,
-        get: function get() {
+
+        get() {
           return valueProp.get.call(element);
         },
-        set: function set(value) {
+
+        set(value) {
           valueProp.set.call(element, value); // We are sure that the value is empty here.
           // For a non-empty value the original setter must raise an exception.
 
@@ -4791,6 +5079,7 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
             value: []
           });
         }
+
       });
     }
 
@@ -4800,7 +5089,7 @@ define("@ember/test-helpers/dom/fire-event", ["exports", "@ember/test-helpers/do
     return event;
   }
 });
-define("@ember/test-helpers/dom/focus", ["exports", "@ember/test-helpers/dom/-get-element", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/settled", "@ember/test-helpers/dom/-is-focusable", "@ember/test-helpers/-utils", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/-internal/helper-hooks", "@ember/test-helpers/dom/blur"], function (_exports, _getElement, _fireEvent, _settled, _isFocusable, _utils, _logging, _helperHooks, _blur) {
+define("@ember/test-helpers/dom/focus", ["exports", "@ember/test-helpers/dom/-get-element", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/settled", "@ember/test-helpers/dom/-is-focusable", "@ember/test-helpers/-utils", "@ember/test-helpers/dom/-target", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/-internal/helper-hooks", "@ember/test-helpers/dom/blur"], function (_exports, _getElement, _fireEvent, _settled, _isFocusable, _utils, _target, _logging, _helperHooks, _blur) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -4808,38 +5097,85 @@ define("@ember/test-helpers/dom/focus", ["exports", "@ember/test-helpers/dom/-ge
   });
   _exports.__focus__ = __focus__;
   _exports.default = focus;
-  (0, _helperHooks.registerHook)('focus', 'start', function (target) {
+  (0, _helperHooks.registerHook)('focus', 'start', target => {
     (0, _logging.log)('focus', target);
   });
   /**
+     Get the closest focusable ancestor of a given element (or the element itself
+     if it's focusable)
+  
+     @private
+     @param {Element} element the element to trigger events on
+     @returns {HTMLElement|SVGElement|null} the focusable element/ancestor or null
+     if there is none
+   */
+
+  function getClosestFocusable(element) {
+    if ((0, _target.isDocument)(element)) {
+      return null;
+    }
+
+    let maybeFocusable = element;
+
+    while (maybeFocusable && !(0, _isFocusable.default)(maybeFocusable)) {
+      maybeFocusable = maybeFocusable.parentElement;
+    }
+
+    return maybeFocusable;
+  }
+  /**
     @private
     @param {Element} element the element to trigger events on
+    @return {Promise<FocusRecord | Event | void>} resolves when settled
   */
 
+
   function __focus__(element) {
-    if (!(0, _isFocusable.default)(element)) {
-      throw new Error("".concat(element, " is not focusable"));
-    }
+    return _utils.Promise.resolve().then(() => {
+      let focusTarget = getClosestFocusable(element);
+      const previousFocusedElement = document.activeElement && document.activeElement !== focusTarget && (0, _isFocusable.default)(document.activeElement) ? document.activeElement : null; // fire __blur__ manually with the null relatedTarget when the target is not focusable
+      // and there was a previously focused element
 
-    var browserIsNotFocused = document.hasFocus && !document.hasFocus(); // fire __blur__ manually with the correct relatedTarget when the browser is not
-    // already in focus and there was a previously focused element
-
-    if (document.activeElement && document.activeElement !== element && (0, _isFocusable.default)(document.activeElement) && browserIsNotFocused) {
-      (0, _blur.__blur__)(document.activeElement, element);
-    } // makes `document.activeElement` be `element`. If the browser is focused, it also fires a focus event
-
-
-    element.focus(); // Firefox does not trigger the `focusin` event if the window
-    // does not have focus. If the document does not have focus then
-    // fire `focusin` event as well.
-
-    if (browserIsNotFocused) {
-      // if the browser is not focused the previous `el.focus()` didn't fire an event, so we simulate it
-      (0, _fireEvent.default)(element, 'focus', {
-        bubbles: false
+      return !focusTarget && previousFocusedElement ? (0, _blur.__blur__)(previousFocusedElement, null).then(() => _utils.Promise.resolve({
+        focusTarget,
+        previousFocusedElement
+      })) : _utils.Promise.resolve({
+        focusTarget,
+        previousFocusedElement
       });
-      (0, _fireEvent.default)(element, 'focusin');
-    }
+    }).then((_ref) => {
+      let {
+        focusTarget,
+        previousFocusedElement
+      } = _ref;
+
+      if (!focusTarget) {
+        throw new Error('There was a previously focused element');
+      }
+
+      let browserIsNotFocused = !document?.hasFocus(); // fire __blur__ manually with the correct relatedTarget when the browser is not
+      // already in focus and there was a previously focused element
+
+      return previousFocusedElement && browserIsNotFocused ? (0, _blur.__blur__)(previousFocusedElement, focusTarget).then(() => _utils.Promise.resolve({
+        focusTarget
+      })) : _utils.Promise.resolve({
+        focusTarget
+      });
+    }).then((_ref2) => {
+      let {
+        focusTarget
+      } = _ref2;
+      // makes `document.activeElement` be `element`. If the browser is focused, it also fires a focus event
+      focusTarget.focus(); // Firefox does not trigger the `focusin` event if the window
+      // does not have focus. If the document does not have focus then
+      // fire `focusin` event as well.
+
+      let browserIsFocused = document?.hasFocus();
+      return browserIsFocused ? _utils.Promise.resolve() : // if the browser is not focused the previous `el.focus()` didn't fire an event, so we simulate it
+      _utils.Promise.resolve().then(() => (0, _fireEvent.default)(focusTarget, 'focus', {
+        bubbles: false
+      })).then(() => (0, _fireEvent.default)(focusTarget, 'focusin')).then(() => (0, _settled.default)());
+    }).catch(() => {});
   }
   /**
     Focus the specified target.
@@ -4869,25 +5205,23 @@ define("@ember/test-helpers/dom/focus", ["exports", "@ember/test-helpers/dom/-ge
 
 
   function focus(target) {
-    return _utils.Promise.resolve().then(function () {
-      return (0, _helperHooks.runHooks)('focus', 'start', target);
-    }).then(function () {
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('focus', 'start', target)).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `focus`.');
       }
 
-      var element = (0, _getElement.default)(target);
+      let element = (0, _getElement.default)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `focus('".concat(target, "')`."));
+        throw new Error(`Element not found when calling \`focus('${target}')\`.`);
       }
 
-      __focus__(element);
+      if (!(0, _isFocusable.default)(element)) {
+        throw new Error(`${element} is not focusable`);
+      }
 
-      return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('focus', 'end', target);
-    });
+      return __focus__(element).then(_settled.default);
+    }).then(() => (0, _helperHooks.runHooks)('focus', 'end', target));
   }
 });
 define("@ember/test-helpers/dom/get-root-element", ["exports", "@ember/test-helpers/setup-context", "@ember/test-helpers/dom/-target"], function (_exports, _setupContext, _target) {
@@ -4905,14 +5239,14 @@ define("@ember/test-helpers/dom/get-root-element", ["exports", "@ember/test-help
     @returns {Element} the root element
   */
   function getRootElement() {
-    var context = (0, _setupContext.getContext)();
-    var owner = context && context.owner;
+    let context = (0, _setupContext.getContext)();
+    let owner = context && context.owner;
 
     if (!owner) {
       throw new Error('Must setup rendering context before attempting to interact with elements.');
     }
 
-    var rootElement; // When the host app uses `setApplication` (instead of `setResolver`) the owner has
+    let rootElement; // When the host app uses `setApplication` (instead of `setResolver`) the owner has
     // a `rootElement` set on it with the element or id to be used
 
     if (owner && owner._emberTestHelpersMockOwner === undefined) {
@@ -4928,13 +5262,13 @@ define("@ember/test-helpers/dom/get-root-element", ["exports", "@ember/test-help
     if ((0, _target.isElement)(rootElement) || (0, _target.isDocument)(rootElement)) {
       return rootElement;
     } else if (typeof rootElement === 'string') {
-      var _rootElement = document.querySelector(rootElement);
+      let _rootElement = document.querySelector(rootElement);
 
       if (_rootElement) {
         return _rootElement;
       }
 
-      throw new Error("Application.rootElement (".concat(rootElement, ") not found"));
+      throw new Error(`Application.rootElement (${rootElement}) not found`);
     } else {
       throw new Error('Application.rootElement must be an element or a selector string');
     }
@@ -4965,9 +5299,7 @@ define("@ember/test-helpers/dom/scroll-to", ["exports", "@ember/test-helpers/dom
     scrollTo('#my-long-div', 0, 100); // scroll down
   */
   function scrollTo(target, x, y) {
-    return _utils.Promise.resolve().then(function () {
-      return (0, _helperHooks.runHooks)('scrollTo', 'start', target);
-    }).then(function () {
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('scrollTo', 'start', target)).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `scrollTo`.');
       }
@@ -4976,23 +5308,20 @@ define("@ember/test-helpers/dom/scroll-to", ["exports", "@ember/test-helpers/dom
         throw new Error('Must pass both x and y coordinates to `scrollTo`.');
       }
 
-      var element = (0, _getElement.default)(target);
+      let element = (0, _getElement.default)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `scrollTo('".concat(target, "')`."));
+        throw new Error(`Element not found when calling \`scrollTo('${target}')\`.`);
       }
 
       if (!(0, _target.isElement)(element)) {
-        throw new Error("\"target\" must be an element, but was a ".concat(element.nodeType, " when calling `scrollTo('").concat(target, "')`."));
+        throw new Error(`"target" must be an element, but was a ${element.nodeType} when calling \`scrollTo('${target}')\`.`);
       }
 
       element.scrollTop = y;
       element.scrollLeft = x;
-      (0, _fireEvent.default)(element, 'scroll');
-      return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('scrollTo', 'end', target);
-    });
+      return (0, _fireEvent.default)(element, 'scroll').then(_settled.default);
+    }).then(() => (0, _helperHooks.runHooks)('scrollTo', 'end', target));
   }
 });
 define("@ember/test-helpers/dom/select", ["exports", "@ember/test-helpers/dom/-get-element", "@ember/test-helpers/dom/-is-select-element", "@ember/test-helpers/dom/focus", "@ember/test-helpers/settled", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/-utils", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _getElement, _isSelectElement, _focus, _settled, _fireEvent, _utils, _helperHooks) {
@@ -5027,10 +5356,8 @@ define("@ember/test-helpers/dom/select", ["exports", "@ember/test-helpers/dom/-g
     select('select', ['apple', 'orange'], true);
   */
   function select(target, options) {
-    var keepPreviouslySelected = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
-    return _utils.Promise.resolve().then(function () {
-      return (0, _helperHooks.runHooks)('select', 'start', target, options, keepPreviouslySelected);
-    }).then(function () {
+    let keepPreviouslySelected = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('select', 'start', target, options, keepPreviouslySelected)).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `select`.');
       }
@@ -5039,30 +5366,30 @@ define("@ember/test-helpers/dom/select", ["exports", "@ember/test-helpers/dom/-g
         throw new Error('Must provide an `option` or `options` to select when calling `select`.');
       }
 
-      var element = (0, _getElement.default)(target);
+      const element = (0, _getElement.default)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `select('".concat(target, "')`."));
+        throw new Error(`Element not found when calling \`select('${target}')\`.`);
       }
 
       if (!(0, _isSelectElement.default)(element)) {
-        throw new Error("Element is not a HTMLSelectElement when calling `select('".concat(target, "')`."));
+        throw new Error(`Element is not a HTMLSelectElement when calling \`select('${target}')\`.`);
       }
 
       if (element.disabled) {
-        throw new Error("Element is disabled when calling `select('".concat(target, "')`."));
+        throw new Error(`Element is disabled when calling \`select('${target}')\`.`);
       }
 
       options = Array.isArray(options) ? options : [options];
 
       if (!element.multiple && options.length > 1) {
-        throw new Error("HTMLSelectElement `multiple` attribute is set to `false` but multiple options were passed when calling `select('".concat(target, "')`."));
+        throw new Error(`HTMLSelectElement \`multiple\` attribute is set to \`false\` but multiple options were passed when calling \`select('${target}')\`.`);
       }
 
-      (0, _focus.__focus__)(element);
-
-      for (var i = 0; i < element.options.length; i++) {
-        var elementOption = element.options.item(i);
+      return (0, _focus.__focus__)(element).then(() => element);
+    }).then(element => {
+      for (let i = 0; i < element.options.length; i++) {
+        let elementOption = element.options.item(i);
 
         if (elementOption) {
           if (options.indexOf(elementOption.value) > -1) {
@@ -5073,12 +5400,247 @@ define("@ember/test-helpers/dom/select", ["exports", "@ember/test-helpers/dom/-g
         }
       }
 
-      (0, _fireEvent.default)(element, 'input');
-      (0, _fireEvent.default)(element, 'change');
+      return (0, _fireEvent.default)(element, 'input').then(() => (0, _fireEvent.default)(element, 'change')).then(_settled.default);
+    }).then(() => (0, _helperHooks.runHooks)('select', 'end', target, options, keepPreviouslySelected));
+  }
+});
+define("@ember/test-helpers/dom/tab", ["exports", "@ember/test-helpers/dom/get-root-element", "@ember/test-helpers/settled", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/dom/-target", "@ember/test-helpers/dom/blur", "@ember/test-helpers/dom/focus", "@ember/test-helpers/-utils", "@ember/test-helpers/-internal/helper-hooks", "@ember/test-helpers/dom/-logging"], function (_exports, _getRootElement, _settled, _fireEvent, _target, _blur, _focus, _utils, _helperHooks, _logging) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = triggerTab;
+  const SUPPORTS_INERT = ('inert' in Element.prototype);
+  const FALLBACK_ELEMENTS = ['CANVAS', 'VIDEO', 'PICTURE'];
+  (0, _helperHooks.registerHook)('tab', 'start', target => {
+    (0, _logging.log)('tab', target);
+  });
+  /**
+    Gets the active element of a document. IE11 may return null instead of the body as
+    other user-agents does when there isn’t an active element.
+    @private
+    @param {Document} ownerDocument the element to check
+    @returns {HTMLElement} the active element of the document
+  */
+
+  function getActiveElement(ownerDocument) {
+    return ownerDocument.activeElement || ownerDocument.body;
+  }
+  /**
+    Compiles a list of nodes that can be focused. Walkes the tree, discardes hidden elements and a few edge cases. To calculate the right.
+    @private
+    @param {Element} root the root element to start traversing on
+    @returns {Array} list of focusable nodes
+  */
+
+
+  function compileFocusAreas() {
+    let root = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : document.body;
+    let {
+      ownerDocument
+    } = root;
+
+    if (!ownerDocument) {
+      throw new Error('Element must be in the DOM');
+    }
+
+    let activeElment = getActiveElement(ownerDocument);
+    let treeWalker = ownerDocument.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: node => {
+        // Only visible nodes can be focused, with, at least, one exception; the "area" element.
+        // reference: https://html.spec.whatwg.org/multipage/interaction.html#data-model
+        if (node.tagName !== 'AREA' && (0, _utils.isVisible)(node) === false) {
+          return NodeFilter.FILTER_REJECT;
+        } // Reject any fallback elements. Fallback elements’s children are only rendered if the UA
+        // doesn’t support the element. We make an assumption that they are always supported, we
+        // could consider feature detecting every node type, or making it configurable.
+
+
+        let parentNode = node.parentNode;
+
+        if (parentNode && FALLBACK_ELEMENTS.indexOf(parentNode.tagName) !== -1) {
+          return NodeFilter.FILTER_REJECT;
+        } // Rejects inert containers, if the user agent supports the feature (or if a polyfill is installed.)
+
+
+        if (SUPPORTS_INERT && node.inert) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        if ((0, _utils.isDisabled)(node)) {
+          return NodeFilter.FILTER_REJECT;
+        } // Always accept the 'activeElement' of the document, as it might fail the next check, elements with tabindex="-1"
+        // can be focused programtically, we'll therefor ensure the current active element is in the list.
+
+
+        if (node === activeElment) {
+          return NodeFilter.FILTER_ACCEPT;
+        } // UA parses the tabindex attribute and applies its default values, If the tabIndex is non negative, the UA can
+        // foucs it.
+
+
+        return node.tabIndex >= 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+      }
+    }, false);
+    let node;
+    let elements = [];
+
+    while (node = treeWalker.nextNode()) {
+      elements.push(node);
+    }
+
+    return elements;
+  }
+  /**
+    Sort elements by their tab indices.
+    As older browsers doesn't necessarily implement stabile sort, we'll have to
+    manually compare with the index in the original array.
+    @private
+    @param {Array<HTMLElement>} elements to sort
+    @returns {Array<HTMLElement>} list of sorted focusable nodes by their tab index
+  */
+
+
+  function sortElementsByTabIndices(elements) {
+    return elements.map((element, index) => {
+      return {
+        index,
+        element
+      };
+    }).sort((a, b) => {
+      if (a.element.tabIndex === b.element.tabIndex) {
+        return a.index - b.index;
+      } else if (a.element.tabIndex === 0 || b.element.tabIndex === 0) {
+        return b.element.tabIndex - a.element.tabIndex;
+      }
+
+      return a.element.tabIndex - b.element.tabIndex;
+    }).map(entity => entity.element);
+  }
+  /**
+    @private
+    @param {Element} root The root element or node to start traversing on.
+    @param {HTMLElement} activeElement The element to find the next and previous focus areas of
+    @returns {object} The next and previous focus areas of the active element
+   */
+
+
+  function findNextResponders(root, activeElement) {
+    let focusAreas = compileFocusAreas(root);
+    let sortedFocusAreas = sortElementsByTabIndices(focusAreas);
+    let elements = activeElement.tabIndex === -1 ? focusAreas : sortedFocusAreas;
+    let index = elements.indexOf(activeElement);
+
+    if (index === -1) {
+      return {
+        next: sortedFocusAreas[0],
+        previous: sortedFocusAreas[sortedFocusAreas.length - 1]
+      };
+    }
+
+    return {
+      next: elements[index + 1],
+      previous: elements[index - 1]
+    };
+  }
+  /**
+    Emulates the user pressing the tab button.
+  
+    Sends a number of events intending to simulate a "real" user pressing tab on their
+    keyboard.
+  
+    @public
+    @param {Object} [options] optional tab behaviors
+    @param {boolean} [options.backwards=false] indicates if the the user navigates backwards
+    @param {boolean} [options.unRestrainTabIndex=false] indicates if tabbing should throw an error when tabindex is greater than 0
+    @return {Promise<void>} resolves when settled
+  
+    @example
+    <caption>
+      Emulating pressing the `TAB` key
+    </caption>
+    tab();
+  
+    @example
+    <caption>
+      Emulating pressing the `SHIFT`+`TAB` key combination
+    </caption>
+    tab({ backwards: true });
+  */
+
+
+  function triggerTab(options) {
+    return _utils.Promise.resolve().then(() => {
+      let backwards = options && options.backwards || false;
+      let unRestrainTabIndex = options && options.unRestrainTabIndex || false;
+      return triggerResponderChange(backwards, unRestrainTabIndex);
+    }).then(() => {
       return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('select', 'end', target, options, keepPreviouslySelected);
     });
+  }
+  /**
+    @private
+    @param {boolean} backwards when `true` it selects the previous foucs area
+    @param {boolean} unRestrainTabIndex when `true`, will not throw an error if tabindex > 0 is encountered
+    @returns {Promise<void>} resolves when all events are fired
+   */
+
+
+  function triggerResponderChange(backwards, unRestrainTabIndex) {
+    let root = (0, _getRootElement.default)();
+    let ownerDocument;
+    let rootElement;
+
+    if ((0, _target.isDocument)(root)) {
+      rootElement = root.body;
+      ownerDocument = root;
+    } else {
+      rootElement = root;
+      ownerDocument = root.ownerDocument;
+    }
+
+    let keyboardEventOptions = {
+      keyCode: 9,
+      which: 9,
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey: backwards
+    };
+    let debugData = {
+      keyboardEventOptions,
+      ownerDocument,
+      rootElement
+    };
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('tab', 'start', debugData)).then(() => getActiveElement(ownerDocument)).then(activeElement => (0, _helperHooks.runHooks)('tab', 'targetFound', activeElement).then(() => activeElement)).then(activeElement => {
+      let event = (0, _fireEvent._buildKeyboardEvent)('keydown', keyboardEventOptions);
+      let defaultNotPrevented = activeElement.dispatchEvent(event);
+
+      if (defaultNotPrevented) {
+        // Query the active element again, as it might change during event phase
+        activeElement = getActiveElement(ownerDocument);
+        let target = findNextResponders(rootElement, activeElement);
+
+        if (target) {
+          if (backwards && target.previous) {
+            return (0, _focus.__focus__)(target.previous);
+          } else if (!backwards && target.next) {
+            return (0, _focus.__focus__)(target.next);
+          } else {
+            return (0, _blur.__blur__)(activeElement);
+          }
+        }
+      }
+
+      return _utils.Promise.resolve();
+    }).then(() => {
+      let activeElement = getActiveElement(ownerDocument);
+      return (0, _fireEvent.default)(activeElement, 'keyup', keyboardEventOptions).then(() => activeElement);
+    }).then(activeElement => {
+      if (!unRestrainTabIndex && activeElement.tabIndex > 0) {
+        throw new Error(`tabindex of greater than 0 is not allowed. Found tabindex=${activeElement.tabIndex}`);
+      }
+    }).then(() => (0, _helperHooks.runHooks)('tab', 'end', debugData));
   }
 });
 define("@ember/test-helpers/dom/tap", ["exports", "@ember/test-helpers/dom/-get-element", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/dom/click", "@ember/test-helpers/settled", "@ember/test-helpers/-utils", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/dom/-is-form-control", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _getElement, _fireEvent, _click, _settled, _utils, _logging, _isFormControl, _helperHooks) {
@@ -5088,7 +5650,7 @@ define("@ember/test-helpers/dom/tap", ["exports", "@ember/test-helpers/dom/-get-
     value: true
   });
   _exports.default = tap;
-  (0, _helperHooks.registerHook)('tap', 'start', function (target) {
+  (0, _helperHooks.registerHook)('tap', 'start', target => {
     (0, _logging.log)('tap', target);
   });
   /**
@@ -5124,7 +5686,7 @@ define("@ember/test-helpers/dom/tap", ["exports", "@ember/test-helpers/dom/-get-
     @public
     @param {string|Element} target the element or selector to tap on
     @param {Object} options the options to be merged into the touch events
-    @return {Promise<void>} resolves when settled
+    @return {Promise<Event | Event[] | void>} resolves when settled
   
     @example
     <caption>
@@ -5135,33 +5697,29 @@ define("@ember/test-helpers/dom/tap", ["exports", "@ember/test-helpers/dom/-get-
   */
 
   function tap(target) {
-    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-    return _utils.Promise.resolve().then(function () {
+    let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    return _utils.Promise.resolve().then(() => {
       return (0, _helperHooks.runHooks)('tap', 'start', target, options);
-    }).then(function () {
+    }).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `tap`.');
       }
 
-      var element = (0, _getElement.default)(target);
+      let element = (0, _getElement.default)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `tap('".concat(target, "')`."));
+        throw new Error(`Element not found when calling \`tap('${target}')\`.`);
       }
 
       if ((0, _isFormControl.default)(element) && element.disabled) {
-        throw new Error("Can not `tap` disabled ".concat(element));
+        throw new Error(`Can not \`tap\` disabled ${element}`);
       }
 
-      var touchstartEv = (0, _fireEvent.default)(element, 'touchstart', options);
-      var touchendEv = (0, _fireEvent.default)(element, 'touchend', options);
-
-      if (!touchstartEv.defaultPrevented && !touchendEv.defaultPrevented) {
-        (0, _click.__click__)(element, options);
-      }
-
-      return (0, _settled.default)();
-    }).then(function () {
+      return (0, _fireEvent.default)(element, 'touchstart', options).then(touchstartEv => (0, _fireEvent.default)(element, 'touchend', options).then(touchendEv => [touchstartEv, touchendEv])).then((_ref) => {
+        let [touchstartEv, touchendEv] = _ref;
+        return !touchstartEv.defaultPrevented && !touchendEv.defaultPrevented ? (0, _click.__click__)(element, options) : _utils.Promise.resolve();
+      }).then(_settled.default);
+    }).then(() => {
       return (0, _helperHooks.runHooks)('tap', 'end', target, options);
     });
   }
@@ -5173,7 +5731,7 @@ define("@ember/test-helpers/dom/trigger-event", ["exports", "@ember/test-helpers
     value: true
   });
   _exports.default = triggerEvent;
-  (0, _helperHooks.registerHook)('triggerEvent', 'start', function (target, eventType) {
+  (0, _helperHooks.registerHook)('triggerEvent', 'start', (target, eventType) => {
     (0, _logging.log)('triggerEvent', target, eventType);
   });
   /**
@@ -5221,30 +5779,29 @@ define("@ember/test-helpers/dom/trigger-event", ["exports", "@ember/test-helpers
    */
 
   function triggerEvent(target, eventType, options) {
-    return _utils.Promise.resolve().then(function () {
+    return _utils.Promise.resolve().then(() => {
       return (0, _helperHooks.runHooks)('triggerEvent', 'start', target, eventType, options);
-    }).then(function () {
+    }).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `triggerEvent`.');
       }
 
       if (!eventType) {
-        throw new Error("Must provide an `eventType` to `triggerEvent`");
+        throw new Error(`Must provide an \`eventType\` to \`triggerEvent\``);
       }
 
-      var element = (0, _getWindowOrElement.getWindowOrElement)(target);
+      let element = (0, _getWindowOrElement.getWindowOrElement)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `triggerEvent('".concat(target, "', ...)`."));
+        throw new Error(`Element not found when calling \`triggerEvent('${target}', ...)\`.`);
       }
 
       if ((0, _isFormControl.default)(element) && element.disabled) {
-        throw new Error("Can not `triggerEvent` on disabled ".concat(element));
+        throw new Error(`Can not \`triggerEvent\` on disabled ${element}`);
       }
 
-      (0, _fireEvent.default)(element, eventType, options);
-      return (0, _settled.default)();
-    }).then(function () {
+      return (0, _fireEvent.default)(element, eventType, options).then(_settled.default);
+    }).then(() => {
       return (0, _helperHooks.runHooks)('triggerEvent', 'end', target, eventType, options);
     });
   }
@@ -5257,17 +5814,17 @@ define("@ember/test-helpers/dom/trigger-key-event", ["exports", "@ember/test-hel
   });
   _exports.__triggerKeyEvent__ = __triggerKeyEvent__;
   _exports.default = triggerKeyEvent;
-  (0, _helperHooks.registerHook)('triggerKeyEvent', 'start', function (target, eventType, key) {
+  (0, _helperHooks.registerHook)('triggerKeyEvent', 'start', (target, eventType, key) => {
     (0, _logging.log)('triggerKeyEvent', target, eventType, key);
   });
-  var DEFAULT_MODIFIERS = Object.freeze({
+  const DEFAULT_MODIFIERS = Object.freeze({
     ctrlKey: false,
     altKey: false,
     shiftKey: false,
     metaKey: false
   }); // This is not a comprehensive list, but it is better than nothing.
 
-  var keyFromKeyCode = {
+  const keyFromKeyCode = {
     8: 'Backspace',
     9: 'Tab',
     13: 'Enter',
@@ -5313,12 +5870,13 @@ define("@ember/test-helpers/dom/trigger-key-event", ["exports", "@ember/test-hel
     84: 't',
     85: 'u',
     86: 'v',
-    87: 'v',
+    87: 'w',
     88: 'x',
     89: 'y',
     90: 'z',
     91: 'Meta',
     93: 'Meta',
+    // There is two keys that map to meta,
     187: '=',
     189: '-'
   };
@@ -5340,7 +5898,7 @@ define("@ember/test-helpers/dom/trigger-key-event", ["exports", "@ember/test-hel
       }
     }
 
-    var key = keyFromKeyCode[keycode];
+    let key = keyFromKeyCode[keycode];
 
     if (key) {
       return key;
@@ -5354,12 +5912,8 @@ define("@ember/test-helpers/dom/trigger-key-event", ["exports", "@ember/test-hel
 
 
   function keyCodeFromKey(key) {
-    var keys = Object.keys(keyFromKeyCode);
-    var keyCode = (0, _ie11Polyfills.find)(keys, function (keyCode) {
-      return keyFromKeyCode[Number(keyCode)] === key;
-    }) || (0, _ie11Polyfills.find)(keys, function (keyCode) {
-      return keyFromKeyCode[Number(keyCode)] === key.toLowerCase();
-    });
+    let keys = Object.keys(keyFromKeyCode);
+    let keyCode = (0, _ie11Polyfills.find)(keys, keyCode => keyFromKeyCode[Number(keyCode)] === key) || (0, _ie11Polyfills.find)(keys, keyCode => keyFromKeyCode[Number(keyCode)] === key.toLowerCase());
     return keyCode !== undefined ? parseInt(keyCode) : undefined;
   }
   /**
@@ -5368,42 +5922,46 @@ define("@ember/test-helpers/dom/trigger-key-event", ["exports", "@ember/test-hel
     @param {'keydown' | 'keyup' | 'keypress'} eventType the type of event to trigger
     @param {number|string} key the `keyCode`(number) or `key`(string) of the event being triggered
     @param {Object} [modifiers] the state of various modifier keys
+    @return {Promise<Event>} resolves when settled
    */
 
 
   function __triggerKeyEvent__(element, eventType, key) {
-    var modifiers = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : DEFAULT_MODIFIERS;
-    var props;
+    let modifiers = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : DEFAULT_MODIFIERS;
+    return _utils.Promise.resolve().then(() => {
+      let props;
 
-    if (typeof key === 'number') {
-      props = {
-        keyCode: key,
-        which: key,
-        key: keyFromKeyCodeAndModifiers(key, modifiers)
-      };
-    } else if (typeof key === 'string' && key.length !== 0) {
-      var firstCharacter = key[0];
+      if (typeof key === 'number') {
+        props = {
+          keyCode: key,
+          which: key,
+          key: keyFromKeyCodeAndModifiers(key, modifiers),
+          ...modifiers
+        };
+      } else if (typeof key === 'string' && key.length !== 0) {
+        let firstCharacter = key[0];
 
-      if (firstCharacter !== firstCharacter.toUpperCase()) {
-        throw new Error("Must provide a `key` to `triggerKeyEvent` that starts with an uppercase character but you passed `".concat(key, "`."));
+        if (firstCharacter !== firstCharacter.toUpperCase()) {
+          throw new Error(`Must provide a \`key\` to \`triggerKeyEvent\` that starts with an uppercase character but you passed \`${key}\`.`);
+        }
+
+        if ((0, _utils.isNumeric)(key) && key.length > 1) {
+          throw new Error(`Must provide a numeric \`keyCode\` to \`triggerKeyEvent\` but you passed \`${key}\` as a string.`);
+        }
+
+        let keyCode = keyCodeFromKey(key);
+        props = {
+          keyCode,
+          which: keyCode,
+          key,
+          ...modifiers
+        };
+      } else {
+        throw new Error(`Must provide a \`key\` or \`keyCode\` to \`triggerKeyEvent\``);
       }
 
-      if ((0, _utils.isNumeric)(key) && key.length > 1) {
-        throw new Error("Must provide a numeric `keyCode` to `triggerKeyEvent` but you passed `".concat(key, "` as a string."));
-      }
-
-      var keyCode = keyCodeFromKey(key);
-      props = {
-        keyCode: keyCode,
-        which: keyCode,
-        key: key
-      };
-    } else {
-      throw new Error("Must provide a `key` or `keyCode` to `triggerKeyEvent`");
-    }
-
-    var options = Ember.assign(props, modifiers);
-    (0, _fireEvent.default)(element, eventType, options);
+      return (0, _fireEvent.default)(element, eventType, props);
+    });
   }
   /**
     Triggers a keyboard event of given type in the target element.
@@ -5431,40 +5989,36 @@ define("@ember/test-helpers/dom/trigger-key-event", ["exports", "@ember/test-hel
 
 
   function triggerKeyEvent(target, eventType, key) {
-    var modifiers = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : DEFAULT_MODIFIERS;
-    return _utils.Promise.resolve().then(function () {
+    let modifiers = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : DEFAULT_MODIFIERS;
+    return _utils.Promise.resolve().then(() => {
       return (0, _helperHooks.runHooks)('triggerKeyEvent', 'start', target, eventType, key);
-    }).then(function () {
+    }).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `triggerKeyEvent`.');
       }
 
-      var element = (0, _getElement.default)(target);
+      let element = (0, _getElement.default)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `triggerKeyEvent('".concat(target, "', ...)`."));
+        throw new Error(`Element not found when calling \`triggerKeyEvent('${target}', ...)\`.`);
       }
 
       if (!eventType) {
-        throw new Error("Must provide an `eventType` to `triggerKeyEvent`");
+        throw new Error(`Must provide an \`eventType\` to \`triggerKeyEvent\``);
       }
 
       if (!(0, _fireEvent.isKeyboardEventType)(eventType)) {
-        var validEventTypes = _fireEvent.KEYBOARD_EVENT_TYPES.join(', ');
+        let validEventTypes = _fireEvent.KEYBOARD_EVENT_TYPES.join(', ');
 
-        throw new Error("Must provide an `eventType` of ".concat(validEventTypes, " to `triggerKeyEvent` but you passed `").concat(eventType, "`."));
+        throw new Error(`Must provide an \`eventType\` of ${validEventTypes} to \`triggerKeyEvent\` but you passed \`${eventType}\`.`);
       }
 
       if ((0, _isFormControl.default)(element) && element.disabled) {
-        throw new Error("Can not `triggerKeyEvent` on disabled ".concat(element));
+        throw new Error(`Can not \`triggerKeyEvent\` on disabled ${element}`);
       }
 
-      __triggerKeyEvent__(element, eventType, key, modifiers);
-
-      return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('triggerKeyEvent', 'end', target, eventType, key);
-    });
+      return __triggerKeyEvent__(element, eventType, key, modifiers).then(_settled.default);
+    }).then(() => (0, _helperHooks.runHooks)('triggerKeyEvent', 'end', target, eventType, key));
   }
 });
 define("@ember/test-helpers/dom/type-in", ["exports", "@ember/test-helpers/-utils", "@ember/test-helpers/settled", "@ember/test-helpers/dom/-get-element", "@ember/test-helpers/dom/-is-form-control", "@ember/test-helpers/dom/focus", "@ember/test-helpers/dom/fire-event", "@ember/test-helpers/dom/-guard-for-maxlength", "@ember/test-helpers/dom/-target", "@ember/test-helpers/dom/trigger-key-event", "@ember/test-helpers/dom/-logging", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _utils, _settled, _getElement, _isFormControl, _focus, _fireEvent, _guardForMaxlength, _target, _triggerKeyEvent, _logging, _helperHooks) {
@@ -5474,7 +6028,7 @@ define("@ember/test-helpers/dom/type-in", ["exports", "@ember/test-helpers/-util
     value: true
   });
   _exports.default = typeIn;
-  (0, _helperHooks.registerHook)('typeIn', 'start', function (target, text) {
+  (0, _helperHooks.registerHook)('typeIn', 'start', (target, text) => {
     (0, _logging.log)('typeIn', target, text);
   });
   /**
@@ -5503,18 +6057,18 @@ define("@ember/test-helpers/dom/type-in", ["exports", "@ember/test-helpers/-util
    */
 
   function typeIn(target, text) {
-    var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
-    return _utils.Promise.resolve().then(function () {
+    let options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+    return _utils.Promise.resolve().then(() => {
       return (0, _helperHooks.runHooks)('typeIn', 'start', target, text, options);
-    }).then(function () {
+    }).then(() => {
       if (!target) {
         throw new Error('Must pass an element or selector to `typeIn`.');
       }
 
-      var element = (0, _getElement.default)(target);
+      const element = (0, _getElement.default)(target);
 
       if (!element) {
-        throw new Error("Element not found when calling `typeIn('".concat(target, "')`"));
+        throw new Error(`Element not found when calling \`typeIn('${target}')\``);
       }
 
       if ((0, _target.isDocument)(element) || !(0, _isFormControl.default)(element) && !(0, _target.isContentEditable)(element)) {
@@ -5527,70 +6081,55 @@ define("@ember/test-helpers/dom/type-in", ["exports", "@ember/test-helpers/-util
 
       if ((0, _isFormControl.default)(element)) {
         if (element.disabled) {
-          throw new Error("Can not `typeIn` disabled '".concat(target, "'."));
+          throw new Error(`Can not \`typeIn\` disabled '${target}'.`);
         }
 
         if ('readOnly' in element && element.readOnly) {
-          throw new Error("Can not `typeIn` readonly '".concat(target, "'."));
+          throw new Error(`Can not \`typeIn\` readonly '${target}'.`);
         }
       }
 
-      (0, _focus.__focus__)(element);
-      var _options$delay = options.delay,
-          delay = _options$delay === void 0 ? 50 : _options$delay;
-      return fillOut(element, text, delay).then(function () {
-        return (0, _fireEvent.default)(element, 'change');
-      }).then(_settled.default).then(function () {
-        return (0, _helperHooks.runHooks)('typeIn', 'end', target, text, options);
-      });
+      let {
+        delay = 50
+      } = options;
+      return (0, _focus.__focus__)(element).then(() => fillOut(element, text, delay)).then(() => (0, _fireEvent.default)(element, 'change')).then(_settled.default).then(() => (0, _helperHooks.runHooks)('typeIn', 'end', target, text, options));
     });
   } // eslint-disable-next-line require-jsdoc
 
 
   function fillOut(element, text, delay) {
-    var inputFunctions = text.split('').map(function (character) {
-      return keyEntry(element, character);
-    });
-    return inputFunctions.reduce(function (currentPromise, func) {
-      return currentPromise.then(function () {
-        return delayedExecute(delay);
-      }).then(func);
+    const inputFunctions = text.split('').map(character => keyEntry(element, character));
+    return inputFunctions.reduce((currentPromise, func) => {
+      return currentPromise.then(() => delayedExecute(delay)).then(func);
     }, _utils.Promise.resolve(undefined));
   } // eslint-disable-next-line require-jsdoc
 
 
   function keyEntry(element, character) {
-    var shiftKey = character === character.toUpperCase() && character !== character.toLowerCase();
-    var options = {
-      shiftKey: shiftKey
+    let shiftKey = character === character.toUpperCase() && character !== character.toLowerCase();
+    let options = {
+      shiftKey
     };
-    var characterKey = character.toUpperCase();
+    let characterKey = character.toUpperCase();
     return function () {
-      return _utils.Promise.resolve().then(function () {
-        return (0, _triggerKeyEvent.__triggerKeyEvent__)(element, 'keydown', characterKey, options);
-      }).then(function () {
-        return (0, _triggerKeyEvent.__triggerKeyEvent__)(element, 'keypress', characterKey, options);
-      }).then(function () {
+      return _utils.Promise.resolve().then(() => (0, _triggerKeyEvent.__triggerKeyEvent__)(element, 'keydown', characterKey, options)).then(() => (0, _triggerKeyEvent.__triggerKeyEvent__)(element, 'keypress', characterKey, options)).then(() => {
         if ((0, _isFormControl.default)(element)) {
-          var newValue = element.value + character;
+          const newValue = element.value + character;
           (0, _guardForMaxlength.default)(element, newValue, 'typeIn');
           element.value = newValue;
         } else {
-          var _newValue = element.innerHTML + character;
-
-          element.innerHTML = _newValue;
+          const newValue = element.innerHTML + character;
+          element.innerHTML = newValue;
         }
 
-        (0, _fireEvent.default)(element, 'input');
-      }).then(function () {
-        return (0, _triggerKeyEvent.__triggerKeyEvent__)(element, 'keyup', characterKey, options);
-      });
+        return (0, _fireEvent.default)(element, 'input');
+      }).then(() => (0, _triggerKeyEvent.__triggerKeyEvent__)(element, 'keyup', characterKey, options));
     };
   } // eslint-disable-next-line require-jsdoc
 
 
   function delayedExecute(delay) {
-    return new _utils.Promise(function (resolve) {
+    return new _utils.Promise(resolve => {
       setTimeout(resolve, delay);
     });
   }
@@ -5621,27 +6160,27 @@ define("@ember/test-helpers/dom/wait-for", ["exports", "@ember/test-helpers/wait
     await waitFor('.my-selector', { timeout: 2000 })
   */
   function waitFor(selector) {
-    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-    return _utils.Promise.resolve().then(function () {
+    let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    return _utils.Promise.resolve().then(() => {
       if (!selector) {
         throw new Error('Must pass a selector to `waitFor`.');
       }
 
-      var _options$timeout = options.timeout,
-          timeout = _options$timeout === void 0 ? 1000 : _options$timeout,
-          _options$count = options.count,
-          count = _options$count === void 0 ? null : _options$count,
-          timeoutMessage = options.timeoutMessage;
+      let {
+        timeout = 1000,
+        count = null,
+        timeoutMessage
+      } = options;
 
       if (!timeoutMessage) {
-        timeoutMessage = "waitFor timed out waiting for selector \"".concat(selector, "\"");
+        timeoutMessage = `waitFor timed out waiting for selector "${selector}"`;
       }
 
-      var callback;
+      let callback;
 
       if (count !== null) {
-        callback = function callback() {
-          var elements = (0, _getElements.default)(selector);
+        callback = () => {
+          let elements = (0, _getElements.default)(selector);
 
           if (elements.length === count) {
             return (0, _ie11Polyfills.toArray)(elements);
@@ -5650,14 +6189,12 @@ define("@ember/test-helpers/dom/wait-for", ["exports", "@ember/test-helpers/wait
           return;
         };
       } else {
-        callback = function callback() {
-          return (0, _getElement.default)(selector);
-        };
+        callback = () => (0, _getElement.default)(selector);
       }
 
       return (0, _waitUntil.default)(callback, {
-        timeout: timeout,
-        timeoutMessage: timeoutMessage
+        timeout,
+        timeoutMessage
       });
     });
   }
@@ -5671,7 +6208,7 @@ define("@ember/test-helpers/global", ["exports"], function (_exports) {
   _exports.default = void 0;
 
   /* globals global */
-  var _default = function () {
+  var _default = (() => {
     if (typeof self !== 'undefined') {
       return self;
     } else if (typeof window !== 'undefined') {
@@ -5681,11 +6218,11 @@ define("@ember/test-helpers/global", ["exports"], function (_exports) {
     } else {
       return Function('return this')();
     }
-  }();
+  })();
 
   _exports.default = _default;
 });
-define("@ember/test-helpers/has-ember-version", ["exports"], function (_exports) {
+define("@ember/test-helpers/has-ember-version", ["exports", "ember"], function (_exports, _ember) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -5703,9 +6240,10 @@ define("@ember/test-helpers/has-ember-version", ["exports"], function (_exports)
     @returns {boolean} true if the Ember version is >= MAJOR.MINOR specified, false otherwise
   */
   function hasEmberVersion(major, minor) {
-    var numbers = Ember.VERSION.split('-')[0].split('.');
-    var actualMajor = parseInt(numbers[0], 10);
-    var actualMinor = parseInt(numbers[1], 10);
+    let numbers = _ember.default.VERSION.split('-')[0].split('.');
+
+    let actualMajor = parseInt(numbers[0], 10);
+    let actualMinor = parseInt(numbers[1], 10);
     return actualMajor > major || actualMajor === major && actualMinor >= minor;
   }
 });
@@ -5748,16 +6286,16 @@ define("@ember/test-helpers/ie-11-polyfills", ["exports"], function (_exports) {
 
 
   function toArrayPolyfill(nodeList) {
-    var array = new Array(nodeList.length);
+    let array = new Array(nodeList.length);
 
-    for (var i = 0; i < nodeList.length; i++) {
+    for (let i = 0; i < nodeList.length; i++) {
       array[i] = nodeList[i];
     }
 
     return array;
   }
 });
-define("@ember/test-helpers/index", ["exports", "@ember/test-helpers/resolver", "@ember/test-helpers/application", "@ember/test-helpers/setup-context", "@ember/test-helpers/teardown-context", "@ember/test-helpers/setup-rendering-context", "@ember/test-helpers/setup-application-context", "@ember/test-helpers/settled", "@ember/test-helpers/wait-until", "@ember/test-helpers/validate-error-handler", "@ember/test-helpers/setup-onerror", "@ember/test-helpers/-internal/debug-info", "@ember/test-helpers/-internal/debug-info-helpers", "@ember/test-helpers/test-metadata", "@ember/test-helpers/-internal/helper-hooks", "@ember/test-helpers/dom/click", "@ember/test-helpers/dom/double-click", "@ember/test-helpers/dom/tap", "@ember/test-helpers/dom/focus", "@ember/test-helpers/dom/blur", "@ember/test-helpers/dom/trigger-event", "@ember/test-helpers/dom/trigger-key-event", "@ember/test-helpers/dom/fill-in", "@ember/test-helpers/dom/select", "@ember/test-helpers/dom/wait-for", "@ember/test-helpers/dom/get-root-element", "@ember/test-helpers/dom/find", "@ember/test-helpers/dom/find-all", "@ember/test-helpers/dom/type-in", "@ember/test-helpers/dom/scroll-to"], function (_exports, _resolver, _application, _setupContext, _teardownContext, _setupRenderingContext, _setupApplicationContext, _settled, _waitUntil, _validateErrorHandler, _setupOnerror, _debugInfo, _debugInfoHelpers, _testMetadata, _helperHooks, _click, _doubleClick, _tap, _focus, _blur, _triggerEvent, _triggerKeyEvent, _fillIn, _select, _waitFor, _getRootElement, _find, _findAll, _typeIn, _scrollTo) {
+define("@ember/test-helpers/index", ["exports", "@ember/test-helpers/resolver", "@ember/test-helpers/application", "@ember/test-helpers/setup-context", "@ember/test-helpers/teardown-context", "@ember/test-helpers/setup-rendering-context", "@ember/test-helpers/rerender", "@ember/test-helpers/setup-application-context", "@ember/test-helpers/settled", "@ember/test-helpers/wait-until", "@ember/test-helpers/validate-error-handler", "@ember/test-helpers/setup-onerror", "@ember/test-helpers/-internal/debug-info", "@ember/test-helpers/-internal/debug-info-helpers", "@ember/test-helpers/test-metadata", "@ember/test-helpers/-internal/helper-hooks", "@ember/test-helpers/dom/click", "@ember/test-helpers/dom/double-click", "@ember/test-helpers/dom/tab", "@ember/test-helpers/dom/tap", "@ember/test-helpers/dom/focus", "@ember/test-helpers/dom/blur", "@ember/test-helpers/dom/trigger-event", "@ember/test-helpers/dom/trigger-key-event", "@ember/test-helpers/dom/fill-in", "@ember/test-helpers/dom/select", "@ember/test-helpers/dom/wait-for", "@ember/test-helpers/dom/get-root-element", "@ember/test-helpers/dom/find", "@ember/test-helpers/dom/find-all", "@ember/test-helpers/dom/type-in", "@ember/test-helpers/dom/scroll-to"], function (_exports, _resolver, _application, _setupContext, _teardownContext, _setupRenderingContext, _rerender, _setupApplicationContext, _settled, _waitUntil, _validateErrorHandler, _setupOnerror, _debugInfo, _debugInfoHelpers, _testMetadata, _helperHooks, _click, _doubleClick, _tab, _tap, _focus, _blur, _triggerEvent, _triggerKeyEvent, _fillIn, _select, _waitFor, _getRootElement, _find, _findAll, _typeIn, _scrollTo) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -5765,274 +6303,338 @@ define("@ember/test-helpers/index", ["exports", "@ember/test-helpers/resolver", 
   });
   Object.defineProperty(_exports, "setResolver", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _resolver.setResolver;
     }
   });
   Object.defineProperty(_exports, "getResolver", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _resolver.getResolver;
     }
   });
   Object.defineProperty(_exports, "getApplication", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _application.getApplication;
     }
   });
   Object.defineProperty(_exports, "setApplication", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _application.setApplication;
     }
   });
   Object.defineProperty(_exports, "setupContext", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupContext.default;
     }
   });
   Object.defineProperty(_exports, "getContext", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupContext.getContext;
     }
   });
   Object.defineProperty(_exports, "setContext", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupContext.setContext;
     }
   });
   Object.defineProperty(_exports, "unsetContext", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupContext.unsetContext;
     }
   });
   Object.defineProperty(_exports, "pauseTest", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupContext.pauseTest;
     }
   });
   Object.defineProperty(_exports, "resumeTest", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupContext.resumeTest;
+    }
+  });
+  Object.defineProperty(_exports, "getDeprecations", {
+    enumerable: true,
+    get: function () {
+      return _setupContext.getDeprecations;
+    }
+  });
+  Object.defineProperty(_exports, "getDeprecationsDuringCallback", {
+    enumerable: true,
+    get: function () {
+      return _setupContext.getDeprecationsDuringCallback;
+    }
+  });
+  Object.defineProperty(_exports, "getWarnings", {
+    enumerable: true,
+    get: function () {
+      return _setupContext.getWarnings;
+    }
+  });
+  Object.defineProperty(_exports, "getWarningsDuringCallback", {
+    enumerable: true,
+    get: function () {
+      return _setupContext.getWarningsDuringCallback;
     }
   });
   Object.defineProperty(_exports, "teardownContext", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _teardownContext.default;
     }
   });
   Object.defineProperty(_exports, "setupRenderingContext", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupRenderingContext.default;
     }
   });
   Object.defineProperty(_exports, "render", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupRenderingContext.render;
     }
   });
   Object.defineProperty(_exports, "clearRender", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupRenderingContext.clearRender;
+    }
+  });
+  Object.defineProperty(_exports, "rerender", {
+    enumerable: true,
+    get: function () {
+      return _rerender.default;
     }
   });
   Object.defineProperty(_exports, "setupApplicationContext", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupApplicationContext.default;
     }
   });
   Object.defineProperty(_exports, "visit", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupApplicationContext.visit;
     }
   });
   Object.defineProperty(_exports, "currentRouteName", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupApplicationContext.currentRouteName;
     }
   });
   Object.defineProperty(_exports, "currentURL", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupApplicationContext.currentURL;
     }
   });
   Object.defineProperty(_exports, "settled", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _settled.default;
     }
   });
   Object.defineProperty(_exports, "isSettled", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _settled.isSettled;
     }
   });
   Object.defineProperty(_exports, "getSettledState", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _settled.getSettledState;
     }
   });
   Object.defineProperty(_exports, "waitUntil", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _waitUntil.default;
     }
   });
   Object.defineProperty(_exports, "validateErrorHandler", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _validateErrorHandler.default;
     }
   });
   Object.defineProperty(_exports, "setupOnerror", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupOnerror.default;
     }
   });
   Object.defineProperty(_exports, "resetOnerror", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _setupOnerror.resetOnerror;
     }
   });
   Object.defineProperty(_exports, "getDebugInfo", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _debugInfo.getDebugInfo;
     }
   });
   Object.defineProperty(_exports, "registerDebugInfoHelper", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _debugInfoHelpers.default;
     }
   });
   Object.defineProperty(_exports, "getTestMetadata", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _testMetadata.default;
     }
   });
   Object.defineProperty(_exports, "_registerHook", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _helperHooks.registerHook;
     }
   });
   Object.defineProperty(_exports, "_runHooks", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _helperHooks.runHooks;
     }
   });
   Object.defineProperty(_exports, "click", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _click.default;
     }
   });
   Object.defineProperty(_exports, "doubleClick", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _doubleClick.default;
+    }
+  });
+  Object.defineProperty(_exports, "tab", {
+    enumerable: true,
+    get: function () {
+      return _tab.default;
     }
   });
   Object.defineProperty(_exports, "tap", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _tap.default;
     }
   });
   Object.defineProperty(_exports, "focus", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _focus.default;
     }
   });
   Object.defineProperty(_exports, "blur", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _blur.default;
     }
   });
   Object.defineProperty(_exports, "triggerEvent", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _triggerEvent.default;
     }
   });
   Object.defineProperty(_exports, "triggerKeyEvent", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _triggerKeyEvent.default;
     }
   });
   Object.defineProperty(_exports, "fillIn", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _fillIn.default;
     }
   });
   Object.defineProperty(_exports, "select", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _select.default;
     }
   });
   Object.defineProperty(_exports, "waitFor", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _waitFor.default;
     }
   });
   Object.defineProperty(_exports, "getRootElement", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _getRootElement.default;
     }
   });
   Object.defineProperty(_exports, "find", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _find.default;
     }
   });
   Object.defineProperty(_exports, "findAll", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _findAll.default;
     }
   });
   Object.defineProperty(_exports, "typeIn", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _typeIn.default;
     }
   });
   Object.defineProperty(_exports, "scrollTo", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _scrollTo.default;
     }
   });
+});
+define("@ember/test-helpers/rerender", ["exports", "@ember/test-helpers/-internal/render-settled"], function (_exports, _renderSettled) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = rerender;
+
+  /**
+    Returns a promise which will resolve when rendering has completed. In
+    this context, rendering is completed when all auto-tracked state that is
+    consumed in the template (including any tracked state in models, services,
+    etc.  that are then used in a template) has been updated in the DOM.
+    
+    For example, in a test you might want to update some tracked state and
+    then run some assertions after rendering has completed. You _could_ use
+    `await settled()` in that location, but in some contexts you don't want to
+    wait for full settledness (which includes test waiters, pending AJAX/fetch,
+    run loops, etc) but instead only want to know when that updated value has
+    been rendered in the DOM. **THAT** is what `await rerender()` is _perfect_
+    for.
+    @public
+    @returns {Promise<void>} a promise which fulfills when rendering has completed
+  */
+  function rerender() {
+    return (0, _renderSettled.default)();
+  }
 });
 define("@ember/test-helpers/resolver", ["exports"], function (_exports) {
   "use strict";
@@ -6043,7 +6645,7 @@ define("@ember/test-helpers/resolver", ["exports"], function (_exports) {
   _exports.setResolver = setResolver;
   _exports.getResolver = getResolver;
 
-  var __resolver__;
+  let __resolver__;
   /**
     Stores the provided resolver instance so that tests being ran can resolve
     objects in the same way as a normal application.
@@ -6070,7 +6672,7 @@ define("@ember/test-helpers/resolver", ["exports"], function (_exports) {
     return __resolver__;
   }
 });
-define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", "@ember/test-helpers/wait-until", "@ember/test-helpers/setup-application-context", "@ember/test-waiters", "@ember/test-helpers/-internal/debug-info"], function (_exports, _utils, _waitUntil, _setupApplicationContext, _testWaiters, _debugInfo) {
+define("@ember/test-helpers/settled", ["exports", "@ember/runloop", "ember", "@ember/application/instance", "@ember/test-helpers/-utils", "@ember/test-helpers/wait-until", "@ember/test-helpers/setup-application-context", "@ember/test-waiters", "@ember/test-helpers/-internal/debug-info"], function (_exports, _runloop, _ember, _instance, _utils, _waitUntil, _setupApplicationContext, _testWaiters, _debugInfo) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -6082,18 +6684,7 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
   _exports.isSettled = isSettled;
   _exports.default = settled;
 
-  function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest(); }
-
-  function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-
-  function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
-
-  function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
-
-  function _iterableToArrayLimit(arr, i) { if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return; var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
-
-  function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
-
+  /* globals jQuery */
   // Ember internally tracks AJAX requests in the same way that we do here for
   // legacy style "acceptance" tests using the `ember-testing.js` asset provided
   // by emberjs/ember.js itself. When `@ember/test-helpers`'s `settled` utility
@@ -6102,32 +6693,59 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
   //
   // This utilizes a local utility method present in Ember since around 2.8.0 to
   // properly consider pending AJAX requests done within legacy acceptance tests.
-  var _internalPendingRequests = function () {
-    var loader = Ember.__loader;
+  const _internalPendingRequestsModule = (() => {
+    let loader = _ember.default.__loader;
 
     if (loader.registry['ember-testing/test/pending_requests']) {
       // Ember <= 3.1
-      return loader.require('ember-testing/test/pending_requests').pendingRequests;
+      return loader.require('ember-testing/test/pending_requests');
     } else if (loader.registry['ember-testing/lib/test/pending_requests']) {
       // Ember >= 3.2
-      return loader.require('ember-testing/lib/test/pending_requests').pendingRequests;
+      return loader.require('ember-testing/lib/test/pending_requests');
     }
 
-    return function () {
-      return 0;
-    };
-  }();
+    return null;
+  })();
 
-  var requests;
+  const _internalGetPendingRequestsCount = () => {
+    if (_internalPendingRequestsModule) {
+      return _internalPendingRequestsModule.pendingRequests();
+    }
+
+    return 0;
+  };
+
+  if (typeof jQuery !== 'undefined' && _internalPendingRequestsModule) {
+    // This exists to ensure that the AJAX listeners setup by Ember itself
+    // (which as of 2.17 are not properly torn down) get cleared and released
+    // when the application is destroyed. Without this, any AJAX requests
+    // that happen _between_ acceptance tests will always share
+    // `pendingRequests`.
+    //
+    // This can be removed once Ember 4.0.0 is released
+    _instance.default.reopen({
+      willDestroy() {
+        jQuery(document).off('ajaxSend', _internalPendingRequestsModule.incrementPendingRequests);
+        jQuery(document).off('ajaxComplete', _internalPendingRequestsModule.decrementPendingRequests);
+
+        _internalPendingRequestsModule.clearPendingRequests();
+
+        this._super(...arguments);
+      }
+
+    });
+  }
+
+  let requests;
   /**
     @private
     @returns {number} the count of pending requests
   */
 
   function pendingRequests() {
-    var localRequestsPending = requests !== undefined ? requests.length : 0;
+    let localRequestsPending = requests !== undefined ? requests.length : 0;
 
-    var internalRequestsPending = _internalPendingRequests();
+    let internalRequestsPending = _internalGetPendingRequestsCount();
 
     return localRequestsPending + internalRequestsPending;
   }
@@ -6159,8 +6777,8 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
     // counter will decrement. In the specific case of AJAX, this means that any
     // promises chained off of `$.ajax` will properly have their `.then` called
     // _before_ this is decremented (and testing continues)
-    (0, _utils.nextTick)(function () {
-      for (var i = 0; i < requests.length; i++) {
+    (0, _utils.nextTick)(() => {
+      for (let i = 0; i < requests.length; i++) {
         if (xhr === requests[i]) {
           requests.splice(i, 1);
         }
@@ -6206,9 +6824,9 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
     jQuery(document).on('ajaxComplete', decrementAjaxPendingRequests);
   }
 
-  var _internalCheckWaiters;
+  let _internalCheckWaiters;
 
-  var loader = Ember.__loader;
+  let loader = _ember.default.__loader;
 
   if (loader.registry['ember-testing/test/waiters']) {
     // Ember <= 3.1
@@ -6224,16 +6842,13 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
 
 
   function checkWaiters() {
-    var EmberTest = Ember.Test;
+    let EmberTest = _ember.default.Test;
 
     if (_internalCheckWaiters) {
       return _internalCheckWaiters();
     } else if (EmberTest.waiters) {
-      if (EmberTest.waiters.some(function (_ref) {
-        var _ref2 = _slicedToArray(_ref, 2),
-            context = _ref2[0],
-            callback = _ref2[1];
-
+      if (EmberTest.waiters.some((_ref) => {
+        let [context, callback] = _ref;
         return !callback.call(context);
       })) {
         return true;
@@ -6262,6 +6877,8 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
     - `pendingRequestCount` - The count of pending AJAX requests.
     - `debugInfo` - Debug information that's combined with info return from backburner's
       getDebugInfo method.
+    - `isRenderPending` - Checks if there are any pending render operations. This will be true as long
+      as there are tracked values in the template that have not been rerendered yet.
   
     @public
     @returns {Object} object with properties for each of the metrics used to determine settledness
@@ -6269,25 +6886,31 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
 
 
   function getSettledState() {
-    var hasPendingTimers = Ember.run.backburner.hasTimers();
-    var hasRunLoop = Boolean(Ember.run.backburner.currentInstance);
-    var hasPendingLegacyWaiters = checkWaiters();
-    var hasPendingTestWaiters = (0, _testWaiters.hasPendingWaiters)();
-    var pendingRequestCount = pendingRequests();
-    var hasPendingRequests = pendingRequestCount > 0;
+    let hasPendingTimers = _runloop._backburner.hasTimers();
+
+    let hasRunLoop = Boolean(_runloop._backburner.currentInstance);
+    let hasPendingLegacyWaiters = checkWaiters();
+    let hasPendingTestWaiters = (0, _testWaiters.hasPendingWaiters)();
+    let pendingRequestCount = pendingRequests();
+    let hasPendingRequests = pendingRequestCount > 0; // TODO: Ideally we'd have a function in Ember itself that can synchronously identify whether
+    // or not there are any pending render operations, but this will have to suffice for now
+
+    let isRenderPending = !!hasRunLoop;
     return {
-      hasPendingTimers: hasPendingTimers,
-      hasRunLoop: hasRunLoop,
+      hasPendingTimers,
+      hasRunLoop,
       hasPendingWaiters: hasPendingLegacyWaiters || hasPendingTestWaiters,
-      hasPendingRequests: hasPendingRequests,
+      hasPendingRequests,
       hasPendingTransitions: (0, _setupApplicationContext.hasPendingTransitions)(),
-      pendingRequestCount: pendingRequestCount,
+      isRenderPending,
+      pendingRequestCount,
       debugInfo: new _debugInfo.TestDebugInfo({
-        hasPendingTimers: hasPendingTimers,
-        hasRunLoop: hasRunLoop,
-        hasPendingLegacyWaiters: hasPendingLegacyWaiters,
-        hasPendingTestWaiters: hasPendingTestWaiters,
-        hasPendingRequests: hasPendingRequests
+        hasPendingTimers,
+        hasRunLoop,
+        hasPendingLegacyWaiters,
+        hasPendingTestWaiters,
+        hasPendingRequests,
+        isRenderPending
       })
     };
   }
@@ -6304,14 +6927,16 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
 
 
   function isSettled() {
-    var _getSettledState = getSettledState(),
-        hasPendingTimers = _getSettledState.hasPendingTimers,
-        hasRunLoop = _getSettledState.hasRunLoop,
-        hasPendingRequests = _getSettledState.hasPendingRequests,
-        hasPendingWaiters = _getSettledState.hasPendingWaiters,
-        hasPendingTransitions = _getSettledState.hasPendingTransitions;
+    let {
+      hasPendingTimers,
+      hasRunLoop,
+      hasPendingRequests,
+      hasPendingWaiters,
+      hasPendingTransitions,
+      isRenderPending
+    } = getSettledState();
 
-    if (hasPendingTimers || hasRunLoop || hasPendingRequests || hasPendingWaiters || hasPendingTransitions) {
+    if (hasPendingTimers || hasRunLoop || hasPendingRequests || hasPendingWaiters || hasPendingTransitions || isRenderPending) {
       return false;
     }
 
@@ -6329,10 +6954,10 @@ define("@ember/test-helpers/settled", ["exports", "@ember/test-helpers/-utils", 
   function settled() {
     return (0, _waitUntil.default)(isSettled, {
       timeout: Infinity
-    }).then(function () {});
+    }).then(() => {});
   }
 });
-define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test-helpers/-utils", "@ember/test-helpers/setup-context", "@ember/test-helpers/global", "@ember/test-helpers/has-ember-version", "@ember/test-helpers/settled", "@ember/test-helpers/test-metadata", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _utils, _setupContext, _global, _hasEmberVersion, _settled, _testMetadata, _helperHooks) {
+define("@ember/test-helpers/setup-application-context", ["exports", "@ember/object", "@ember/test-helpers/-utils", "@ember/test-helpers/setup-context", "@ember/test-helpers/global", "@ember/test-helpers/has-ember-version", "@ember/test-helpers/settled", "@ember/test-helpers/test-metadata", "@ember/test-helpers/-internal/helper-hooks"], function (_exports, _object, _utils, _setupContext, _global, _hasEmberVersion, _settled, _testMetadata, _helperHooks) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -6345,10 +6970,10 @@ define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test
   _exports.currentRouteName = currentRouteName;
   _exports.currentURL = currentURL;
   _exports.default = setupApplicationContext;
-  var CAN_USE_ROUTER_EVENTS = (0, _hasEmberVersion.default)(3, 6);
-  var routerTransitionsPending = null;
-  var ROUTER = new WeakMap();
-  var HAS_SETUP_ROUTER = new WeakMap(); // eslint-disable-next-line require-jsdoc
+  const CAN_USE_ROUTER_EVENTS = (0, _hasEmberVersion.default)(3, 6);
+  let routerTransitionsPending = null;
+  const ROUTER = new WeakMap();
+  const HAS_SETUP_ROUTER = new WeakMap(); // eslint-disable-next-line require-jsdoc
 
   function isApplicationTestContext(context) {
     return (0, _setupContext.isTestContext)(context);
@@ -6366,13 +6991,13 @@ define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test
       return routerTransitionsPending;
     }
 
-    var context = (0, _setupContext.getContext)(); // there is no current context, we cannot check
+    let context = (0, _setupContext.getContext)(); // there is no current context, we cannot check
 
     if (context === undefined) {
       return null;
     }
 
-    var router = ROUTER.get(context);
+    let router = ROUTER.get(context);
 
     if (router === undefined) {
       // if there is no router (e.g. no `visit` calls made yet), we cannot
@@ -6381,7 +7006,7 @@ define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test
       return null;
     }
 
-    var routerMicrolib = router._routerMicrolib || router.router;
+    let routerMicrolib = router._routerMicrolib || router.router;
 
     if (routerMicrolib === undefined) {
       return null;
@@ -6400,7 +7025,7 @@ define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test
 
 
   function setupRouterSettlednessTracking() {
-    var context = (0, _setupContext.getContext)();
+    const context = (0, _setupContext.getContext)();
 
     if (context === undefined) {
       throw new Error('Cannot setupRouterSettlednessTracking outside of a test context');
@@ -6412,27 +7037,25 @@ define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test
     }
 
     HAS_SETUP_ROUTER.set(context, true);
-    var owner = context.owner;
-    var router;
+    let {
+      owner
+    } = context;
+    let router;
 
     if (CAN_USE_ROUTER_EVENTS) {
       router = owner.lookup('service:router'); // track pending transitions via the public routeWillChange / routeDidChange APIs
       // routeWillChange can fire many times and is only useful to know when we have _started_
       // transitioning, we can then use routeDidChange to signal that the transition has settled
 
-      router.on('routeWillChange', function () {
-        return routerTransitionsPending = true;
-      });
-      router.on('routeDidChange', function () {
-        return routerTransitionsPending = false;
-      });
+      router.on('routeWillChange', () => routerTransitionsPending = true);
+      router.on('routeDidChange', () => routerTransitionsPending = false);
     } else {
       router = owner.lookup('router:main');
       ROUTER.set(context, router);
     } // hook into teardown to reset local settledness state
 
 
-    var ORIGINAL_WILL_DESTROY = router.willDestroy;
+    let ORIGINAL_WILL_DESTROY = router.willDestroy;
 
     router.willDestroy = function () {
       routerTransitionsPending = null;
@@ -6450,28 +7073,30 @@ define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test
 
 
   function visit(url, options) {
-    var context = (0, _setupContext.getContext)();
+    const context = (0, _setupContext.getContext)();
 
     if (!context || !isApplicationTestContext(context)) {
       throw new Error('Cannot call `visit` without having first called `setupApplicationContext`.');
     }
 
-    var owner = context.owner;
-    var testMetadata = (0, _testMetadata.default)(context);
+    let {
+      owner
+    } = context;
+    let testMetadata = (0, _testMetadata.default)(context);
     testMetadata.usedHelpers.push('visit');
-    return _utils.Promise.resolve().then(function () {
+    return _utils.Promise.resolve().then(() => {
       return (0, _helperHooks.runHooks)('visit', 'start', url, options);
-    }).then(function () {
-      var visitResult = owner.visit(url, options);
+    }).then(() => {
+      let visitResult = owner.visit(url, options);
       setupRouterSettlednessTracking();
       return visitResult;
-    }).then(function () {
+    }).then(() => {
       if (_global.default.EmberENV._APPLICATION_TEMPLATE_WRAPPER !== false) {
         context.element = document.querySelector('#ember-testing > .ember-view');
       } else {
         context.element = document.querySelector('#ember-testing');
       }
-    }).then(_settled.default).then(function () {
+    }).then(_settled.default).then(() => {
       return (0, _helperHooks.runHooks)('visit', 'end', url, options);
     });
   }
@@ -6482,35 +7107,35 @@ define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test
 
 
   function currentRouteName() {
-    var context = (0, _setupContext.getContext)();
+    const context = (0, _setupContext.getContext)();
 
     if (!context || !isApplicationTestContext(context)) {
       throw new Error('Cannot call `currentRouteName` without having first called `setupApplicationContext`.');
     }
 
-    var router = context.owner.lookup('router:main');
-    return Ember.get(router, 'currentRouteName');
+    let router = context.owner.lookup('router:main');
+    return (0, _object.get)(router, 'currentRouteName');
   }
 
-  var HAS_CURRENT_URL_ON_ROUTER = (0, _hasEmberVersion.default)(2, 13);
+  const HAS_CURRENT_URL_ON_ROUTER = (0, _hasEmberVersion.default)(2, 13);
   /**
     @public
     @returns {string} the applications current url
   */
 
   function currentURL() {
-    var context = (0, _setupContext.getContext)();
+    const context = (0, _setupContext.getContext)();
 
     if (!context || !isApplicationTestContext(context)) {
       throw new Error('Cannot call `currentURL` without having first called `setupApplicationContext`.');
     }
 
-    var router = context.owner.lookup('router:main');
+    let router = context.owner.lookup('router:main');
 
     if (HAS_CURRENT_URL_ON_ROUTER) {
-      return Ember.get(router, 'currentURL');
+      return (0, _object.get)(router, 'currentURL');
     } else {
-      return Ember.get(router, 'location').getURL();
+      return (0, _object.get)(router, 'location').getURL();
     }
   }
   /**
@@ -6529,12 +7154,12 @@ define("@ember/test-helpers/setup-application-context", ["exports", "@ember/test
 
 
   function setupApplicationContext(context) {
-    var testMetadata = (0, _testMetadata.default)(context);
+    let testMetadata = (0, _testMetadata.default)(context);
     testMetadata.setupTypes.push('setupApplicationContext');
     return _utils.Promise.resolve();
   }
 });
-define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/build-owner", "@ember/test-helpers/settled", "@ember/test-helpers/setup-onerror", "@ember/test-helpers/global", "@ember/test-helpers/resolver", "@ember/test-helpers/application", "@ember/test-helpers/-utils", "@ember/test-helpers/test-metadata"], function (_exports, _buildOwner, _settled, _setupOnerror, _global, _resolver, _application, _utils, _testMetadata) {
+define("@ember/test-helpers/setup-context", ["exports", "@ember/runloop", "@ember/object", "@ember/application", "@ember/test-helpers/build-owner", "@ember/test-helpers/settled", "@ember/test-helpers/setup-onerror", "ember", "@ember/debug", "@ember/test-helpers/global", "@ember/test-helpers/resolver", "@ember/test-helpers/application", "@ember/test-helpers/-utils", "@ember/test-helpers/test-metadata", "@ember/destroyable", "@ember/test-helpers/-internal/deprecations", "@ember/test-helpers/-internal/warnings"], function (_exports, _runloop, _object, _application, _buildOwner, _settled, _setupOnerror, _ember, _debug, _global, _resolver, _application2, _utils, _testMetadata, _destroyable, _deprecations, _warnings) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -6546,14 +7171,52 @@ define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/bui
   _exports.unsetContext = unsetContext;
   _exports.pauseTest = pauseTest;
   _exports.resumeTest = resumeTest;
+  _exports.getDeprecations = getDeprecations;
+  _exports.getDeprecationsDuringCallback = getDeprecationsDuringCallback;
+  _exports.getWarnings = getWarnings;
+  _exports.getWarningsDuringCallback = getWarningsDuringCallback;
   _exports.default = setupContext;
+  _exports.SetUsage = _exports.ComponentRenderMap = void 0;
+  // This handler exists to provide the underlying data to enable the following methods:
+  // * getDeprecations()
+  // * getDeprecationsDuringCallback()
+  // * getDeprecationsDuringCallbackForContext()
+  (0, _debug.registerDeprecationHandler)((message, options, next) => {
+    const context = getContext();
 
-  // eslint-disable-next-line require-jsdoc
+    if (context === undefined) {
+      return;
+    }
+
+    (0, _deprecations.getDeprecationsForContext)(context).push({
+      message,
+      options
+    });
+    next.apply(null, [message, options]);
+  }); // This handler exists to provide the underlying data to enable the following methods:
+  // * getWarnings()
+  // * getWarningsDuringCallback()
+  // * getWarningsDuringCallbackForContext()
+
+  (0, _debug.registerWarnHandler)((message, options, next) => {
+    const context = getContext();
+
+    if (context === undefined) {
+      return;
+    }
+
+    (0, _warnings.getWarningsForContext)(context).push({
+      message,
+      options
+    });
+    next.apply(null, [message, options]);
+  }); // eslint-disable-next-line require-jsdoc
+
   function isTestContext(context) {
     return typeof context.pauseTest === 'function' && typeof context.resumeTest === 'function';
   }
 
-  var __test_context__;
+  let __test_context__;
   /**
     Stores the provided context as the "global testing context".
   
@@ -6627,7 +7290,7 @@ define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/bui
 
 
   function pauseTest() {
-    var context = getContext();
+    let context = getContext();
 
     if (!context || !isTestContext(context)) {
       throw new Error('Cannot call `pauseTest` without having first called `setupTest` or `setupRenderingTest`.');
@@ -6643,7 +7306,7 @@ define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/bui
 
 
   function resumeTest() {
-    var context = getContext();
+    let context = getContext();
 
     if (!context || !isTestContext(context)) {
       throw new Error('Cannot call `resumeTest` without having first called `setupTest` or `setupRenderingTest`.');
@@ -6659,12 +7322,154 @@ define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/bui
 
   function cleanup(context) {
     (0, _settled._teardownAJAXHooks)();
-    Ember.testing = false;
+    _ember.default.testing = false;
     unsetContext(); // this should not be required, but until https://github.com/emberjs/ember.js/pull/19106
     // lands in a 3.20 patch release
 
     context.owner.destroy();
   }
+  /**
+   * Returns deprecations which have occured so far for a the current test context
+   *
+   * @public
+   * @returns {Array<DeprecationFailure>} An array of deprecation messages
+   * @example <caption>Usage via ember-qunit</caption>
+   *
+   * import { getDeprecations } from '@ember/test-helpers';
+   *
+   * module('awesome-sauce', function(hooks) {
+   *   setupRenderingTest(hooks);
+   *
+   *   test('does something awesome', function(assert) {
+         const deprecations = getDeprecations() // => returns deprecations which have occured so far in this test
+   *   });
+   * });
+   */
+
+
+  function getDeprecations() {
+    const context = getContext();
+
+    if (!context) {
+      throw new Error('[@ember/test-helpers] could not get deprecations if no test context is currently active');
+    }
+
+    return (0, _deprecations.getDeprecationsForContext)(context);
+  }
+  /**
+   * Returns deprecations which have occured so far for a the current test context
+   *
+   * @public
+   * @param {CallableFunction} [callback] The callback that when executed will have its DeprecationFailure recorded
+   * @returns {Array<DeprecationFailure> | Promise<Array<DeprecationFailure>>} An array of deprecation messages
+   * @example <caption>Usage via ember-qunit</caption>
+   *
+   * import { getDeprecationsDuringCallback } from '@ember/test-helpers';
+   *
+   * module('awesome-sauce', function(hooks) {
+   *   setupRenderingTest(hooks);
+   *
+   *   test('does something awesome', function(assert) {
+   *     const deprecations = getDeprecationsDuringCallback(() => {
+   *       // code that might emit some deprecations
+   *
+   *     }); // => returns deprecations which occured while the callback was invoked
+   *   });
+   *
+   *
+   *   test('does something awesome', async function(assert) {
+   *     const deprecations = await getDeprecationsDuringCallback(async () => {
+   *       // awaited code that might emit some deprecations
+   *     }); // => returns deprecations which occured while the callback was invoked
+   *   });
+   * });
+   */
+
+
+  function getDeprecationsDuringCallback(callback) {
+    const context = getContext();
+
+    if (!context) {
+      throw new Error('[@ember/test-helpers] could not get deprecations if no test context is currently active');
+    }
+
+    return (0, _deprecations.getDeprecationsDuringCallbackForContext)(context, callback);
+  }
+  /**
+   * Returns warnings which have occured so far for a the current test context
+   *
+   * @public
+   * @returns {Array<Warning>} An array of warnings
+   * @example <caption>Usage via ember-qunit</caption>
+   *
+   * import { getWarnings } from '@ember/test-helpers';
+   *
+   * module('awesome-sauce', function(hooks) {
+   *   setupRenderingTest(hooks);
+   *
+   *   test('does something awesome', function(assert) {
+         const warnings = getWarnings() // => returns warnings which have occured so far in this test
+   *   });
+   * });
+   */
+
+
+  function getWarnings() {
+    const context = getContext();
+
+    if (!context) {
+      throw new Error('[@ember/test-helpers] could not get warnings if no test context is currently active');
+    }
+
+    return (0, _warnings.getWarningsForContext)(context);
+  }
+  /**
+   * Returns warnings which have occured so far for a the current test context
+   *
+   * @public
+   * @param {CallableFunction} [callback] The callback that when executed will have its warnings recorded
+   * @returns {Array<Warning> | Promise<Array<Warning>>} An array of warnings information
+   * @example <caption>Usage via ember-qunit</caption>
+   *
+   * import { getWarningsDuringCallback } from '@ember/test-helpers';
+   * import { warn } from '@ember/debug';
+   *
+   * module('awesome-sauce', function(hooks) {
+   *   setupRenderingTest(hooks);
+   *
+   *   test('does something awesome', function(assert) {
+   *     const warnings = getWarningsDuringCallback(() => {
+   *     warn('some warning');
+   *
+   *     }); // => returns warnings which occured while the callback was invoked
+   *   });
+   *
+   *   test('does something awesome', async function(assert) {
+   *     warn('some warning');
+   *
+   *     const warnings = await getWarningsDuringCallback(async () => {
+   *       warn('some other warning');
+   *     }); // => returns warnings which occured while the callback was invoked
+   *   });
+   * });
+   */
+
+
+  function getWarningsDuringCallback(callback) {
+    const context = getContext();
+
+    if (!context) {
+      throw new Error('[@ember/test-helpers] could not get warnings if no test context is currently active');
+    }
+
+    return (0, _warnings.getWarningsDuringCallbackForContext)(context, callback);
+  } // This WeakMap is used to track whenever a component is rendered in a test so that we can throw
+  // assertions when someone uses `this.{set,setProperties}` while rendering a component.
+
+
+  const ComponentRenderMap = new WeakMap();
+  _exports.ComponentRenderMap = ComponentRenderMap;
+  const SetUsage = new WeakMap();
   /**
     Used by test framework addons to setup the provided context for testing.
   
@@ -6683,28 +7488,29 @@ define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/bui
     @returns {Promise<Object>} resolves with the context that was setup
   */
 
+  _exports.SetUsage = SetUsage;
 
   function setupContext(context) {
-    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-    Ember.testing = true;
+    let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    _ember.default.testing = true;
     setContext(context);
-    var testMetadata = (0, _testMetadata.default)(context);
+    let testMetadata = (0, _testMetadata.default)(context);
     testMetadata.setupTypes.push('setupContext');
-    Ember.run.backburner.DEBUG = true;
-
-    Ember._registerDestructor(context, cleanup);
-
+    _runloop._backburner.DEBUG = true;
+    (0, _destroyable.registerDestructor)(context, cleanup);
     (0, _setupOnerror._prepareOnerror)(context);
-    return _utils.Promise.resolve().then(function () {
-      var application = (0, _application.getApplication)();
+    return _utils.Promise.resolve().then(() => {
+      let application = (0, _application2.getApplication)();
 
       if (application) {
-        return application.boot().then(function () {});
+        return application.boot().then(() => {});
       }
 
       return;
-    }).then(function () {
-      var resolver = options.resolver; // This handles precendence, specifying a specific option of
+    }).then(() => {
+      let {
+        resolver
+      } = options; // This handles precendence, specifying a specific option of
       // resolver always trumps whatever is auto-detected, then we fallback to
       // the suite-wide registrations
       //
@@ -6715,63 +7521,96 @@ define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/bui
         return (0, _buildOwner.default)(null, resolver);
       }
 
-      return (0, _buildOwner.default)((0, _application.getApplication)(), (0, _resolver.getResolver)());
-    }).then(function (owner) {
-      Ember._associateDestroyableChild(context, owner);
-
+      return (0, _buildOwner.default)((0, _application2.getApplication)(), (0, _resolver.getResolver)());
+    }).then(owner => {
+      (0, _destroyable.associateDestroyableChild)(context, owner);
       Object.defineProperty(context, 'owner', {
         configurable: true,
         enumerable: true,
         value: owner,
         writable: false
       });
-      Ember.setOwner(context, owner);
+      (0, _application.setOwner)(context, owner);
       Object.defineProperty(context, 'set', {
         configurable: true,
         enumerable: true,
-        value: function value(key, _value) {
-          var ret = Ember.run(function () {
-            return Ember.set(context, key, _value);
+
+        value(key, value) {
+          let ret = (0, _runloop.run)(function () {
+            if (ComponentRenderMap.has(context)) {
+              (true && !(false) && (0, _debug.assert)('You cannot call `this.set` when passing a component to `render()` (the rendered component does not have access to the test context).'));
+            } else {
+              let setCalls = SetUsage.get(context);
+
+              if (setCalls === undefined) {
+                setCalls = [];
+                SetUsage.set(context, setCalls);
+              }
+
+              setCalls?.push(key);
+            }
+
+            return (0, _object.set)(context, key, value);
           });
           return ret;
         },
+
         writable: false
       });
       Object.defineProperty(context, 'setProperties', {
         configurable: true,
         enumerable: true,
-        value: function value(hash) {
-          var ret = Ember.run(function () {
-            return Ember.setProperties(context, hash);
+
+        value(hash) {
+          let ret = (0, _runloop.run)(function () {
+            if (ComponentRenderMap.has(context)) {
+              (true && !(false) && (0, _debug.assert)('You cannot call `this.setProperties` when passing a component to `render()` (the rendered component does not have access to the test context)'));
+            } else {
+              let setCalls = SetUsage.get(context);
+
+              if (SetUsage.get(context) === undefined) {
+                setCalls = [];
+                SetUsage.set(context, setCalls);
+              }
+
+              setCalls?.push(...Object.keys(hash));
+            }
+
+            return (0, _object.setProperties)(context, hash);
           });
           return ret;
         },
+
         writable: false
       });
       Object.defineProperty(context, 'get', {
         configurable: true,
         enumerable: true,
-        value: function value(key) {
-          return Ember.get(context, key);
+
+        value(key) {
+          return (0, _object.get)(context, key);
         },
+
         writable: false
       });
       Object.defineProperty(context, 'getProperties', {
         configurable: true,
         enumerable: true,
-        value: function value() {
+
+        value() {
           for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
             args[_key] = arguments[_key];
           }
 
-          return Ember.getProperties(context, args);
+          return (0, _object.getProperties)(context, args);
         },
+
         writable: false
       });
-      var resume;
+      let resume;
 
       context.resumeTest = function resumeTest() {
-        (true && !(Boolean(resume)) && Ember.assert('Testing has not been paused. There is nothing to resume.', Boolean(resume)));
+        (true && !(Boolean(resume)) && (0, _debug.assert)('Testing has not been paused. There is nothing to resume.', Boolean(resume)));
         resume();
         _global.default.resumeTest = resume = undefined;
       };
@@ -6779,7 +7618,7 @@ define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/bui
       context.pauseTest = function pauseTest() {
         console.info('Testing paused. Use `resumeTest()` to continue.'); // eslint-disable-line no-console
 
-        return new _utils.Promise(function (resolve) {
+        return new _utils.Promise(resolve => {
           resume = resolve;
           _global.default.resumeTest = resumeTest;
         });
@@ -6790,7 +7629,7 @@ define("@ember/test-helpers/setup-context", ["exports", "@ember/test-helpers/bui
     });
   }
 });
-define("@ember/test-helpers/setup-onerror", ["exports", "@ember/test-helpers/setup-context"], function (_exports, _setupContext) {
+define("@ember/test-helpers/setup-onerror", ["exports", "ember", "@ember/test-helpers/setup-context"], function (_exports, _ember, _setupContext) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -6800,7 +7639,7 @@ define("@ember/test-helpers/setup-onerror", ["exports", "@ember/test-helpers/set
   _exports.resetOnerror = resetOnerror;
   _exports._prepareOnerror = _prepareOnerror;
   _exports._cleanupOnerror = _cleanupOnerror;
-  var cachedOnerror = new Map();
+  let cachedOnerror = new Map();
   /**
    * Sets the `Ember.onerror` function for tests. This value is intended to be reset after
    * each test to ensure correct test isolation. To reset, you should simply call `setupOnerror`
@@ -6821,7 +7660,7 @@ define("@ember/test-helpers/setup-onerror", ["exports", "@ember/test-helpers/set
    */
 
   function setupOnerror(onError) {
-    var context = (0, _setupContext.getContext)();
+    let context = (0, _setupContext.getContext)();
 
     if (!context) {
       throw new Error('Must setup test context before calling setupOnerror');
@@ -6835,7 +7674,7 @@ define("@ember/test-helpers/setup-onerror", ["exports", "@ember/test-helpers/set
       onError = cachedOnerror.get(context);
     }
 
-    Ember.onerror = onError;
+    _ember.default.onerror = onError;
   }
   /**
    * Resets `Ember.onerror` to the value it originally was at the start of the test run.
@@ -6854,10 +7693,10 @@ define("@ember/test-helpers/setup-onerror", ["exports", "@ember/test-helpers/set
 
 
   function resetOnerror() {
-    var context = (0, _setupContext.getContext)();
+    let context = (0, _setupContext.getContext)();
 
     if (context && cachedOnerror.has(context)) {
-      Ember.onerror = cachedOnerror.get(context);
+      _ember.default.onerror = cachedOnerror.get(context);
     }
   }
   /**
@@ -6874,7 +7713,7 @@ define("@ember/test-helpers/setup-onerror", ["exports", "@ember/test-helpers/set
       throw new Error('_prepareOnerror should only be called once per-context');
     }
 
-    cachedOnerror.set(context, Ember.onerror);
+    cachedOnerror.set(context, _ember.default.onerror);
   }
   /**
    * Removes the cached value of Ember.onerror.
@@ -6889,7 +7728,7 @@ define("@ember/test-helpers/setup-onerror", ["exports", "@ember/test-helpers/set
     cachedOnerror.delete(context);
   }
 });
-define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-helpers/global", "@ember/test-helpers/setup-context", "@ember/test-helpers/-utils", "@ember/test-helpers/settled", "@ember/test-helpers/dom/get-root-element", "@ember/test-helpers/test-metadata", "@ember/test-helpers/-internal/helper-hooks", "@ember/test-helpers/has-ember-version"], function (_exports, _global, _setupContext, _utils, _settled, _getRootElement, _testMetadata, _helperHooks, _hasEmberVersion) {
+define("@ember/test-helpers/setup-rendering-context", ["exports", "@embroider/macros/runtime", "@ember/template-factory", "@ember/runloop", "ember", "@ember/test-helpers/global", "@ember/test-helpers/setup-context", "@ember/test-helpers/-utils", "@ember/test-helpers/settled", "@ember/test-helpers/dom/get-root-element", "@ember/test-helpers/test-metadata", "@ember/debug", "@ember/test-helpers/-internal/helper-hooks", "@ember/test-helpers/has-ember-version", "@ember/test-helpers/-internal/is-component", "@embroider/util"], function (_exports, _runtime, _templateFactory, _runloop, _ember, _global, _setupContext, _utils, _settled, _getRootElement, _testMetadata, _debug, _helperHooks, _hasEmberVersion, _isComponent, _util) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -6899,7 +7738,9 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
   _exports.render = render;
   _exports.clearRender = clearRender;
   _exports.default = setupRenderingContext;
-  var OUTLET_TEMPLATE = Ember.HTMLBars.template(
+
+  /* globals EmberENV */
+  const OUTLET_TEMPLATE = (0, _templateFactory.createTemplateFactory)(
   /*
     {{outlet}}
   */
@@ -6909,13 +7750,23 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
     "moduleName": "(unknown template module)",
     "isStrictMode": false
   });
-  var EMPTY_TEMPLATE = Ember.HTMLBars.template(
+  const EMPTY_TEMPLATE = (0, _templateFactory.createTemplateFactory)(
   /*
     
   */
   {
     "id": "BD59E4Lo",
     "block": "[[],[],false,[]]",
+    "moduleName": "(unknown template module)",
+    "isStrictMode": false
+  });
+  const INVOKE_PROVIDED_COMPONENT = (0, _templateFactory.createTemplateFactory)(
+  /*
+    <this.ProvidedComponent />
+  */
+  {
+    "id": "jx0Ye8Pb",
+    "block": "[[[8,[30,0,[\"ProvidedComponent\"]],null,null,null]],[],false,[]]",
     "moduleName": "(unknown template module)",
     "isStrictMode": false
   }); // eslint-disable-next-line require-jsdoc
@@ -6932,7 +7783,7 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
 
 
   function lookupTemplate(owner, templateFullName) {
-    var template = owner.lookup(templateFullName);
+    let template = owner.lookup(templateFullName);
     if (typeof template === 'function') return template(owner);
     return template;
   }
@@ -6944,7 +7795,7 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
 
 
   function lookupOutletTemplate(owner) {
-    var OutletTemplate = lookupTemplate(owner, 'template:-outlet');
+    let OutletTemplate = lookupTemplate(owner, 'template:-outlet');
 
     if (!OutletTemplate) {
       owner.register('template:-outlet', OUTLET_TEMPLATE);
@@ -6954,40 +7805,79 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
     return OutletTemplate;
   }
 
-  var templateId = 0;
+  let templateId = 0;
   /**
     Renders the provided template and appends it to the DOM.
   
     @public
-    @param {CompiledTemplate} template the template to render
+    @param {Template|Component} templateOrComponent the component (or template) to render
+    @param {RenderOptions} options options hash containing engine owner ({ owner: engineOwner })
     @returns {Promise<void>} resolves when settled
   */
 
-  function render(template) {
-    var context = (0, _setupContext.getContext)();
+  function render(templateOrComponent, options) {
+    let context = (0, _setupContext.getContext)();
 
-    if (!template) {
+    if (!templateOrComponent) {
       throw new Error('you must pass a template to `render()`');
     }
 
-    return _utils.Promise.resolve().then(function () {
-      return (0, _helperHooks.runHooks)('render', 'start');
-    }).then(function () {
+    return _utils.Promise.resolve().then(() => (0, _helperHooks.runHooks)('render', 'start')).then(() => {
       if (!context || !isRenderingTestContext(context)) {
         throw new Error('Cannot call `render` without having first called `setupRenderingContext`.');
       }
 
-      var owner = context.owner;
-      var testMetadata = (0, _testMetadata.default)(context);
+      let {
+        owner
+      } = context;
+      let testMetadata = (0, _testMetadata.default)(context);
       testMetadata.usedHelpers.push('render');
-      var toplevelView = owner.lookup('-top-level-view:main');
-      var OutletTemplate = lookupOutletTemplate(owner);
-      templateId += 1;
-      var templateFullName = "template:-undertest-".concat(templateId);
-      owner.register(templateFullName, template);
-      var outletState = {
+      let toplevelView = owner.lookup('-top-level-view:main');
+      let OutletTemplate = lookupOutletTemplate(owner);
+      let ownerToRenderFrom = options?.owner || owner;
+
+      if ((0, _runtime.macroCondition)(false)) {
+        // Pre 3.24, we just don't support rendering components at all, so we error
+        // if we find anything that isn't a template.
+        const isTemplate = '__id' in templateOrComponent && '__meta' in templateOrComponent || 'id' in templateOrComponent && 'meta' in templateOrComponent;
+
+        if (!isTemplate) {
+          throw new Error(`Using \`render\` with something other than a pre-compiled template is not supported until Ember 3.24 (you are on ${_ember.default.VERSION}).`);
+        }
+
+        templateId += 1;
+        let templateFullName = `template:-undertest-${templateId}`;
+        ownerToRenderFrom.register(templateFullName, templateOrComponent);
+        templateOrComponent = lookupTemplate(ownerToRenderFrom, templateFullName);
+      } else {
+        if ((0, _isComponent.default)(templateOrComponent, owner)) {
+          // We use this to track when `render` is used with a component so that we can throw an
+          // assertion if `this.{set,setProperty} is used in the same test
+          _setupContext.ComponentRenderMap.set(context, true);
+
+          const setCalls = _setupContext.SetUsage.get(context);
+
+          if (setCalls !== undefined) {
+            (true && !(false) && (0, _debug.assert)(`You cannot call \`this.set\` or \`this.setProperties\` when passing a component to \`render\`, but they were called for the following properties:\n${setCalls.map(key => `  - ${key}`).join('\n')}`));
+          }
+
+          let ProvidedComponent = (0, _util.ensureSafeComponent)(templateOrComponent, context);
+          context = {
+            ProvidedComponent
+          };
+          templateOrComponent = INVOKE_PROVIDED_COMPONENT;
+        } else {
+          templateId += 1;
+          let templateFullName = `template:-undertest-${templateId}`;
+          ownerToRenderFrom.register(templateFullName, templateOrComponent);
+          templateOrComponent = lookupTemplate(ownerToRenderFrom, templateFullName);
+        }
+      }
+
+      let outletState = {
         render: {
-          owner: owner,
+          owner,
+          // always use the host app owner for application outlet
           into: undefined,
           outlet: 'main',
           name: 'application',
@@ -6998,13 +7888,14 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
         outlets: {
           main: {
             render: {
-              owner: owner,
+              owner: ownerToRenderFrom,
+              // the actual owner to be used for any lookups
               into: undefined,
               outlet: 'main',
               name: 'index',
               controller: context,
               ViewClass: undefined,
-              template: lookupTemplate(owner, templateFullName),
+              template: templateOrComponent,
               outlets: {}
             },
             outlets: {}
@@ -7019,7 +7910,7 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
       // render), but on Ember < 3.23 that is not guaranteed.
 
       if (!(0, _hasEmberVersion.default)(3, 23)) {
-        Ember.run.backburner.ensureInstance();
+        _runloop.run.backburner.ensureInstance();
       } // returning settled here because the actual rendering does not happen until
       // the renderer detects it is dirty (which happens on backburner's end
       // hook), see the following implementation details:
@@ -7029,9 +7920,7 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
 
 
       return (0, _settled.default)();
-    }).then(function () {
-      return (0, _helperHooks.runHooks)('render', 'end');
-    });
+    }).then(() => (0, _helperHooks.runHooks)('render', 'end'));
   }
   /**
     Clears any templates previously rendered. This is commonly used for
@@ -7044,7 +7933,7 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
 
 
   function clearRender() {
-    var context = (0, _setupContext.getContext)();
+    let context = (0, _setupContext.getContext)();
 
     if (!context || !isRenderingTestContext(context)) {
       throw new Error('Cannot call `clearRender` without having first called `setupRenderingContext`.');
@@ -7074,13 +7963,15 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
 
 
   function setupRenderingContext(context) {
-    var testMetadata = (0, _testMetadata.default)(context);
+    let testMetadata = (0, _testMetadata.default)(context);
     testMetadata.setupTypes.push('setupRenderingContext');
-    return _utils.Promise.resolve().then(function () {
-      var owner = context.owner;
+    return _utils.Promise.resolve().then(() => {
+      let {
+        owner
+      } = context;
 
-      var renderDeprecationWrapper = function renderDeprecationWrapper(template) {
-        (true && !(false) && Ember.deprecate('Using this.render has been deprecated, consider using `render` imported from `@ember/test-helpers`.', false, {
+      let renderDeprecationWrapper = function (template) {
+        (true && !(false) && (0, _debug.deprecate)('Using this.render has been deprecated, consider using `render` imported from `@ember/test-helpers`.', false, {
           id: 'ember-test-helpers.setup-rendering-context.render',
           until: '3.0.0',
           for: '@ember/test-helpers',
@@ -7092,8 +7983,8 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
         return render(template);
       };
 
-      var clearRenderDeprecationWrapper = function clearRenderDeprecationWrapper() {
-        (true && !(false) && Ember.deprecate('Using this.clearRender has been deprecated, consider using `clearRender` imported from `@ember/test-helpers`.', false, {
+      let clearRenderDeprecationWrapper = function () {
+        (true && !(false) && (0, _debug.deprecate)('Using this.clearRender has been deprecated, consider using `clearRender` imported from `@ember/test-helpers`.', false, {
           id: 'ember-test-helpers.setup-rendering-context.clearRender',
           until: '3.0.0',
           for: '@ember/test-helpers',
@@ -7123,23 +8014,30 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
       // manually start the event dispatcher.
 
       if (owner._emberTestHelpersMockOwner) {
-        var dispatcher = owner.lookup('event_dispatcher:main') || Ember.EventDispatcher.create();
+        let dispatcher = owner.lookup('event_dispatcher:main') || _ember.default.EventDispatcher.create();
+
         dispatcher.setup({}, '#ember-testing');
       }
 
-      var OutletView = owner.factoryFor ? owner.factoryFor('view:-outlet') : owner._lookupFactory('view:-outlet');
-      var toplevelView = OutletView.create();
+      let OutletView = owner.factoryFor ? owner.factoryFor('view:-outlet') : owner._lookupFactory('view:-outlet');
+      let environment = owner.lookup('-environment:main');
+      let template = owner.lookup('template:-outlet');
+      let toplevelView = OutletView.create({
+        template,
+        environment
+      });
       owner.register('-top-level-view:main', {
-        create: function create() {
+        create() {
           return toplevelView;
         }
+
       }); // initially render a simple empty template
 
-      return render(EMPTY_TEMPLATE).then(function () {
-        Ember.run(toplevelView, 'appendTo', (0, _getRootElement.default)());
+      return render(EMPTY_TEMPLATE).then(() => {
+        (0, _runloop.run)(toplevelView, 'appendTo', (0, _getRootElement.default)());
         return (0, _settled.default)();
       });
-    }).then(function () {
+    }).then(() => {
       Object.defineProperty(context, 'element', {
         configurable: true,
         enumerable: true,
@@ -7157,7 +8055,7 @@ define("@ember/test-helpers/setup-rendering-context", ["exports", "@ember/test-h
     });
   }
 });
-define("@ember/test-helpers/teardown-context", ["exports", "@ember/test-helpers/-utils", "@ember/test-helpers/settled", "@ember/test-helpers/setup-onerror"], function (_exports, _utils, _settled, _setupOnerror) {
+define("@ember/test-helpers/teardown-context", ["exports", "@ember/test-helpers/-utils", "@ember/test-helpers/settled", "@ember/test-helpers/setup-onerror", "@ember/destroyable"], function (_exports, _utils, _settled, _setupOnerror, _destroyable) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -7181,16 +8079,16 @@ define("@ember/test-helpers/teardown-context", ["exports", "@ember/test-helpers/
     @returns {Promise<void>} resolves when settled
   */
   function teardownContext(context, options) {
-    var waitForSettled = true;
+    let waitForSettled = true;
 
     if (options !== undefined && 'waitForSettled' in options) {
       waitForSettled = options.waitForSettled;
     }
 
-    return _utils.Promise.resolve().then(function () {
+    return _utils.Promise.resolve().then(() => {
       (0, _setupOnerror._cleanupOnerror)(context);
-      Ember.destroy(context);
-    }).finally(function () {
+      (0, _destroyable.destroy)(context);
+    }).finally(() => {
       if (waitForSettled) {
         return (0, _settled.default)();
       }
@@ -7208,37 +8106,24 @@ define("@ember/test-helpers/test-metadata", ["exports"], function (_exports) {
   _exports.default = getTestMetadata;
   _exports.TestMetadata = void 0;
 
-  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-  function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
-
-  function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
-
-  var TestMetadata = /*#__PURE__*/function () {
-    function TestMetadata() {
-      _classCallCheck(this, TestMetadata);
-
+  class TestMetadata {
+    constructor() {
       this.setupTypes = [];
       this.usedHelpers = [];
     }
 
-    _createClass(TestMetadata, [{
-      key: "isRendering",
-      get: function get() {
-        return this.setupTypes.indexOf('setupRenderingContext') > -1 && this.usedHelpers.indexOf('render') > -1;
-      }
-    }, {
-      key: "isApplication",
-      get: function get() {
-        return this.setupTypes.indexOf('setupApplicationContext') > -1;
-      }
-    }]);
+    get isRendering() {
+      return this.setupTypes.indexOf('setupRenderingContext') > -1 && this.usedHelpers.indexOf('render') > -1;
+    }
 
-    return TestMetadata;
-  }();
+    get isApplication() {
+      return this.setupTypes.indexOf('setupApplicationContext') > -1;
+    }
+
+  }
 
   _exports.TestMetadata = TestMetadata;
-  var TEST_METADATA = new WeakMap();
+  const TEST_METADATA = new WeakMap();
   /**
    * Gets the test metadata associated with the provided test context. Will create
    * a new test metadata object if one does not exist.
@@ -7255,18 +8140,18 @@ define("@ember/test-helpers/test-metadata", ["exports"], function (_exports) {
     return TEST_METADATA.get(context);
   }
 });
-define("@ember/test-helpers/validate-error-handler", ["exports"], function (_exports) {
+define("@ember/test-helpers/validate-error-handler", ["exports", "ember"], function (_exports, _ember) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
     value: true
   });
   _exports.default = validateErrorHandler;
-  var VALID = Object.freeze({
+  const VALID = Object.freeze({
     isValid: true,
     message: null
   });
-  var INVALID = Object.freeze({
+  const INVALID = Object.freeze({
     isValid: false,
     message: 'error handler should have re-thrown the provided error'
   });
@@ -7295,15 +8180,15 @@ define("@ember/test-helpers/validate-error-handler", ["exports"], function (_exp
    */
 
   function validateErrorHandler() {
-    var callback = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : Ember.onerror;
+    let callback = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : _ember.default.onerror;
 
     if (callback === undefined || callback === null) {
       return VALID;
     }
 
-    var error = new Error('Error handler validation error!');
-    var originalEmberTesting = Ember.testing;
-    Ember.testing = true;
+    let error = new Error('Error handler validation error!');
+    let originalEmberTesting = _ember.default.testing;
+    _ember.default.testing = true;
 
     try {
       callback(error);
@@ -7312,7 +8197,7 @@ define("@ember/test-helpers/validate-error-handler", ["exports"], function (_exp
         return VALID;
       }
     } finally {
-      Ember.testing = originalEmberTesting;
+      _ember.default.testing = originalEmberTesting;
     }
 
     return INVALID;
@@ -7325,8 +8210,8 @@ define("@ember/test-helpers/wait-until", ["exports", "@ember/test-helpers/-utils
     value: true
   });
   _exports.default = waitUntil;
-  var TIMEOUTS = [0, 1, 2, 5, 7];
-  var MAX_TIMEOUT = 10;
+  const TIMEOUTS = [0, 1, 2, 5, 7];
+  const MAX_TIMEOUT = 10;
   /**
     Wait for the provided callback to return a truthy value.
   
@@ -7350,16 +8235,16 @@ define("@ember/test-helpers/wait-until", ["exports", "@ember/test-helpers/-utils
   */
 
   function waitUntil(callback) {
-    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-    var timeout = 'timeout' in options ? options.timeout : 1000;
-    var timeoutMessage = 'timeoutMessage' in options ? options.timeoutMessage : 'waitUntil timed out'; // creating this error eagerly so it has the proper invocation stack
+    let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    let timeout = 'timeout' in options ? options.timeout : 1000;
+    let timeoutMessage = 'timeoutMessage' in options ? options.timeoutMessage : 'waitUntil timed out'; // creating this error eagerly so it has the proper invocation stack
 
-    var waitUntilTimedOut = new Error(timeoutMessage);
+    let waitUntilTimedOut = new Error(timeoutMessage);
     return new _utils.Promise(function (resolve, reject) {
-      var time = 0; // eslint-disable-next-line require-jsdoc
+      let time = 0; // eslint-disable-next-line require-jsdoc
 
       function scheduleCheck(timeoutsIndex) {
-        var interval = TIMEOUTS[timeoutsIndex];
+        let interval = TIMEOUTS[timeoutsIndex];
 
         if (interval === undefined) {
           interval = MAX_TIMEOUT;
@@ -7367,7 +8252,7 @@ define("@ember/test-helpers/wait-until", ["exports", "@ember/test-helpers/-utils
 
         (0, _utils.futureTick)(function () {
           time += interval;
-          var value;
+          let value;
 
           try {
             value = callback();
@@ -7401,15 +8286,8 @@ define("ember-cli-test-loader/test-support/index", ["exports"], function (_expor
   _exports.addModuleIncludeMatcher = addModuleIncludeMatcher;
   _exports.addModuleExcludeMatcher = addModuleExcludeMatcher;
   _exports.default = void 0;
-
-  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-  function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
-
-  function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
-
-  var moduleIncludeMatchers = [];
-  var moduleExcludeMatchers = [];
+  let moduleIncludeMatchers = [];
+  let moduleExcludeMatchers = [];
 
   function addModuleIncludeMatcher(fn) {
     moduleIncludeMatchers.push(fn);
@@ -7420,111 +8298,84 @@ define("ember-cli-test-loader/test-support/index", ["exports"], function (_expor
   }
 
   function checkMatchers(matchers, moduleName) {
-    return matchers.some(function (matcher) {
-      return matcher(moduleName);
-    });
+    return matchers.some(matcher => matcher(moduleName));
   }
 
-  var TestLoader = /*#__PURE__*/function () {
-    _createClass(TestLoader, null, [{
-      key: "load",
-      value: function load() {
-        new TestLoader().loadModules();
-      }
-    }]);
+  class TestLoader {
+    static load() {
+      new TestLoader().loadModules();
+    }
 
-    function TestLoader() {
-      _classCallCheck(this, TestLoader);
-
+    constructor() {
       this._didLogMissingUnsee = false;
     }
 
-    _createClass(TestLoader, [{
-      key: "shouldLoadModule",
-      value: function shouldLoadModule(moduleName) {
-        return moduleName.match(/[-_]test$/);
-      }
-    }, {
-      key: "listModules",
-      value: function listModules() {
-        return Object.keys(requirejs.entries);
-      }
-    }, {
-      key: "listTestModules",
-      value: function listTestModules() {
-        var moduleNames = this.listModules();
-        var testModules = [];
-        var moduleName;
+    shouldLoadModule(moduleName) {
+      return moduleName.match(/[-_]test$/);
+    }
 
-        for (var i = 0; i < moduleNames.length; i++) {
-          moduleName = moduleNames[i];
+    listModules() {
+      return Object.keys(requirejs.entries);
+    }
 
-          if (checkMatchers(moduleExcludeMatchers, moduleName)) {
-            continue;
-          }
+    listTestModules() {
+      let moduleNames = this.listModules();
+      let testModules = [];
+      let moduleName;
 
-          if (checkMatchers(moduleIncludeMatchers, moduleName) || this.shouldLoadModule(moduleName)) {
-            testModules.push(moduleName);
-          }
+      for (let i = 0; i < moduleNames.length; i++) {
+        moduleName = moduleNames[i];
+
+        if (checkMatchers(moduleExcludeMatchers, moduleName)) {
+          continue;
         }
 
-        return testModules;
-      }
-    }, {
-      key: "loadModules",
-      value: function loadModules() {
-        var testModules = this.listTestModules();
-        var testModule;
-
-        for (var i = 0; i < testModules.length; i++) {
-          testModule = testModules[i];
-
-          this.require(testModule);
-
-          this.unsee(testModule);
+        if (checkMatchers(moduleIncludeMatchers, moduleName) || this.shouldLoadModule(moduleName)) {
+          testModules.push(moduleName);
         }
       }
-    }, {
-      key: "require",
-      value: function (_require) {
-        function require(_x) {
-          return _require.apply(this, arguments);
-        }
 
-        require.toString = function () {
-          return _require.toString();
-        };
+      return testModules;
+    }
 
-        return require;
-      }(function (moduleName) {
-        try {
-          require(moduleName);
-        } catch (e) {
-          this.moduleLoadFailure(moduleName, e);
-        }
-      })
-    }, {
-      key: "unsee",
-      value: function unsee(moduleName) {
-        if (typeof require.unsee === 'function') {
-          require.unsee(moduleName);
-        } else if (!this._didLogMissingUnsee) {
-          this._didLogMissingUnsee = true;
+    loadModules() {
+      let testModules = this.listTestModules();
+      let testModule;
 
-          if (typeof console !== 'undefined') {
-            console.warn('unable to require.unsee, please upgrade loader.js to >= v3.3.0');
-          }
+      for (let i = 0; i < testModules.length; i++) {
+        testModule = testModules[i];
+
+        this.require(testModule);
+
+        this.unsee(testModule);
+      }
+    }
+
+    require(moduleName) {
+      try {
+        require(moduleName);
+      } catch (e) {
+        this.moduleLoadFailure(moduleName, e);
+      }
+    }
+
+    unsee(moduleName) {
+      if (typeof require.unsee === 'function') {
+        require.unsee(moduleName);
+      } else if (!this._didLogMissingUnsee) {
+        this._didLogMissingUnsee = true;
+
+        if (typeof console !== 'undefined') {
+          console.warn('unable to require.unsee, please upgrade loader.js to >= v3.3.0');
         }
       }
-    }, {
-      key: "moduleLoadFailure",
-      value: function moduleLoadFailure(moduleName, error) {
-        console.error('Error loading: ' + moduleName, error.stack);
-      }
-    }]);
+    }
 
-    return TestLoader;
-  }();
+    moduleLoadFailure(moduleName, error) {
+      console.error('Error loading: ' + moduleName, error.stack);
+    }
+
+  }
 
   _exports.default = TestLoader;
   ;
@@ -7537,26 +8388,13 @@ define("ember-page-title/test-support/get-page-title", ["exports"], function (_e
   });
   _exports.getPageTitle = getPageTitle;
 
-  function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread(); }
-
-  function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-
-  function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
-
-  function _iterableToArray(iter) { if (typeof Symbol !== "undefined" && Symbol.iterator in Object(iter)) return Array.from(iter); }
-
-  function _arrayWithoutHoles(arr) { if (Array.isArray(arr)) return _arrayLikeToArray(arr); }
-
-  function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
-
   // Testem appends progress to the title...
   // and there's no way to stop this at the moment
   function getPageTitle(doc) {
     // In Fastboot context we get 2 title elements if we don't remove one from app/index.html
     // In real world applications, it is mandatory to remove <title> from app/index.html
     // We are keeping both for sake for testing browser and fastboot scenarios
-    var element = _toConsumableArray((doc || window.document).querySelectorAll('head title')).pop();
-
+    let element = [...(doc || window.document).querySelectorAll('head title')].pop();
     return element && element.innerText.trim().replace(/^\(\d+\/\d+\)/, '');
   }
 });
@@ -7568,12 +8406,12 @@ define("ember-page-title/test-support/index", ["exports", "ember-page-title/test
   });
   Object.defineProperty(_exports, "getPageTitle", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _getPageTitle.getPageTitle;
     }
   });
 });
-define("ember-qunit/adapter", ["exports", "qunit", "@ember/test-helpers/has-ember-version"], function (_exports, QUnit, _hasEmberVersion) {
+define("ember-qunit/adapter", ["exports", "ember", "qunit", "@ember/test-helpers/has-ember-version"], function (_exports, _ember, QUnit, _hasEmberVersion) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -7582,12 +8420,10 @@ define("ember-qunit/adapter", ["exports", "qunit", "@ember/test-helpers/has-embe
   _exports.nonTestDoneCallback = nonTestDoneCallback;
   _exports.default = void 0;
 
-  function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
   function unhandledRejectionAssertion(current, error) {
-    var message, source;
+    let message, source;
 
-    if (_typeof(error) === 'object' && error !== null) {
+    if (typeof error === 'object' && error !== null) {
       message = error.message;
       source = error.stack;
     } else if (typeof error === 'string') {
@@ -7609,36 +8445,39 @@ define("ember-qunit/adapter", ["exports", "qunit", "@ember/test-helpers/has-embe
 
   function nonTestDoneCallback() {}
 
-  var Adapter = Ember.Test.Adapter.extend({
-    init: function init() {
+  let Adapter = _ember.default.Test.Adapter.extend({
+    init() {
       this.doneCallbacks = [];
       this.qunit = this.qunit || QUnit;
     },
-    asyncStart: function asyncStart() {
-      var currentTest = this.qunit.config.current;
-      var done = currentTest && currentTest.assert ? currentTest.assert.async() : nonTestDoneCallback;
+
+    asyncStart() {
+      let currentTest = this.qunit.config.current;
+      let done = currentTest && currentTest.assert ? currentTest.assert.async() : nonTestDoneCallback;
       this.doneCallbacks.push({
         test: currentTest,
-        done: done
+        done
       });
     },
-    asyncEnd: function asyncEnd() {
-      var currentTest = this.qunit.config.current;
+
+    asyncEnd() {
+      let currentTest = this.qunit.config.current;
 
       if (this.doneCallbacks.length === 0) {
         throw new Error('Adapter asyncEnd called when no async was expected. Please create an issue in ember-qunit.');
       }
 
-      var _this$doneCallbacks$p = this.doneCallbacks.pop(),
-          test = _this$doneCallbacks$p.test,
-          done = _this$doneCallbacks$p.done; // In future, we should explore fixing this at a different level, specifically
+      let {
+        test,
+        done
+      } = this.doneCallbacks.pop(); // In future, we should explore fixing this at a different level, specifically
       // addressing the pairing of asyncStart/asyncEnd behavior in a more consistent way.
-
 
       if (test === currentTest) {
         done();
       }
     },
+
     // clobber default implementation of `exception` will be added back for Ember
     // < 2.17 just below...
     exception: null
@@ -7647,18 +8486,20 @@ define("ember-qunit/adapter", ["exports", "qunit", "@ember/test-helpers/has-embe
   // automatically re-thrown and will therefore hit QUnit's own global error
   // handler (therefore appropriately causing test failure)
 
+
   if (!(0, _hasEmberVersion.default)(2, 17)) {
     Adapter = Adapter.extend({
-      exception: function exception(error) {
+      exception(error) {
         unhandledRejectionAssertion(QUnit.config.current, error);
       }
+
     });
   }
 
   var _default = Adapter;
   _exports.default = _default;
 });
-define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test-loader", "ember-qunit/qunit-configuration", "@ember/test-helpers", "qunit", "ember-qunit/test-isolation-validation"], function (_exports, _adapter, _testLoader, _qunitConfiguration, _testHelpers, QUnit, _testIsolationValidation) {
+define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test-loader", "ember-qunit/qunit-configuration", "@ember/runloop", "@ember/polyfills", "@ember/test-helpers", "ember", "qunit", "ember-qunit/test-isolation-validation"], function (_exports, _adapter, _testLoader, _qunitConfiguration, _runloop, _polyfills, _testHelpers, _ember, QUnit, _testIsolationValidation) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -7677,19 +8518,19 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
   _exports.start = start;
   Object.defineProperty(_exports, "QUnitAdapter", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _adapter.default;
     }
   });
   Object.defineProperty(_exports, "nonTestDoneCallback", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _adapter.nonTestDoneCallback;
     }
   });
   Object.defineProperty(_exports, "loadTests", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _testLoader.loadTests;
     }
   });
@@ -7699,23 +8540,21 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
     Testem.hookIntoTestFramework();
   }
 
-  var waitForSettled = true;
+  let waitForSettled = true;
 
   function setupTest(hooks, _options) {
-    var options = _options === undefined ? {
-      waitForSettled: waitForSettled
-    } : Ember.assign({
-      waitForSettled: waitForSettled
+    let options = _options === undefined ? {
+      waitForSettled
+    } : (0, _polyfills.assign)({
+      waitForSettled
     }, _options);
     hooks.beforeEach(function (assert) {
-      var _this = this;
-
-      var testMetadata = (0, _testHelpers.getTestMetadata)(this);
+      let testMetadata = (0, _testHelpers.getTestMetadata)(this);
       testMetadata.framework = 'qunit';
-      return (0, _testHelpers.setupContext)(this, options).then(function () {
-        var originalPauseTest = _this.pauseTest;
+      return (0, _testHelpers.setupContext)(this, options).then(() => {
+        let originalPauseTest = this.pauseTest;
 
-        _this.pauseTest = function QUnit_pauseTest() {
+        this.pauseTest = function QUnit_pauseTest() {
           assert.timeout(-1); // prevent the test from timing out
           // This is a temporary work around for
           // https://github.com/emberjs/ember-qunit/issues/496 this clears the
@@ -7733,10 +8572,10 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
   }
 
   function setupRenderingTest(hooks, _options) {
-    var options = _options === undefined ? {
-      waitForSettled: waitForSettled
-    } : Ember.assign({
-      waitForSettled: waitForSettled
+    let options = _options === undefined ? {
+      waitForSettled
+    } : (0, _polyfills.assign)({
+      waitForSettled
     }, _options);
     setupTest(hooks, options);
     hooks.beforeEach(function () {
@@ -7745,10 +8584,10 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
   }
 
   function setupApplicationTest(hooks, _options) {
-    var options = _options === undefined ? {
-      waitForSettled: waitForSettled
-    } : Ember.assign({
-      waitForSettled: waitForSettled
+    let options = _options === undefined ? {
+      waitForSettled
+    } : (0, _polyfills.assign)({
+      waitForSettled
     }, _options);
     setupTest(hooks, options);
     hooks.beforeEach(function () {
@@ -7767,14 +8606,14 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
 
 
   function setupTestContainer() {
-    var testContainer = document.getElementById('ember-testing-container');
+    let testContainer = document.getElementById('ember-testing-container');
 
     if (!testContainer) {
       return;
     }
 
-    var params = QUnit.urlParams;
-    var containerVisibility = params.nocontainer ? 'hidden' : 'visible';
+    let params = QUnit.urlParams;
+    let containerVisibility = params.nocontainer ? 'hidden' : 'visible';
 
     if (params.devmode || params.fullscreencontainer) {
       testContainer.className = ' full-screen';
@@ -7799,7 +8638,7 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
 
 
   function setupTestAdapter() {
-    Ember.Test.adapter = _adapter.default.create();
+    _ember.default.Test.adapter = _adapter.default.create();
   }
   /**
     Ensures that `Ember.testing` is set to `true` before each test begins
@@ -7810,11 +8649,11 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
 
 
   function setupEmberTesting() {
-    QUnit.testStart(function () {
-      Ember.testing = true;
+    QUnit.testStart(() => {
+      _ember.default.testing = true;
     });
-    QUnit.testDone(function () {
-      Ember.testing = false;
+    QUnit.testDone(() => {
+      _ember.default.testing = false;
     });
   }
   /**
@@ -7827,8 +8666,8 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
     QUnit.module('ember-qunit: Ember.onerror validation', function () {
       QUnit.test('Ember.onerror is functioning properly', function (assert) {
         assert.expect(1);
-        var result = (0, _testHelpers.validateErrorHandler)();
-        assert.ok(result.isValid, "Ember.onerror handler with invalid testing behavior detected. An Ember.onerror handler _must_ rethrow exceptions when `Ember.testing` is `true` or the test suite is unreliable. See https://git.io/vbine for more details.");
+        let result = (0, _testHelpers.validateErrorHandler)();
+        assert.ok(result.isValid, `Ember.onerror handler with invalid testing behavior detected. An Ember.onerror handler _must_ rethrow exceptions when \`Ember.testing\` is \`true\` or the test suite is unreliable. See https://git.io/vbine for more details.`);
       });
     });
   }
@@ -7839,10 +8678,8 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
 
   function setupTestIsolationValidation(delay) {
     waitForSettled = false;
-    Ember.run.backburner.DEBUG = true;
-    QUnit.on('testStart', function () {
-      return (0, _testIsolationValidation.installTestNotIsolatedHook)(delay);
-    });
+    _runloop.run.backburner.DEBUG = true;
+    QUnit.on('testStart', () => (0, _testIsolationValidation.installTestNotIsolatedHook)(delay));
   }
   /**
      @method start
@@ -7869,7 +8706,7 @@ define("ember-qunit/index", ["exports", "ember-qunit/adapter", "ember-qunit/test
 
 
   function start() {
-    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
     if (options.loadTests !== false) {
       (0, _testLoader.loadTests)();
@@ -7920,7 +8757,7 @@ define("ember-qunit/qunit-configuration", ["qunit"], function (QUnit) {
   });
   QUnit.config.testTimeout = QUnit.urlParams.devmode ? null : 60000; //Default Test Timeout 60 Seconds
 });
-define("ember-qunit/test-isolation-validation", ["exports", "qunit", "@ember/test-helpers"], function (_exports, QUnit, _testHelpers) {
+define("ember-qunit/test-isolation-validation", ["exports", "qunit", "@ember/runloop", "@ember/test-helpers"], function (_exports, QUnit, _runloop, _testHelpers) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -7946,19 +8783,19 @@ define("ember-qunit/test-isolation-validation", ["exports", "qunit", "@ember/tes
    * @param {string} testInfo.name The test name
    */
   function detectIfTestNotIsolated(test) {
-    var message = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+    let message = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
 
     if (!(0, _testHelpers.isSettled)()) {
-      var _getSettledState = (0, _testHelpers.getSettledState)(),
-          debugInfo = _getSettledState.debugInfo;
-
-      console.group("".concat(test.module.name, ": ").concat(test.testName));
+      let {
+        debugInfo
+      } = (0, _testHelpers.getSettledState)();
+      console.group(`${test.module.name}: ${test.testName}`);
       debugInfo.toConsole();
       console.groupEnd();
       test.expected++;
       test.assert.pushResult({
         result: false,
-        message: "".concat(message, " \nMore information has been printed to the console. Please use that information to help in debugging.\n\n")
+        message: `${message} \nMore information has been printed to the console. Please use that information to help in debugging.\n\n`
       });
     }
   }
@@ -7973,15 +8810,15 @@ define("ember-qunit/test-isolation-validation", ["exports", "qunit", "@ember/tes
 
 
   function installTestNotIsolatedHook() {
-    var delay = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 50;
+    let delay = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 50;
 
     if (!(0, _testHelpers.getDebugInfo)()) {
       return;
     }
 
-    var test = QUnit.config.current;
-    var finish = test.finish;
-    var pushFailure = test.pushFailure;
+    let test = QUnit.config.current;
+    let finish = test.finish;
+    let pushFailure = test.pushFailure;
 
     test.pushFailure = function (message) {
       if (message.indexOf('Test took longer than') === 0) {
@@ -8007,36 +8844,30 @@ define("ember-qunit/test-isolation-validation", ["exports", "qunit", "@ember/tes
 
 
     test.finish = function () {
-      var _arguments = arguments,
-          _this = this;
-
-      var doFinish = function doFinish() {
-        return finish.apply(_this, _arguments);
-      };
+      let doFinish = () => finish.apply(this, arguments);
 
       if ((0, _testHelpers.isSettled)()) {
         return doFinish();
       } else {
         return (0, _testHelpers.waitUntil)(_testHelpers.isSettled, {
           timeout: delay
-        }).catch(function () {// we consider that when waitUntil times out, you're in a state of
+        }).catch(() => {// we consider that when waitUntil times out, you're in a state of
           // test isolation violation. The nature of the error is irrelevant
           // in this case, and we want to allow the error to fall through
           // to the finally, where cleanup occurs.
-        }).finally(function () {
-          detectIfTestNotIsolated(_this, 'Test is not isolated (async execution is extending beyond the duration of the test).'); // canceling timers here isn't perfect, but is as good as we can do
+        }).finally(() => {
+          detectIfTestNotIsolated(this, 'Test is not isolated (async execution is extending beyond the duration of the test).'); // canceling timers here isn't perfect, but is as good as we can do
           // to attempt to prevent future tests from failing due to this test's
           // leakage
 
-          Ember.run.cancelTimers();
+          _runloop.run.cancelTimers();
+
           return doFinish();
         });
       }
     };
   }
 });
-function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
 define("ember-qunit/test-loader", ["exports", "qunit", "ember-cli-test-loader/test-support/index"], function (_exports, QUnit, _index) {
   "use strict";
 
@@ -8045,36 +8876,15 @@ define("ember-qunit/test-loader", ["exports", "qunit", "ember-cli-test-loader/te
   });
   _exports.loadTests = loadTests;
   _exports.TestLoader = void 0;
-
-  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-  function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
-
-  function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
-
-  function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }
-
-  function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
-
-  function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
-
-  function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
-
-  function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
-
-  function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
-
-  function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
-
   (0, _index.addModuleExcludeMatcher)(function (moduleName) {
     return QUnit.urlParams.nolint && moduleName.match(/\.(jshint|lint-test)$/);
   });
   (0, _index.addModuleIncludeMatcher)(function (moduleName) {
     return moduleName.match(/\.jshint$/);
   });
-  var moduleLoadFailures = [];
+  let moduleLoadFailures = [];
   QUnit.done(function () {
-    var length = moduleLoadFailures.length;
+    let length = moduleLoadFailures.length;
 
     try {
       if (length === 0) {// do nothing
@@ -8089,30 +8899,16 @@ define("ember-qunit/test-loader", ["exports", "qunit", "ember-cli-test-loader/te
     }
   });
 
-  var TestLoader = /*#__PURE__*/function (_AbstractTestLoader) {
-    _inherits(TestLoader, _AbstractTestLoader);
-
-    var _super = _createSuper(TestLoader);
-
-    function TestLoader() {
-      _classCallCheck(this, TestLoader);
-
-      return _super.apply(this, arguments);
+  class TestLoader extends _index.default {
+    moduleLoadFailure(moduleName, error) {
+      moduleLoadFailures.push(error);
+      QUnit.module('TestLoader Failures');
+      QUnit.test(moduleName + ': could not be loaded', function () {
+        throw error;
+      });
     }
 
-    _createClass(TestLoader, [{
-      key: "moduleLoadFailure",
-      value: function moduleLoadFailure(moduleName, error) {
-        moduleLoadFailures.push(error);
-        QUnit.module('TestLoader Failures');
-        QUnit.test(moduleName + ': could not be loaded', function () {
-          throw error;
-        });
-      }
-    }]);
-
-    return TestLoader;
-  }(_index.default);
+  }
   /**
      Load tests following the default patterns:
   
@@ -8143,7 +8939,7 @@ define("ember-test-helpers/has-ember-version", ["exports", "@ember/test-helpers/
   });
   Object.defineProperty(_exports, "default", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _hasEmberVersion.default;
     }
   });
@@ -8156,8 +8952,6 @@ define("qunit-dom/index", ["exports"], function (_exports) {
   });
   _exports.install = install;
   _exports.setup = setup;
-
-  function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
   function exists(options, message) {
     var expectedCount = null;
@@ -9962,7 +10756,7 @@ define("qunit-dom/index", ["exports"], function (_exports) {
       /**
        * @private
        */
-      get: function get() {
+      get: function () {
         return elementToString(this.target);
       },
       enumerable: false,
@@ -9971,7 +10765,7 @@ define("qunit-dom/index", ["exports"], function (_exports) {
     return DOMAssertions;
   }();
 
-  var _getRootElement = function _getRootElement() {
+  var _getRootElement = function () {
     return null;
   };
 
@@ -9999,7 +10793,7 @@ define("qunit-dom/index", ["exports"], function (_exports) {
     };
 
     function isValidRootElement(element) {
-      return !element || _typeof(element) === 'object' && typeof element.querySelector === 'function' && typeof element.querySelectorAll === 'function';
+      return !element || typeof element === 'object' && typeof element.querySelector === 'function' && typeof element.querySelectorAll === 'function';
     }
   }
 
@@ -10188,36 +10982,36 @@ var __ember_auto_import__ =
 /************************************************************************/
 /******/ ({
 
-/***/ "../../../../../tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/l.js":
+/***/ "../../../../../tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js":
 /*!*********************************************************************!*\
-  !*** /tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/l.js ***!
+  !*** /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js ***!
   \*********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/l.js?");
+eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js?");
 
 /***/ }),
 
-/***/ "../../../../../tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/tests.js":
+/***/ "../../../../../tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/tests.js":
 /*!*************************************************************************!*\
-  !*** /tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/tests.js ***!
+  !*** /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/tests.js ***!
   \*************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    if (arguments.length === 1) {\n      return r('_eai_dyn_' + specifier);\n    } else {\n      return r('_eai_dynt_' + specifier)(Array.prototype.slice.call(arguments, 1))\n    }\n  };\n    d('qunit', [], function() { return __webpack_require__(/*! ./node_modules/qunit/qunit/qunit.js */ \"./node_modules/qunit/qunit/qunit.js\"); });\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/tests.js?");
+eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    if (arguments.length === 1) {\n      return r('_eai_dyn_' + specifier);\n    } else {\n      return r('_eai_dynt_' + specifier)(Array.prototype.slice.call(arguments, 1))\n    }\n  };\n    d('qunit', [], function() { return __webpack_require__(/*! ./node_modules/qunit/qunit/qunit.js */ \"./node_modules/qunit/qunit/qunit.js\"); });\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/tests.js?");
 
 /***/ }),
 
 /***/ 1:
 /*!*********************************************************************************************************************************************!*\
-  !*** multi /tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/l.js /tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/tests.js ***!
+  !*** multi /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/tests.js ***!
   \*********************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("__webpack_require__(/*! /tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/l.js */\"../../../../../tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/tests.js */\"../../../../../tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/tests.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/l.js_/tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/staging/tests.js?");
+eval("__webpack_require__(/*! /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js */\"../../../../../tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/tests.js */\"../../../../../tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/tests.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/l.js_/tmp/broccoli-1648qAI0SrM17nHe/cache-201-bundler/staging/tests.js?");
 
 /***/ })
 
@@ -10231,7 +11025,7 @@ eval("__webpack_require__(/*! /tmp/broccoli-1626ZwWuNvSuC5y4/cache-193-bundler/s
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("/* WEBPACK VAR INJECTION */(function(module) {var __WEBPACK_AMD_DEFINE_RESULT__;function _typeof2(obj) { \"@babel/helpers - typeof\"; if (typeof Symbol === \"function\" && typeof Symbol.iterator === \"symbol\") { _typeof2 = function _typeof2(obj) { return typeof obj; }; } else { _typeof2 = function _typeof2(obj) { return obj && typeof Symbol === \"function\" && obj.constructor === Symbol && obj !== Symbol.prototype ? \"symbol\" : typeof obj; }; } return _typeof2(obj); }\n\n/*!\n * QUnit 2.15.0\n * https://qunitjs.com/\n *\n * Copyright OpenJS Foundation and other contributors\n * Released under the MIT license\n * https://jquery.org/license\n */\n(function () {\n  'use strict'; // Support IE 9-10, PhantomJS: Fallback for fuzzysort.js used by ./html.js\n  // eslint-disable-next-line no-unused-vars\n\n  var Map = typeof Map === \"function\" ? Map : function StringMap() {\n    var store = Object.create(null);\n\n    this.get = function (strKey) {\n      return store[strKey];\n    };\n\n    this.set = function (strKey, val) {\n      store[strKey] = val;\n      return this;\n    };\n\n    this.clear = function () {\n      store = Object.create(null);\n    };\n  };\n\n  function _typeof(obj) {\n    \"@babel/helpers - typeof\";\n\n    if (typeof Symbol === \"function\" && typeof Symbol.iterator === \"symbol\") {\n      _typeof = function _typeof(obj) {\n        return typeof obj;\n      };\n    } else {\n      _typeof = function _typeof(obj) {\n        return obj && typeof Symbol === \"function\" && obj.constructor === Symbol && obj !== Symbol.prototype ? \"symbol\" : typeof obj;\n      };\n    }\n\n    return _typeof(obj);\n  }\n\n  function _classCallCheck(instance, Constructor) {\n    if (!(instance instanceof Constructor)) {\n      throw new TypeError(\"Cannot call a class as a function\");\n    }\n  }\n\n  function _defineProperties(target, props) {\n    for (var i = 0; i < props.length; i++) {\n      var descriptor = props[i];\n      descriptor.enumerable = descriptor.enumerable || false;\n      descriptor.configurable = true;\n      if (\"value\" in descriptor) descriptor.writable = true;\n      Object.defineProperty(target, descriptor.key, descriptor);\n    }\n  }\n\n  function _createClass(Constructor, protoProps, staticProps) {\n    if (protoProps) _defineProperties(Constructor.prototype, protoProps);\n    if (staticProps) _defineProperties(Constructor, staticProps);\n    return Constructor;\n  }\n\n  function _toConsumableArray(arr) {\n    return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread();\n  }\n\n  function _arrayWithoutHoles(arr) {\n    if (Array.isArray(arr)) return _arrayLikeToArray(arr);\n  }\n\n  function _iterableToArray(iter) {\n    if (typeof Symbol !== \"undefined\" && Symbol.iterator in Object(iter)) return Array.from(iter);\n  }\n\n  function _unsupportedIterableToArray(o, minLen) {\n    if (!o) return;\n    if (typeof o === \"string\") return _arrayLikeToArray(o, minLen);\n    var n = Object.prototype.toString.call(o).slice(8, -1);\n    if (n === \"Object\" && o.constructor) n = o.constructor.name;\n    if (n === \"Map\" || n === \"Set\") return Array.from(o);\n    if (n === \"Arguments\" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);\n  }\n\n  function _arrayLikeToArray(arr, len) {\n    if (len == null || len > arr.length) len = arr.length;\n\n    for (var i = 0, arr2 = new Array(len); i < len; i++) {\n      arr2[i] = arr[i];\n    }\n\n    return arr2;\n  }\n\n  function _nonIterableSpread() {\n    throw new TypeError(\"Invalid attempt to spread non-iterable instance.\\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.\");\n  }\n\n  function _createForOfIteratorHelper(o, allowArrayLike) {\n    var it;\n\n    if (typeof Symbol === \"undefined\" || o[Symbol.iterator] == null) {\n      if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === \"number\") {\n        if (it) o = it;\n        var i = 0;\n\n        var F = function F() {};\n\n        return {\n          s: F,\n          n: function n() {\n            if (i >= o.length) return {\n              done: true\n            };\n            return {\n              done: false,\n              value: o[i++]\n            };\n          },\n          e: function e(_e) {\n            throw _e;\n          },\n          f: F\n        };\n      }\n\n      throw new TypeError(\"Invalid attempt to iterate non-iterable instance.\\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.\");\n    }\n\n    var normalCompletion = true,\n        didErr = false,\n        err;\n    return {\n      s: function s() {\n        it = o[Symbol.iterator]();\n      },\n      n: function n() {\n        var step = it.next();\n        normalCompletion = step.done;\n        return step;\n      },\n      e: function e(_e2) {\n        didErr = true;\n        err = _e2;\n      },\n      f: function f() {\n        try {\n          if (!normalCompletion && it.return != null) it.return();\n        } finally {\n          if (didErr) throw err;\n        }\n      }\n    };\n  }\n  /*\n  https://github.com/ungap/global-this/blob/v0.4.4/esm/index.js\n   Copyright (c) 2020, Andrea Giammarchi, @WebReflection\n   Permission to use, copy, modify, and/or distribute this software for any\n  purpose with or without fee is hereby granted, provided that the above\n  copyright notice and this permission notice appear in all copies.\n   THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\n  REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY\n  AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\n  INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM\n  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE\n  OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR\n  PERFORMANCE OF THIS SOFTWARE.\n   -------\n   Patches for use in QUnit:\n   - 2021-02-25: Export as module only, don't change global scope as QUnit must not\n    affect the host context (e.g. people may test their application intentionally\n    with different or no polyfills and we must not affect that).\n   */\n\n\n  var foundGlobalThis;\n\n  (function (Object) {\n    if ((typeof globalThis === \"undefined\" ? \"undefined\" : _typeof(globalThis)) === \"object\") {\n      foundGlobalThis = globalThis;\n    } else {\n      var get = function get() {\n        foundGlobalThis = this || self;\n        delete Object.prototype._T_;\n      };\n\n      this ? get() : (Object.defineProperty(Object.prototype, \"_T_\", {\n        configurable: true,\n        get: get\n      }), _T_);\n    }\n  })(Object);\n\n  var globalThis$1 = foundGlobalThis;\n  var window$1 = globalThis$1.window;\n  var self$1 = globalThis$1.self;\n  var console$1 = globalThis$1.console;\n  var setTimeout$1 = globalThis$1.setTimeout;\n  var clearTimeout = globalThis$1.clearTimeout;\n  var document = window$1 && window$1.document;\n  var navigator = window$1 && window$1.navigator;\n\n  var localSessionStorage = function () {\n    var x = \"qunit-test-string\";\n\n    try {\n      globalThis$1.sessionStorage.setItem(x, x);\n      globalThis$1.sessionStorage.removeItem(x);\n      return globalThis$1.sessionStorage;\n    } catch (e) {\n      return undefined;\n    }\n  }(); // Detect if the console object exists and no-op otherwise.\n  // This allows support for IE 9, which doesn't have a console\n  // object if the developer tools are not open.\n  // Support: SpiderMonkey (mozjs 68+)\n  // The console object has a log method, but no warn method.\n\n\n  var Logger = {\n    warn: console$1 ? (console$1.warn || console$1.log).bind(console$1) : function () {}\n  };\n  var toString = Object.prototype.toString;\n  var hasOwn = Object.prototype.hasOwnProperty;\n\n  var now = Date.now || function () {\n    return new Date().getTime();\n  };\n\n  var nativePerf = getNativePerf();\n\n  function getNativePerf() {\n    if (window$1 && typeof window$1.performance !== \"undefined\" && typeof window$1.performance.mark === \"function\" && typeof window$1.performance.measure === \"function\") {\n      return window$1.performance;\n    } else {\n      return undefined;\n    }\n  }\n\n  var performance = {\n    now: nativePerf ? nativePerf.now.bind(nativePerf) : now,\n    measure: nativePerf ? function (comment, startMark, endMark) {\n      // `performance.measure` may fail if the mark could not be found.\n      // reasons a specific mark could not be found include: outside code invoking `performance.clearMarks()`\n      try {\n        nativePerf.measure(comment, startMark, endMark);\n      } catch (ex) {\n        Logger.warn(\"performance.measure could not be executed because of \", ex.message);\n      }\n    } : function () {},\n    mark: nativePerf ? nativePerf.mark.bind(nativePerf) : function () {}\n  }; // Returns a new Array with the elements that are in a but not in b\n\n  function diff(a, b) {\n    var result = a.slice();\n\n    for (var i = 0; i < result.length; i++) {\n      for (var j = 0; j < b.length; j++) {\n        if (result[i] === b[j]) {\n          result.splice(i, 1);\n          i--;\n          break;\n        }\n      }\n    }\n\n    return result;\n  }\n  /**\n   * Determines whether an element exists in a given array or not.\n   *\n   * @method inArray\n   * @param {Any} elem\n   * @param {Array} array\n   * @return {boolean}\n   */\n\n\n  function inArray(elem, array) {\n    return array.indexOf(elem) !== -1;\n  }\n  /**\n   * Makes a clone of an object using only Array or Object as base,\n   * and copies over the own enumerable properties.\n   *\n   * @param {Object} obj\n   * @return {Object} New object with only the own properties (recursively).\n   */\n\n\n  function objectValues(obj) {\n    var vals = is(\"array\", obj) ? [] : {};\n\n    for (var key in obj) {\n      if (hasOwn.call(obj, key)) {\n        var val = obj[key];\n        vals[key] = val === Object(val) ? objectValues(val) : val;\n      }\n    }\n\n    return vals;\n  }\n\n  function extend(a, b, undefOnly) {\n    for (var prop in b) {\n      if (hasOwn.call(b, prop)) {\n        if (b[prop] === undefined) {\n          delete a[prop];\n        } else if (!(undefOnly && typeof a[prop] !== \"undefined\")) {\n          a[prop] = b[prop];\n        }\n      }\n    }\n\n    return a;\n  }\n\n  function objectType(obj) {\n    if (typeof obj === \"undefined\") {\n      return \"undefined\";\n    } // Consider: typeof null === object\n\n\n    if (obj === null) {\n      return \"null\";\n    }\n\n    var match = toString.call(obj).match(/^\\[object\\s(.*)\\]$/);\n    var type = match && match[1];\n\n    switch (type) {\n      case \"Number\":\n        if (isNaN(obj)) {\n          return \"nan\";\n        }\n\n        return \"number\";\n\n      case \"String\":\n      case \"Boolean\":\n      case \"Array\":\n      case \"Set\":\n      case \"Map\":\n      case \"Date\":\n      case \"RegExp\":\n      case \"Function\":\n      case \"Symbol\":\n        return type.toLowerCase();\n\n      default:\n        return _typeof(obj);\n    }\n  } // Safe object type checking\n\n\n  function is(type, obj) {\n    return objectType(obj) === type;\n  } // Based on Java's String.hashCode, a simple but not\n  // rigorously collision resistant hashing function\n\n\n  function generateHash(module, testName) {\n    var str = module + \"\\x1C\" + testName;\n    var hash = 0;\n\n    for (var i = 0; i < str.length; i++) {\n      hash = (hash << 5) - hash + str.charCodeAt(i);\n      hash |= 0;\n    } // Convert the possibly negative integer hash code into an 8 character hex string, which isn't\n    // strictly necessary but increases user understanding that the id is a SHA-like hash\n\n\n    var hex = (0x100000000 + hash).toString(16);\n\n    if (hex.length < 8) {\n      hex = \"0000000\" + hex;\n    }\n\n    return hex.slice(-8);\n  } // Authors: Philippe Rathé <prathe@gmail.com>, David Chan <david@troi.org>\n\n\n  var equiv = function () {\n    // Value pairs queued for comparison. Used for breadth-first processing order, recursion\n    // detection and avoiding repeated comparison (see below for details).\n    // Elements are { a: val, b: val }.\n    var pairs = [];\n\n    var getProto = Object.getPrototypeOf || function (obj) {\n      return obj.__proto__;\n    };\n\n    function useStrictEquality(a, b) {\n      // This only gets called if a and b are not strict equal, and is used to compare on\n      // the primitive values inside object wrappers. For example:\n      // `var i = 1;`\n      // `var j = new Number(1);`\n      // Neither a nor b can be null, as a !== b and they have the same type.\n      if (_typeof(a) === \"object\") {\n        a = a.valueOf();\n      }\n\n      if (_typeof(b) === \"object\") {\n        b = b.valueOf();\n      }\n\n      return a === b;\n    }\n\n    function compareConstructors(a, b) {\n      var protoA = getProto(a);\n      var protoB = getProto(b); // Comparing constructors is more strict than using `instanceof`\n\n      if (a.constructor === b.constructor) {\n        return true;\n      } // Ref #851\n      // If the obj prototype descends from a null constructor, treat it\n      // as a null prototype.\n\n\n      if (protoA && protoA.constructor === null) {\n        protoA = null;\n      }\n\n      if (protoB && protoB.constructor === null) {\n        protoB = null;\n      } // Allow objects with no prototype to be equivalent to\n      // objects with Object as their constructor.\n\n\n      if (protoA === null && protoB === Object.prototype || protoB === null && protoA === Object.prototype) {\n        return true;\n      }\n\n      return false;\n    }\n\n    function getRegExpFlags(regexp) {\n      return \"flags\" in regexp ? regexp.flags : regexp.toString().match(/[gimuy]*$/)[0];\n    }\n\n    function isContainer(val) {\n      return [\"object\", \"array\", \"map\", \"set\"].indexOf(objectType(val)) !== -1;\n    }\n\n    function breadthFirstCompareChild(a, b) {\n      // If a is a container not reference-equal to b, postpone the comparison to the\n      // end of the pairs queue -- unless (a, b) has been seen before, in which case skip\n      // over the pair.\n      if (a === b) {\n        return true;\n      }\n\n      if (!isContainer(a)) {\n        return typeEquiv(a, b);\n      }\n\n      if (pairs.every(function (pair) {\n        return pair.a !== a || pair.b !== b;\n      })) {\n        // Not yet started comparing this pair\n        pairs.push({\n          a: a,\n          b: b\n        });\n      }\n\n      return true;\n    }\n\n    var callbacks = {\n      \"string\": useStrictEquality,\n      \"boolean\": useStrictEquality,\n      \"number\": useStrictEquality,\n      \"null\": useStrictEquality,\n      \"undefined\": useStrictEquality,\n      \"symbol\": useStrictEquality,\n      \"date\": useStrictEquality,\n      \"nan\": function nan() {\n        return true;\n      },\n      \"regexp\": function regexp(a, b) {\n        return a.source === b.source && // Include flags in the comparison\n        getRegExpFlags(a) === getRegExpFlags(b);\n      },\n      // abort (identical references / instance methods were skipped earlier)\n      \"function\": function _function() {\n        return false;\n      },\n      \"array\": function array(a, b) {\n        var len = a.length;\n\n        if (len !== b.length) {\n          // Safe and faster\n          return false;\n        }\n\n        for (var i = 0; i < len; i++) {\n          // Compare non-containers; queue non-reference-equal containers\n          if (!breadthFirstCompareChild(a[i], b[i])) {\n            return false;\n          }\n        }\n\n        return true;\n      },\n      // Define sets a and b to be equivalent if for each element aVal in a, there\n      // is some element bVal in b such that aVal and bVal are equivalent. Element\n      // repetitions are not counted, so these are equivalent:\n      // a = new Set( [ {}, [], [] ] );\n      // b = new Set( [ {}, {}, [] ] );\n      \"set\": function set(a, b) {\n        if (a.size !== b.size) {\n          // This optimization has certain quirks because of the lack of\n          // repetition counting. For instance, adding the same\n          // (reference-identical) element to two equivalent sets can\n          // make them non-equivalent.\n          return false;\n        }\n\n        var outerEq = true;\n        a.forEach(function (aVal) {\n          // Short-circuit if the result is already known. (Using for...of\n          // with a break clause would be cleaner here, but it would cause\n          // a syntax error on older Javascript implementations even if\n          // Set is unused)\n          if (!outerEq) {\n            return;\n          }\n\n          var innerEq = false;\n          b.forEach(function (bVal) {\n            // Likewise, short-circuit if the result is already known\n            if (innerEq) {\n              return;\n            } // Swap out the global pairs list, as the nested call to\n            // innerEquiv will clobber its contents\n\n\n            var parentPairs = pairs;\n\n            if (innerEquiv(bVal, aVal)) {\n              innerEq = true;\n            } // Replace the global pairs list\n\n\n            pairs = parentPairs;\n          });\n\n          if (!innerEq) {\n            outerEq = false;\n          }\n        });\n        return outerEq;\n      },\n      // Define maps a and b to be equivalent if for each key-value pair (aKey, aVal)\n      // in a, there is some key-value pair (bKey, bVal) in b such that\n      // [ aKey, aVal ] and [ bKey, bVal ] are equivalent. Key repetitions are not\n      // counted, so these are equivalent:\n      // a = new Map( [ [ {}, 1 ], [ {}, 1 ], [ [], 1 ] ] );\n      // b = new Map( [ [ {}, 1 ], [ [], 1 ], [ [], 1 ] ] );\n      \"map\": function map(a, b) {\n        if (a.size !== b.size) {\n          // This optimization has certain quirks because of the lack of\n          // repetition counting. For instance, adding the same\n          // (reference-identical) key-value pair to two equivalent maps\n          // can make them non-equivalent.\n          return false;\n        }\n\n        var outerEq = true;\n        a.forEach(function (aVal, aKey) {\n          // Short-circuit if the result is already known. (Using for...of\n          // with a break clause would be cleaner here, but it would cause\n          // a syntax error on older Javascript implementations even if\n          // Map is unused)\n          if (!outerEq) {\n            return;\n          }\n\n          var innerEq = false;\n          b.forEach(function (bVal, bKey) {\n            // Likewise, short-circuit if the result is already known\n            if (innerEq) {\n              return;\n            } // Swap out the global pairs list, as the nested call to\n            // innerEquiv will clobber its contents\n\n\n            var parentPairs = pairs;\n\n            if (innerEquiv([bVal, bKey], [aVal, aKey])) {\n              innerEq = true;\n            } // Replace the global pairs list\n\n\n            pairs = parentPairs;\n          });\n\n          if (!innerEq) {\n            outerEq = false;\n          }\n        });\n        return outerEq;\n      },\n      \"object\": function object(a, b) {\n        if (compareConstructors(a, b) === false) {\n          return false;\n        }\n\n        var aProperties = [];\n        var bProperties = []; // Be strict: don't ensure hasOwnProperty and go deep\n\n        for (var i in a) {\n          // Collect a's properties\n          aProperties.push(i); // Skip OOP methods that look the same\n\n          if (a.constructor !== Object && typeof a.constructor !== \"undefined\" && typeof a[i] === \"function\" && typeof b[i] === \"function\" && a[i].toString() === b[i].toString()) {\n            continue;\n          } // Compare non-containers; queue non-reference-equal containers\n\n\n          if (!breadthFirstCompareChild(a[i], b[i])) {\n            return false;\n          }\n        }\n\n        for (var _i in b) {\n          // Collect b's properties\n          bProperties.push(_i);\n        } // Ensures identical properties name\n\n\n        return typeEquiv(aProperties.sort(), bProperties.sort());\n      }\n    };\n\n    function typeEquiv(a, b) {\n      var type = objectType(a); // Callbacks for containers will append to the pairs queue to achieve breadth-first\n      // search order. The pairs queue is also used to avoid reprocessing any pair of\n      // containers that are reference-equal to a previously visited pair (a special case\n      // this being recursion detection).\n      //\n      // Because of this approach, once typeEquiv returns a false value, it should not be\n      // called again without clearing the pair queue else it may wrongly report a visited\n      // pair as being equivalent.\n\n      return objectType(b) === type && callbacks[type](a, b);\n    }\n\n    function innerEquiv(a, b) {\n      // We're done when there's nothing more to compare\n      if (arguments.length < 2) {\n        return true;\n      } // Clear the global pair queue and add the top-level values being compared\n\n\n      pairs = [{\n        a: a,\n        b: b\n      }];\n\n      for (var i = 0; i < pairs.length; i++) {\n        var pair = pairs[i]; // Perform type-specific comparison on any pairs that are not strictly\n        // equal. For container types, that comparison will postpone comparison\n        // of any sub-container pair to the end of the pair queue. This gives\n        // breadth-first search order. It also avoids the reprocessing of\n        // reference-equal siblings, cousins etc, which can have a significant speed\n        // impact when comparing a container of small objects each of which has a\n        // reference to the same (singleton) large object.\n\n        if (pair.a !== pair.b && !typeEquiv(pair.a, pair.b)) {\n          return false;\n        }\n      } // ...across all consecutive argument pairs\n\n\n      return arguments.length === 2 || innerEquiv.apply(this, [].slice.call(arguments, 1));\n    }\n\n    return function () {\n      var result = innerEquiv.apply(void 0, arguments); // Release any retained objects\n\n      pairs.length = 0;\n      return result;\n    };\n  }();\n  /**\n   * Config object: Maintain internal state\n   * Later exposed as QUnit.config\n   * `config` initialized at top of scope\n   */\n\n\n  var config = {\n    // The queue of tests to run\n    queue: [],\n    // Block until document ready\n    blocking: true,\n    // By default, run previously failed tests first\n    // very useful in combination with \"Hide passed tests\" checked\n    reorder: true,\n    // By default, modify document.title when suite is done\n    altertitle: true,\n    // HTML Reporter: collapse every test except the first failing test\n    // If false, all failing tests will be expanded\n    collapse: true,\n    // By default, scroll to top of the page when suite is done\n    scrolltop: true,\n    // Depth up-to which object will be dumped\n    maxDepth: 5,\n    // When enabled, all tests must call expect()\n    requireExpects: false,\n    // Placeholder for user-configurable form-exposed URL parameters\n    urlConfig: [],\n    // Set of all modules.\n    modules: [],\n    // The first unnamed module\n    currentModule: {\n      name: \"\",\n      tests: [],\n      childModules: [],\n      testsRun: 0,\n      testsIgnored: 0,\n      hooks: {\n        before: [],\n        beforeEach: [],\n        afterEach: [],\n        after: []\n      }\n    },\n    callbacks: {},\n    // The storage module to use for reordering tests\n    storage: localSessionStorage\n  }; // take a predefined QUnit.config and extend the defaults\n\n  var globalConfig = window$1 && window$1.QUnit && window$1.QUnit.config; // only extend the global config if there is no QUnit overload\n\n  if (window$1 && window$1.QUnit && !window$1.QUnit.version) {\n    extend(config, globalConfig);\n  } // Push a loose unnamed module to the modules collection\n\n\n  config.modules.push(config.currentModule);\n\n  var dump = function () {\n    function quote(str) {\n      return \"\\\"\" + str.toString().replace(/\\\\/g, \"\\\\\\\\\").replace(/\"/g, \"\\\\\\\"\") + \"\\\"\";\n    }\n\n    function literal(o) {\n      return o + \"\";\n    }\n\n    function join(pre, arr, post) {\n      var s = dump.separator();\n      var inner = dump.indent(1);\n\n      if (arr.join) {\n        arr = arr.join(\",\" + s + inner);\n      }\n\n      if (!arr) {\n        return pre + post;\n      }\n\n      var base = dump.indent();\n      return [pre, inner + arr, base + post].join(s);\n    }\n\n    function array(arr, stack) {\n      if (dump.maxDepth && dump.depth > dump.maxDepth) {\n        return \"[object Array]\";\n      }\n\n      this.up();\n      var i = arr.length;\n      var ret = new Array(i);\n\n      while (i--) {\n        ret[i] = this.parse(arr[i], undefined, stack);\n      }\n\n      this.down();\n      return join(\"[\", ret, \"]\");\n    }\n\n    function isArray(obj) {\n      return (//Native Arrays\n        toString.call(obj) === \"[object Array]\" || // NodeList objects\n        typeof obj.length === \"number\" && obj.item !== undefined && (obj.length ? obj.item(0) === obj[0] : obj.item(0) === null && obj[0] === undefined)\n      );\n    }\n\n    var reName = /^function (\\w+)/;\n    var dump = {\n      // The objType is used mostly internally, you can fix a (custom) type in advance\n      parse: function parse(obj, objType, stack) {\n        stack = stack || [];\n        var objIndex = stack.indexOf(obj);\n\n        if (objIndex !== -1) {\n          return \"recursion(\".concat(objIndex - stack.length, \")\");\n        }\n\n        objType = objType || this.typeOf(obj);\n        var parser = this.parsers[objType];\n\n        var parserType = _typeof(parser);\n\n        if (parserType === \"function\") {\n          stack.push(obj);\n          var res = parser.call(this, obj, stack);\n          stack.pop();\n          return res;\n        }\n\n        return parserType === \"string\" ? parser : this.parsers.error;\n      },\n      typeOf: function typeOf(obj) {\n        var type;\n\n        if (obj === null) {\n          type = \"null\";\n        } else if (typeof obj === \"undefined\") {\n          type = \"undefined\";\n        } else if (is(\"regexp\", obj)) {\n          type = \"regexp\";\n        } else if (is(\"date\", obj)) {\n          type = \"date\";\n        } else if (is(\"function\", obj)) {\n          type = \"function\";\n        } else if (obj.setInterval !== undefined && obj.document !== undefined && obj.nodeType === undefined) {\n          type = \"window\";\n        } else if (obj.nodeType === 9) {\n          type = \"document\";\n        } else if (obj.nodeType) {\n          type = \"node\";\n        } else if (isArray(obj)) {\n          type = \"array\";\n        } else if (obj.constructor === Error.prototype.constructor) {\n          type = \"error\";\n        } else {\n          type = _typeof(obj);\n        }\n\n        return type;\n      },\n      separator: function separator() {\n        if (this.multiline) {\n          return this.HTML ? \"<br />\" : \"\\n\";\n        } else {\n          return this.HTML ? \"&#160;\" : \" \";\n        }\n      },\n      // Extra can be a number, shortcut for increasing-calling-decreasing\n      indent: function indent(extra) {\n        if (!this.multiline) {\n          return \"\";\n        }\n\n        var chr = this.indentChar;\n\n        if (this.HTML) {\n          chr = chr.replace(/\\t/g, \"   \").replace(/ /g, \"&#160;\");\n        }\n\n        return new Array(this.depth + (extra || 0)).join(chr);\n      },\n      up: function up(a) {\n        this.depth += a || 1;\n      },\n      down: function down(a) {\n        this.depth -= a || 1;\n      },\n      setParser: function setParser(name, parser) {\n        this.parsers[name] = parser;\n      },\n      // The next 3 are exposed so you can use them\n      quote: quote,\n      literal: literal,\n      join: join,\n      depth: 1,\n      maxDepth: config.maxDepth,\n      // This is the list of parsers, to modify them, use dump.setParser\n      parsers: {\n        window: \"[Window]\",\n        document: \"[Document]\",\n        error: function error(_error) {\n          return \"Error(\\\"\" + _error.message + \"\\\")\";\n        },\n        unknown: \"[Unknown]\",\n        \"null\": \"null\",\n        \"undefined\": \"undefined\",\n        \"function\": function _function(fn) {\n          var ret = \"function\"; // Functions never have name in IE\n\n          var name = \"name\" in fn ? fn.name : (reName.exec(fn) || [])[1];\n\n          if (name) {\n            ret += \" \" + name;\n          }\n\n          ret += \"(\";\n          ret = [ret, dump.parse(fn, \"functionArgs\"), \"){\"].join(\"\");\n          return join(ret, dump.parse(fn, \"functionCode\"), \"}\");\n        },\n        array: array,\n        nodelist: array,\n        \"arguments\": array,\n        object: function object(map, stack) {\n          var ret = [];\n\n          if (dump.maxDepth && dump.depth > dump.maxDepth) {\n            return \"[object Object]\";\n          }\n\n          dump.up();\n          var keys = [];\n\n          for (var key in map) {\n            keys.push(key);\n          } // Some properties are not always enumerable on Error objects.\n\n\n          var nonEnumerableProperties = [\"message\", \"name\"];\n\n          for (var i in nonEnumerableProperties) {\n            var _key = nonEnumerableProperties[i];\n\n            if (_key in map && !inArray(_key, keys)) {\n              keys.push(_key);\n            }\n          }\n\n          keys.sort();\n\n          for (var _i = 0; _i < keys.length; _i++) {\n            var _key2 = keys[_i];\n            var val = map[_key2];\n            ret.push(dump.parse(_key2, \"key\") + \": \" + dump.parse(val, undefined, stack));\n          }\n\n          dump.down();\n          return join(\"{\", ret, \"}\");\n        },\n        node: function node(_node) {\n          var open = dump.HTML ? \"&lt;\" : \"<\";\n          var close = dump.HTML ? \"&gt;\" : \">\";\n\n          var tag = _node.nodeName.toLowerCase();\n\n          var ret = open + tag;\n          var attrs = _node.attributes;\n\n          if (attrs) {\n            for (var i = 0, len = attrs.length; i < len; i++) {\n              var val = attrs[i].nodeValue; // IE6 includes all attributes in .attributes, even ones not explicitly\n              // set. Those have values like undefined, null, 0, false, \"\" or\n              // \"inherit\".\n\n              if (val && val !== \"inherit\") {\n                ret += \" \" + attrs[i].nodeName + \"=\" + dump.parse(val, \"attribute\");\n              }\n            }\n          }\n\n          ret += close; // Show content of TextNode or CDATASection\n\n          if (_node.nodeType === 3 || _node.nodeType === 4) {\n            ret += _node.nodeValue;\n          }\n\n          return ret + open + \"/\" + tag + close;\n        },\n        // Function calls it internally, it's the arguments part of the function\n        functionArgs: function functionArgs(fn) {\n          var l = fn.length;\n\n          if (!l) {\n            return \"\";\n          }\n\n          var args = new Array(l);\n\n          while (l--) {\n            // 97 is 'a'\n            args[l] = String.fromCharCode(97 + l);\n          }\n\n          return \" \" + args.join(\", \") + \" \";\n        },\n        // Object calls it internally, the key part of an item in a map\n        key: quote,\n        // Function calls it internally, it's the content of the function\n        functionCode: \"[code]\",\n        // Node calls it internally, it's a html attribute value\n        attribute: quote,\n        string: quote,\n        date: quote,\n        regexp: literal,\n        number: literal,\n        \"boolean\": literal,\n        symbol: function symbol(sym) {\n          return sym.toString();\n        }\n      },\n      // If true, entities are escaped ( <, >, \\t, space and \\n )\n      HTML: false,\n      // Indentation unit\n      indentChar: \"  \",\n      // If true, items in a collection, are separated by a \\n, else just a space.\n      multiline: true\n    };\n    return dump;\n  }();\n\n  var SuiteReport = /*#__PURE__*/function () {\n    function SuiteReport(name, parentSuite) {\n      _classCallCheck(this, SuiteReport);\n\n      this.name = name;\n      this.fullName = parentSuite ? parentSuite.fullName.concat(name) : [];\n      this.tests = [];\n      this.childSuites = [];\n\n      if (parentSuite) {\n        parentSuite.pushChildSuite(this);\n      }\n    }\n\n    _createClass(SuiteReport, [{\n      key: \"start\",\n      value: function start(recordTime) {\n        if (recordTime) {\n          this._startTime = performance.now();\n          var suiteLevel = this.fullName.length;\n          performance.mark(\"qunit_suite_\".concat(suiteLevel, \"_start\"));\n        }\n\n        return {\n          name: this.name,\n          fullName: this.fullName.slice(),\n          tests: this.tests.map(function (test) {\n            return test.start();\n          }),\n          childSuites: this.childSuites.map(function (suite) {\n            return suite.start();\n          }),\n          testCounts: {\n            total: this.getTestCounts().total\n          }\n        };\n      }\n    }, {\n      key: \"end\",\n      value: function end(recordTime) {\n        if (recordTime) {\n          this._endTime = performance.now();\n          var suiteLevel = this.fullName.length;\n          var suiteName = this.fullName.join(\" – \");\n          performance.mark(\"qunit_suite_\".concat(suiteLevel, \"_end\"));\n          performance.measure(suiteLevel === 0 ? \"QUnit Test Run\" : \"QUnit Test Suite: \".concat(suiteName), \"qunit_suite_\".concat(suiteLevel, \"_start\"), \"qunit_suite_\".concat(suiteLevel, \"_end\"));\n        }\n\n        return {\n          name: this.name,\n          fullName: this.fullName.slice(),\n          tests: this.tests.map(function (test) {\n            return test.end();\n          }),\n          childSuites: this.childSuites.map(function (suite) {\n            return suite.end();\n          }),\n          testCounts: this.getTestCounts(),\n          runtime: this.getRuntime(),\n          status: this.getStatus()\n        };\n      }\n    }, {\n      key: \"pushChildSuite\",\n      value: function pushChildSuite(suite) {\n        this.childSuites.push(suite);\n      }\n    }, {\n      key: \"pushTest\",\n      value: function pushTest(test) {\n        this.tests.push(test);\n      }\n    }, {\n      key: \"getRuntime\",\n      value: function getRuntime() {\n        return this._endTime - this._startTime;\n      }\n    }, {\n      key: \"getTestCounts\",\n      value: function getTestCounts() {\n        var counts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {\n          passed: 0,\n          failed: 0,\n          skipped: 0,\n          todo: 0,\n          total: 0\n        };\n        counts = this.tests.reduce(function (counts, test) {\n          if (test.valid) {\n            counts[test.getStatus()]++;\n            counts.total++;\n          }\n\n          return counts;\n        }, counts);\n        return this.childSuites.reduce(function (counts, suite) {\n          return suite.getTestCounts(counts);\n        }, counts);\n      }\n    }, {\n      key: \"getStatus\",\n      value: function getStatus() {\n        var _this$getTestCounts = this.getTestCounts(),\n            total = _this$getTestCounts.total,\n            failed = _this$getTestCounts.failed,\n            skipped = _this$getTestCounts.skipped,\n            todo = _this$getTestCounts.todo;\n\n        if (failed) {\n          return \"failed\";\n        } else {\n          if (skipped === total) {\n            return \"skipped\";\n          } else if (todo === total) {\n            return \"todo\";\n          } else {\n            return \"passed\";\n          }\n        }\n      }\n    }]);\n\n    return SuiteReport;\n  }();\n\n  var moduleStack = [];\n\n  function isParentModuleInQueue() {\n    var modulesInQueue = config.modules.map(function (module) {\n      return module.moduleId;\n    });\n    return moduleStack.some(function (module) {\n      return modulesInQueue.includes(module.moduleId);\n    });\n  }\n\n  function createModule(name, testEnvironment, modifiers) {\n    var parentModule = moduleStack.length ? moduleStack.slice(-1)[0] : null;\n    var moduleName = parentModule !== null ? [parentModule.name, name].join(\" > \") : name;\n    var parentSuite = parentModule ? parentModule.suiteReport : globalSuite;\n    var skip = parentModule !== null && parentModule.skip || modifiers.skip;\n    var todo = parentModule !== null && parentModule.todo || modifiers.todo;\n    var module = {\n      name: moduleName,\n      parentModule: parentModule,\n      tests: [],\n      moduleId: generateHash(moduleName),\n      testsRun: 0,\n      testsIgnored: 0,\n      childModules: [],\n      suiteReport: new SuiteReport(name, parentSuite),\n      // Pass along `skip` and `todo` properties from parent module, in case\n      // there is one, to childs. And use own otherwise.\n      // This property will be used to mark own tests and tests of child suites\n      // as either `skipped` or `todo`.\n      skip: skip,\n      todo: skip ? false : todo,\n      ignored: modifiers.ignored || false\n    };\n    var env = {};\n\n    if (parentModule) {\n      parentModule.childModules.push(module);\n      extend(env, parentModule.testEnvironment);\n    }\n\n    extend(env, testEnvironment);\n    module.testEnvironment = env;\n    config.modules.push(module);\n    return module;\n  }\n\n  function processModule(name, options, executeNow) {\n    var modifiers = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};\n\n    if (objectType(options) === \"function\") {\n      executeNow = options;\n      options = undefined;\n    }\n\n    var module = createModule(name, options, modifiers); // Move any hooks to a 'hooks' object\n\n    var testEnvironment = module.testEnvironment;\n    var hooks = module.hooks = {};\n    setHookFromEnvironment(hooks, testEnvironment, \"before\");\n    setHookFromEnvironment(hooks, testEnvironment, \"beforeEach\");\n    setHookFromEnvironment(hooks, testEnvironment, \"afterEach\");\n    setHookFromEnvironment(hooks, testEnvironment, \"after\");\n    var moduleFns = {\n      before: setHookFunction(module, \"before\"),\n      beforeEach: setHookFunction(module, \"beforeEach\"),\n      afterEach: setHookFunction(module, \"afterEach\"),\n      after: setHookFunction(module, \"after\")\n    };\n    var currentModule = config.currentModule;\n\n    if (objectType(executeNow) === \"function\") {\n      moduleStack.push(module);\n      config.currentModule = module;\n      executeNow.call(module.testEnvironment, moduleFns);\n      moduleStack.pop();\n      module = module.parentModule || currentModule;\n    }\n\n    config.currentModule = module;\n\n    function setHookFromEnvironment(hooks, environment, name) {\n      var potentialHook = environment[name];\n      hooks[name] = typeof potentialHook === \"function\" ? [potentialHook] : [];\n      delete environment[name];\n    }\n\n    function setHookFunction(module, hookName) {\n      return function setHook(callback) {\n        if (config.currentModule !== module) {\n          Logger.warn(\"The `\" + hookName + \"` hook was called inside the wrong module. \" + \"Instead, use hooks provided by the callback to the containing module.\" + \"This will become an error in QUnit 3.0.\");\n        }\n\n        module.hooks[hookName].push(callback);\n      };\n    }\n  }\n\n  var focused$1 = false; // indicates that the \"only\" filter was used\n\n  function module$1(name, options, executeNow) {\n    var ignored = focused$1 && !isParentModuleInQueue();\n    processModule(name, options, executeNow, {\n      ignored: ignored\n    });\n  }\n\n  module$1.only = function () {\n    if (!focused$1) {\n      config.modules.length = 0;\n      config.queue.length = 0;\n    }\n\n    processModule.apply(void 0, arguments);\n    focused$1 = true;\n  };\n\n  module$1.skip = function (name, options, executeNow) {\n    if (focused$1) {\n      return;\n    }\n\n    processModule(name, options, executeNow, {\n      skip: true\n    });\n  };\n\n  module$1.todo = function (name, options, executeNow) {\n    if (focused$1) {\n      return;\n    }\n\n    processModule(name, options, executeNow, {\n      todo: true\n    });\n  };\n\n  var LISTENERS = Object.create(null);\n  var SUPPORTED_EVENTS = [\"runStart\", \"suiteStart\", \"testStart\", \"assertion\", \"testEnd\", \"suiteEnd\", \"runEnd\"];\n  /**\n   * Emits an event with the specified data to all currently registered listeners.\n   * Callbacks will fire in the order in which they are registered (FIFO). This\n   * function is not exposed publicly; it is used by QUnit internals to emit\n   * logging events.\n   *\n   * @private\n   * @method emit\n   * @param {string} eventName\n   * @param {Object} data\n   * @return {void}\n   */\n\n  function emit(eventName, data) {\n    if (objectType(eventName) !== \"string\") {\n      throw new TypeError(\"eventName must be a string when emitting an event\");\n    } // Clone the callbacks in case one of them registers a new callback\n\n\n    var originalCallbacks = LISTENERS[eventName];\n    var callbacks = originalCallbacks ? _toConsumableArray(originalCallbacks) : [];\n\n    for (var i = 0; i < callbacks.length; i++) {\n      callbacks[i](data);\n    }\n  }\n  /**\n   * Registers a callback as a listener to the specified event.\n   *\n   * @public\n   * @method on\n   * @param {string} eventName\n   * @param {Function} callback\n   * @return {void}\n   */\n\n\n  function on(eventName, callback) {\n    if (objectType(eventName) !== \"string\") {\n      throw new TypeError(\"eventName must be a string when registering a listener\");\n    } else if (!inArray(eventName, SUPPORTED_EVENTS)) {\n      var events = SUPPORTED_EVENTS.join(\", \");\n      throw new Error(\"\\\"\".concat(eventName, \"\\\" is not a valid event; must be one of: \").concat(events, \".\"));\n    } else if (objectType(callback) !== \"function\") {\n      throw new TypeError(\"callback must be a function when registering a listener\");\n    }\n\n    if (!LISTENERS[eventName]) {\n      LISTENERS[eventName] = [];\n    } // Don't register the same callback more than once\n\n\n    if (!inArray(callback, LISTENERS[eventName])) {\n      LISTENERS[eventName].push(callback);\n    }\n  }\n\n  var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};\n\n  function createCommonjsModule(fn) {\n    var module = {\n      exports: {}\n    };\n    return fn(module, module.exports), module.exports;\n  }\n\n  function commonjsRequire(path) {\n    throw new Error('Could not dynamically require \"' + path + '\". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');\n  }\n\n  var promisePolyfill = createCommonjsModule(function (module) {\n    (function () {\n      /** @suppress {undefinedVars} */\n      var globalNS = function () {\n        // the only reliable means to get the global object is\n        // `Function('return this')()`\n        // However, this causes CSP violations in Chrome apps.\n        if (typeof globalThis !== 'undefined') {\n          return globalThis;\n        }\n\n        if (typeof self !== 'undefined') {\n          return self;\n        }\n\n        if (typeof window !== 'undefined') {\n          return window;\n        }\n\n        if (typeof commonjsGlobal !== 'undefined') {\n          return commonjsGlobal;\n        }\n\n        throw new Error('unable to locate global object');\n      }(); // Expose the polyfill if Promise is undefined or set to a\n      // non-function value. The latter can be due to a named HTMLElement\n      // being exposed by browsers for legacy reasons.\n      // https://github.com/taylorhakes/promise-polyfill/issues/114\n\n\n      if (typeof globalNS['Promise'] === 'function') {\n        module.exports = globalNS['Promise'];\n        return;\n      }\n      /**\n       * @this {Promise}\n       */\n\n\n      function finallyConstructor(callback) {\n        var constructor = this.constructor;\n        return this.then(function (value) {\n          // @ts-ignore\n          return constructor.resolve(callback()).then(function () {\n            return value;\n          });\n        }, function (reason) {\n          // @ts-ignore\n          return constructor.resolve(callback()).then(function () {\n            // @ts-ignore\n            return constructor.reject(reason);\n          });\n        });\n      }\n\n      function allSettled(arr) {\n        var P = this;\n        return new P(function (resolve, reject) {\n          if (!(arr && typeof arr.length !== 'undefined')) {\n            return reject(new TypeError(_typeof(arr) + ' ' + arr + ' is not iterable(cannot read property Symbol(Symbol.iterator))'));\n          }\n\n          var args = Array.prototype.slice.call(arr);\n          if (args.length === 0) return resolve([]);\n          var remaining = args.length;\n\n          function res(i, val) {\n            if (val && (_typeof(val) === 'object' || typeof val === 'function')) {\n              var then = val.then;\n\n              if (typeof then === 'function') {\n                then.call(val, function (val) {\n                  res(i, val);\n                }, function (e) {\n                  args[i] = {\n                    status: 'rejected',\n                    reason: e\n                  };\n\n                  if (--remaining === 0) {\n                    resolve(args);\n                  }\n                });\n                return;\n              }\n            }\n\n            args[i] = {\n              status: 'fulfilled',\n              value: val\n            };\n\n            if (--remaining === 0) {\n              resolve(args);\n            }\n          }\n\n          for (var i = 0; i < args.length; i++) {\n            res(i, args[i]);\n          }\n        });\n      } // Store setTimeout reference so promise-polyfill will be unaffected by\n      // other code modifying setTimeout (like sinon.useFakeTimers())\n\n\n      var setTimeoutFunc = setTimeout;\n\n      function isArray(x) {\n        return Boolean(x && typeof x.length !== 'undefined');\n      }\n\n      function noop() {} // Polyfill for Function.prototype.bind\n\n\n      function bind(fn, thisArg) {\n        return function () {\n          fn.apply(thisArg, arguments);\n        };\n      }\n      /**\n       * @constructor\n       * @param {Function} fn\n       */\n\n\n      function Promise(fn) {\n        if (!(this instanceof Promise)) throw new TypeError('Promises must be constructed via new');\n        if (typeof fn !== 'function') throw new TypeError('not a function');\n        /** @type {!number} */\n\n        this._state = 0;\n        /** @type {!boolean} */\n\n        this._handled = false;\n        /** @type {Promise|undefined} */\n\n        this._value = undefined;\n        /** @type {!Array<!Function>} */\n\n        this._deferreds = [];\n        doResolve(fn, this);\n      }\n\n      function handle(self, deferred) {\n        while (self._state === 3) {\n          self = self._value;\n        }\n\n        if (self._state === 0) {\n          self._deferreds.push(deferred);\n\n          return;\n        }\n\n        self._handled = true;\n\n        Promise._immediateFn(function () {\n          var cb = self._state === 1 ? deferred.onFulfilled : deferred.onRejected;\n\n          if (cb === null) {\n            (self._state === 1 ? resolve : reject)(deferred.promise, self._value);\n            return;\n          }\n\n          var ret;\n\n          try {\n            ret = cb(self._value);\n          } catch (e) {\n            reject(deferred.promise, e);\n            return;\n          }\n\n          resolve(deferred.promise, ret);\n        });\n      }\n\n      function resolve(self, newValue) {\n        try {\n          // Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure\n          if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.');\n\n          if (newValue && (_typeof(newValue) === 'object' || typeof newValue === 'function')) {\n            var then = newValue.then;\n\n            if (newValue instanceof Promise) {\n              self._state = 3;\n              self._value = newValue;\n              finale(self);\n              return;\n            } else if (typeof then === 'function') {\n              doResolve(bind(then, newValue), self);\n              return;\n            }\n          }\n\n          self._state = 1;\n          self._value = newValue;\n          finale(self);\n        } catch (e) {\n          reject(self, e);\n        }\n      }\n\n      function reject(self, newValue) {\n        self._state = 2;\n        self._value = newValue;\n        finale(self);\n      }\n\n      function finale(self) {\n        if (self._state === 2 && self._deferreds.length === 0) {\n          Promise._immediateFn(function () {\n            if (!self._handled) {\n              Promise._unhandledRejectionFn(self._value);\n            }\n          });\n        }\n\n        for (var i = 0, len = self._deferreds.length; i < len; i++) {\n          handle(self, self._deferreds[i]);\n        }\n\n        self._deferreds = null;\n      }\n      /**\n       * @constructor\n       */\n\n\n      function Handler(onFulfilled, onRejected, promise) {\n        this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;\n        this.onRejected = typeof onRejected === 'function' ? onRejected : null;\n        this.promise = promise;\n      }\n      /**\n       * Take a potentially misbehaving resolver function and make sure\n       * onFulfilled and onRejected are only called once.\n       *\n       * Makes no guarantees about asynchrony.\n       */\n\n\n      function doResolve(fn, self) {\n        var done = false;\n\n        try {\n          fn(function (value) {\n            if (done) return;\n            done = true;\n            resolve(self, value);\n          }, function (reason) {\n            if (done) return;\n            done = true;\n            reject(self, reason);\n          });\n        } catch (ex) {\n          if (done) return;\n          done = true;\n          reject(self, ex);\n        }\n      }\n\n      Promise.prototype['catch'] = function (onRejected) {\n        return this.then(null, onRejected);\n      };\n\n      Promise.prototype.then = function (onFulfilled, onRejected) {\n        // @ts-ignore\n        var prom = new this.constructor(noop);\n        handle(this, new Handler(onFulfilled, onRejected, prom));\n        return prom;\n      };\n\n      Promise.prototype['finally'] = finallyConstructor;\n\n      Promise.all = function (arr) {\n        return new Promise(function (resolve, reject) {\n          if (!isArray(arr)) {\n            return reject(new TypeError('Promise.all accepts an array'));\n          }\n\n          var args = Array.prototype.slice.call(arr);\n          if (args.length === 0) return resolve([]);\n          var remaining = args.length;\n\n          function res(i, val) {\n            try {\n              if (val && (_typeof(val) === 'object' || typeof val === 'function')) {\n                var then = val.then;\n\n                if (typeof then === 'function') {\n                  then.call(val, function (val) {\n                    res(i, val);\n                  }, reject);\n                  return;\n                }\n              }\n\n              args[i] = val;\n\n              if (--remaining === 0) {\n                resolve(args);\n              }\n            } catch (ex) {\n              reject(ex);\n            }\n          }\n\n          for (var i = 0; i < args.length; i++) {\n            res(i, args[i]);\n          }\n        });\n      };\n\n      Promise.allSettled = allSettled;\n\n      Promise.resolve = function (value) {\n        if (value && _typeof(value) === 'object' && value.constructor === Promise) {\n          return value;\n        }\n\n        return new Promise(function (resolve) {\n          resolve(value);\n        });\n      };\n\n      Promise.reject = function (value) {\n        return new Promise(function (resolve, reject) {\n          reject(value);\n        });\n      };\n\n      Promise.race = function (arr) {\n        return new Promise(function (resolve, reject) {\n          if (!isArray(arr)) {\n            return reject(new TypeError('Promise.race accepts an array'));\n          }\n\n          for (var i = 0, len = arr.length; i < len; i++) {\n            Promise.resolve(arr[i]).then(resolve, reject);\n          }\n        });\n      }; // Use polyfill for setImmediate for performance gains\n\n\n      Promise._immediateFn = // @ts-ignore\n      typeof setImmediate === 'function' && function (fn) {\n        // @ts-ignore\n        setImmediate(fn);\n      } || function (fn) {\n        setTimeoutFunc(fn, 0);\n      };\n\n      Promise._unhandledRejectionFn = function _unhandledRejectionFn(err) {\n        if (typeof console !== 'undefined' && console) {\n          console.warn('Possible Unhandled Promise Rejection:', err); // eslint-disable-line no-console\n        }\n      };\n\n      module.exports = Promise;\n    })();\n  });\n\n  function registerLoggingCallbacks(obj) {\n    var callbackNames = [\"begin\", \"done\", \"log\", \"testStart\", \"testDone\", \"moduleStart\", \"moduleDone\"];\n\n    function registerLoggingCallback(key) {\n      var loggingCallback = function loggingCallback(callback) {\n        if (objectType(callback) !== \"function\") {\n          throw new Error(\"QUnit logging methods require a callback function as their first parameters.\");\n        }\n\n        config.callbacks[key].push(callback);\n      };\n\n      return loggingCallback;\n    }\n\n    for (var i = 0, l = callbackNames.length; i < l; i++) {\n      var key = callbackNames[i]; // Initialize key collection of logging callback\n\n      if (objectType(config.callbacks[key]) === \"undefined\") {\n        config.callbacks[key] = [];\n      }\n\n      obj[key] = registerLoggingCallback(key);\n    }\n  }\n\n  function runLoggingCallbacks(key, args) {\n    var callbacks = config.callbacks[key]; // Handling 'log' callbacks separately. Unlike the other callbacks,\n    // the log callback is not controlled by the processing queue,\n    // but rather used by asserts. Hence to promisfy the 'log' callback\n    // would mean promisfying each step of a test\n\n    if (key === \"log\") {\n      callbacks.map(function (callback) {\n        return callback(args);\n      });\n      return;\n    } // ensure that each callback is executed serially\n\n\n    return callbacks.reduce(function (promiseChain, callback) {\n      return promiseChain.then(function () {\n        return promisePolyfill.resolve(callback(args));\n      });\n    }, promisePolyfill.resolve([]));\n  } // Doesn't support IE9, it will return undefined on these browsers\n  // See also https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/Error/Stack\n\n\n  var fileName = (sourceFromStacktrace(0) || \"\").replace(/(:\\d+)+\\)?/, \"\").replace(/.+\\//, \"\");\n\n  function extractStacktrace(e, offset) {\n    offset = offset === undefined ? 4 : offset;\n\n    if (e && e.stack) {\n      var stack = e.stack.split(\"\\n\");\n\n      if (/^error$/i.test(stack[0])) {\n        stack.shift();\n      }\n\n      if (fileName) {\n        var include = [];\n\n        for (var i = offset; i < stack.length; i++) {\n          if (stack[i].indexOf(fileName) !== -1) {\n            break;\n          }\n\n          include.push(stack[i]);\n        }\n\n        if (include.length) {\n          return include.join(\"\\n\");\n        }\n      }\n\n      return stack[offset];\n    }\n  }\n\n  function sourceFromStacktrace(offset) {\n    var error = new Error(); // Support: Safari <=7 only, IE <=10 - 11 only\n    // Not all browsers generate the `stack` property for `new Error()`, see also #636\n\n    if (!error.stack) {\n      try {\n        throw error;\n      } catch (err) {\n        error = err;\n      }\n    }\n\n    return extractStacktrace(error, offset);\n  }\n\n  var priorityCount = 0;\n  var unitSampler; // This is a queue of functions that are tasks within a single test.\n  // After tests are dequeued from config.queue they are expanded into\n  // a set of tasks in this queue.\n\n  var taskQueue = [];\n  /**\n   * Advances the taskQueue to the next task. If the taskQueue is empty,\n   * process the testQueue\n   */\n\n  function advance() {\n    advanceTaskQueue();\n\n    if (!taskQueue.length && !config.blocking && !config.current) {\n      advanceTestQueue();\n    }\n  }\n  /**\n   * Advances the taskQueue with an increased depth\n   */\n\n\n  function advanceTaskQueue() {\n    var start = now();\n    config.depth = (config.depth || 0) + 1;\n    processTaskQueue(start);\n    config.depth--;\n  }\n  /**\n   * Process the first task on the taskQueue as a promise.\n   * Each task is a function added by Test#queue() in /src/test.js\n   */\n\n\n  function processTaskQueue(start) {\n    if (taskQueue.length && !config.blocking) {\n      var elapsedTime = now() - start;\n\n      if (!setTimeout$1 || config.updateRate <= 0 || elapsedTime < config.updateRate) {\n        var task = taskQueue.shift();\n        promisePolyfill.resolve(task()).then(function () {\n          if (!taskQueue.length) {\n            advance();\n          } else {\n            processTaskQueue(start);\n          }\n        });\n      } else {\n        setTimeout$1(advance);\n      }\n    }\n  }\n  /**\n   * Advance the testQueue to the next test to process. Call done() if testQueue completes.\n   */\n\n\n  function advanceTestQueue() {\n    if (!config.blocking && !config.queue.length && config.depth === 0) {\n      done();\n      return;\n    }\n\n    var testTasks = config.queue.shift();\n    addToTaskQueue(testTasks());\n\n    if (priorityCount > 0) {\n      priorityCount--;\n    }\n\n    advance();\n  }\n  /**\n   * Enqueue the tasks for a test into the task queue.\n   * @param {Array} tasksArray\n   */\n\n\n  function addToTaskQueue(tasksArray) {\n    taskQueue.push.apply(taskQueue, _toConsumableArray(tasksArray));\n  }\n  /**\n   * Return the number of tasks remaining in the task queue to be processed.\n   * @return {number}\n   */\n\n\n  function taskQueueLength() {\n    return taskQueue.length;\n  }\n  /**\n   * Adds a test to the TestQueue for execution.\n   * @param {Function} testTasksFunc\n   * @param {boolean} prioritize\n   * @param {string} seed\n   */\n\n\n  function addToTestQueue(testTasksFunc, prioritize, seed) {\n    if (prioritize) {\n      config.queue.splice(priorityCount++, 0, testTasksFunc);\n    } else if (seed) {\n      if (!unitSampler) {\n        unitSampler = unitSamplerGenerator(seed);\n      } // Insert into a random position after all prioritized items\n\n\n      var index = Math.floor(unitSampler() * (config.queue.length - priorityCount + 1));\n      config.queue.splice(priorityCount + index, 0, testTasksFunc);\n    } else {\n      config.queue.push(testTasksFunc);\n    }\n  }\n  /**\n   * Creates a seeded \"sample\" generator which is used for randomizing tests.\n   */\n\n\n  function unitSamplerGenerator(seed) {\n    // 32-bit xorshift, requires only a nonzero seed\n    // https://excamera.com/sphinx/article-xorshift.html\n    var sample = parseInt(generateHash(seed), 16) || -1;\n    return function () {\n      sample ^= sample << 13;\n      sample ^= sample >>> 17;\n      sample ^= sample << 5; // ECMAScript has no unsigned number type\n\n      if (sample < 0) {\n        sample += 0x100000000;\n      }\n\n      return sample / 0x100000000;\n    };\n  }\n  /**\n   * This function is called when the ProcessingQueue is done processing all\n   * items. It handles emitting the final run events.\n   */\n\n\n  function done() {\n    var storage = config.storage;\n    ProcessingQueue.finished = true;\n    var runtime = now() - config.started;\n    var passed = config.stats.all - config.stats.bad;\n\n    if (config.stats.testCount === 0) {\n      if (config.filter && config.filter.length) {\n        throw new Error(\"No tests matched the filter \\\"\".concat(config.filter, \"\\\".\"));\n      }\n\n      if (config.module && config.module.length) {\n        throw new Error(\"No tests matched the module \\\"\".concat(config.module, \"\\\".\"));\n      }\n\n      if (config.moduleId && config.moduleId.length) {\n        throw new Error(\"No tests matched the moduleId \\\"\".concat(config.moduleId, \"\\\".\"));\n      }\n\n      if (config.testId && config.testId.length) {\n        throw new Error(\"No tests matched the testId \\\"\".concat(config.testId, \"\\\".\"));\n      }\n\n      throw new Error(\"No tests were run.\");\n    }\n\n    emit(\"runEnd\", globalSuite.end(true));\n    runLoggingCallbacks(\"done\", {\n      passed: passed,\n      failed: config.stats.bad,\n      total: config.stats.all,\n      runtime: runtime\n    }).then(function () {\n      // Clear own storage items if all tests passed\n      if (storage && config.stats.bad === 0) {\n        for (var i = storage.length - 1; i >= 0; i--) {\n          var key = storage.key(i);\n\n          if (key.indexOf(\"qunit-test-\") === 0) {\n            storage.removeItem(key);\n          }\n        }\n      }\n    });\n  }\n\n  var ProcessingQueue = {\n    finished: false,\n    add: addToTestQueue,\n    advance: advance,\n    taskCount: taskQueueLength\n  };\n\n  var TestReport = /*#__PURE__*/function () {\n    function TestReport(name, suite, options) {\n      _classCallCheck(this, TestReport);\n\n      this.name = name;\n      this.suiteName = suite.name;\n      this.fullName = suite.fullName.concat(name);\n      this.runtime = 0;\n      this.assertions = [];\n      this.skipped = !!options.skip;\n      this.todo = !!options.todo;\n      this.valid = options.valid;\n      this._startTime = 0;\n      this._endTime = 0;\n      suite.pushTest(this);\n    }\n\n    _createClass(TestReport, [{\n      key: \"start\",\n      value: function start(recordTime) {\n        if (recordTime) {\n          this._startTime = performance.now();\n          performance.mark(\"qunit_test_start\");\n        }\n\n        return {\n          name: this.name,\n          suiteName: this.suiteName,\n          fullName: this.fullName.slice()\n        };\n      }\n    }, {\n      key: \"end\",\n      value: function end(recordTime) {\n        if (recordTime) {\n          this._endTime = performance.now();\n\n          if (performance) {\n            performance.mark(\"qunit_test_end\");\n            var testName = this.fullName.join(\" – \");\n            performance.measure(\"QUnit Test: \".concat(testName), \"qunit_test_start\", \"qunit_test_end\");\n          }\n        }\n\n        return extend(this.start(), {\n          runtime: this.getRuntime(),\n          status: this.getStatus(),\n          errors: this.getFailedAssertions(),\n          assertions: this.getAssertions()\n        });\n      }\n    }, {\n      key: \"pushAssertion\",\n      value: function pushAssertion(assertion) {\n        this.assertions.push(assertion);\n      }\n    }, {\n      key: \"getRuntime\",\n      value: function getRuntime() {\n        return this._endTime - this._startTime;\n      }\n    }, {\n      key: \"getStatus\",\n      value: function getStatus() {\n        if (this.skipped) {\n          return \"skipped\";\n        }\n\n        var testPassed = this.getFailedAssertions().length > 0 ? this.todo : !this.todo;\n\n        if (!testPassed) {\n          return \"failed\";\n        } else if (this.todo) {\n          return \"todo\";\n        } else {\n          return \"passed\";\n        }\n      }\n    }, {\n      key: \"getFailedAssertions\",\n      value: function getFailedAssertions() {\n        return this.assertions.filter(function (assertion) {\n          return !assertion.passed;\n        });\n      }\n    }, {\n      key: \"getAssertions\",\n      value: function getAssertions() {\n        return this.assertions.slice();\n      } // Remove actual and expected values from assertions. This is to prevent\n      // leaking memory throughout a test suite.\n\n    }, {\n      key: \"slimAssertions\",\n      value: function slimAssertions() {\n        this.assertions = this.assertions.map(function (assertion) {\n          delete assertion.actual;\n          delete assertion.expected;\n          return assertion;\n        });\n      }\n    }]);\n\n    return TestReport;\n  }();\n\n  function Test(settings) {\n    this.expected = null;\n    this.assertions = [];\n    this.semaphore = 0;\n    this.module = config.currentModule;\n    this.steps = [];\n    this.timeout = undefined;\n    extend(this, settings); // If a module is skipped, all its tests and the tests of the child suites\n    // should be treated as skipped even if they are defined as `only` or `todo`.\n    // As for `todo` module, all its tests will be treated as `todo` except for\n    // tests defined as `skip` which will be left intact.\n    //\n    // So, if a test is defined as `todo` and is inside a skipped module, we should\n    // then treat that test as if was defined as `skip`.\n\n    if (this.module.skip) {\n      this.skip = true;\n      this.todo = false; // Skipped tests should be left intact\n    } else if (this.module.todo && !this.skip) {\n      this.todo = true;\n    }\n\n    if (!this.skip && typeof this.callback !== \"function\") {\n      var method = this.todo ? \"QUnit.todo\" : \"QUnit.test\";\n      throw new TypeError(\"You must provide a callback to \".concat(method, \"(\\\"\").concat(this.testName, \"\\\")\"));\n    } // No validation after this. Beyond this point, failures must be recorded as\n    // a completed test with errors, instead of early bail out.\n    // Otherwise, internals may be left in an inconsistent state.\n    // Ref https://github.com/qunitjs/qunit/issues/1514\n\n\n    ++Test.count;\n    this.errorForStack = new Error();\n    this.testReport = new TestReport(this.testName, this.module.suiteReport, {\n      todo: this.todo,\n      skip: this.skip,\n      valid: this.valid()\n    }); // Register unique strings\n\n    for (var i = 0, l = this.module.tests; i < l.length; i++) {\n      if (this.module.tests[i].name === this.testName) {\n        this.testName += \" \";\n      }\n    }\n\n    this.testId = generateHash(this.module.name, this.testName);\n    this.module.tests.push({\n      name: this.testName,\n      testId: this.testId,\n      skip: !!this.skip\n    });\n\n    if (this.skip) {\n      // Skipped tests will fully ignore any sent callback\n      this.callback = function () {};\n\n      this.async = false;\n      this.expected = 0;\n    } else {\n      this.assert = new Assert(this);\n    }\n  }\n\n  Test.count = 0;\n\n  function getNotStartedModules(startModule) {\n    var module = startModule;\n    var modules = [];\n\n    while (module && module.testsRun === 0) {\n      modules.push(module);\n      module = module.parentModule;\n    } // The above push modules from the child to the parent\n    // return a reversed order with the top being the top most parent module\n\n\n    return modules.reverse();\n  }\n\n  Test.prototype = {\n    // generating a stack trace can be expensive, so using a getter defers this until we need it\n    get stack() {\n      return extractStacktrace(this.errorForStack, 2);\n    },\n\n    before: function before() {\n      var _this = this;\n\n      var module = this.module;\n      var notStartedModules = getNotStartedModules(module); // ensure the callbacks are executed serially for each module\n\n      var callbackPromises = notStartedModules.reduce(function (promiseChain, startModule) {\n        return promiseChain.then(function () {\n          startModule.stats = {\n            all: 0,\n            bad: 0,\n            started: now()\n          };\n          emit(\"suiteStart\", startModule.suiteReport.start(true));\n          return runLoggingCallbacks(\"moduleStart\", {\n            name: startModule.name,\n            tests: startModule.tests\n          });\n        });\n      }, promisePolyfill.resolve([]));\n      return callbackPromises.then(function () {\n        config.current = _this;\n        _this.testEnvironment = extend({}, module.testEnvironment);\n        _this.started = now();\n        emit(\"testStart\", _this.testReport.start(true));\n        return runLoggingCallbacks(\"testStart\", {\n          name: _this.testName,\n          module: module.name,\n          testId: _this.testId,\n          previousFailure: _this.previousFailure\n        }).then(function () {\n          if (!config.pollution) {\n            saveGlobal();\n          }\n        });\n      });\n    },\n    run: function run() {\n      config.current = this;\n      this.callbackStarted = now();\n\n      if (config.notrycatch) {\n        runTest(this);\n        return;\n      }\n\n      try {\n        runTest(this);\n      } catch (e) {\n        this.pushFailure(\"Died on test #\" + (this.assertions.length + 1) + \" \" + this.stack + \": \" + (e.message || e), extractStacktrace(e, 0)); // Else next test will carry the responsibility\n\n        saveGlobal(); // Restart the tests if they're blocking\n\n        if (config.blocking) {\n          internalRecover(this);\n        }\n      }\n\n      function runTest(test) {\n        var promise = test.callback.call(test.testEnvironment, test.assert);\n        test.resolvePromise(promise); // If the test has a \"lock\" on it, but the timeout is 0, then we push a\n        // failure as the test should be synchronous.\n\n        if (test.timeout === 0 && test.semaphore !== 0) {\n          pushFailure(\"Test did not finish synchronously even though assert.timeout( 0 ) was used.\", sourceFromStacktrace(2));\n        }\n      }\n    },\n    after: function after() {\n      checkPollution();\n    },\n    queueHook: function queueHook(hook, hookName, hookOwner) {\n      var _this2 = this;\n\n      var callHook = function callHook() {\n        var promise = hook.call(_this2.testEnvironment, _this2.assert);\n\n        _this2.resolvePromise(promise, hookName);\n      };\n\n      var runHook = function runHook() {\n        if (hookName === \"before\") {\n          if (hookOwner.testsRun !== 0) {\n            return;\n          }\n\n          _this2.preserveEnvironment = true;\n        } // The 'after' hook should only execute when there are not tests left and\n        // when the 'after' and 'finish' tasks are the only tasks left to process\n\n\n        if (hookName === \"after\" && !lastTestWithinModuleExecuted(hookOwner) && (config.queue.length > 0 || ProcessingQueue.taskCount() > 2)) {\n          return;\n        }\n\n        config.current = _this2;\n\n        if (config.notrycatch) {\n          callHook();\n          return;\n        }\n\n        try {\n          callHook();\n        } catch (error) {\n          _this2.pushFailure(hookName + \" failed on \" + _this2.testName + \": \" + (error.message || error), extractStacktrace(error, 0));\n        }\n      };\n\n      return runHook;\n    },\n    // Currently only used for module level hooks, can be used to add global level ones\n    hooks: function hooks(handler) {\n      var hooks = [];\n\n      function processHooks(test, module) {\n        if (module.parentModule) {\n          processHooks(test, module.parentModule);\n        }\n\n        if (module.hooks[handler].length) {\n          for (var i = 0; i < module.hooks[handler].length; i++) {\n            hooks.push(test.queueHook(module.hooks[handler][i], handler, module));\n          }\n        }\n      } // Hooks are ignored on skipped tests\n\n\n      if (!this.skip) {\n        processHooks(this, this.module);\n      }\n\n      return hooks;\n    },\n    finish: function finish() {\n      config.current = this; // Release the test callback to ensure that anything referenced has been\n      // released to be garbage collected.\n\n      this.callback = undefined;\n\n      if (this.steps.length) {\n        var stepsList = this.steps.join(\", \");\n        this.pushFailure(\"Expected assert.verifySteps() to be called before end of test \" + \"after using assert.step(). Unverified steps: \".concat(stepsList), this.stack);\n      }\n\n      if (config.requireExpects && this.expected === null) {\n        this.pushFailure(\"Expected number of assertions to be defined, but expect() was \" + \"not called.\", this.stack);\n      } else if (this.expected !== null && this.expected !== this.assertions.length) {\n        this.pushFailure(\"Expected \" + this.expected + \" assertions, but \" + this.assertions.length + \" were run\", this.stack);\n      } else if (this.expected === null && !this.assertions.length) {\n        this.pushFailure(\"Expected at least one assertion, but none were run - call \" + \"expect(0) to accept zero assertions.\", this.stack);\n      }\n\n      var module = this.module;\n      var moduleName = module.name;\n      var testName = this.testName;\n      var skipped = !!this.skip;\n      var todo = !!this.todo;\n      var bad = 0;\n      var storage = config.storage;\n      this.runtime = now() - this.started;\n      config.stats.all += this.assertions.length;\n      config.stats.testCount += 1;\n      module.stats.all += this.assertions.length;\n\n      for (var i = 0; i < this.assertions.length; i++) {\n        if (!this.assertions[i].result) {\n          bad++;\n          config.stats.bad++;\n          module.stats.bad++;\n        }\n      }\n\n      if (skipped) {\n        incrementTestsIgnored(module);\n      } else {\n        incrementTestsRun(module);\n      } // Store result when possible\n\n\n      if (storage) {\n        if (bad) {\n          storage.setItem(\"qunit-test-\" + moduleName + \"-\" + testName, bad);\n        } else {\n          storage.removeItem(\"qunit-test-\" + moduleName + \"-\" + testName);\n        }\n      } // After emitting the js-reporters event we cleanup the assertion data to\n      // avoid leaking it. It is not used by the legacy testDone callbacks.\n\n\n      emit(\"testEnd\", this.testReport.end(true));\n      this.testReport.slimAssertions();\n      var test = this;\n      return runLoggingCallbacks(\"testDone\", {\n        name: testName,\n        module: moduleName,\n        skipped: skipped,\n        todo: todo,\n        failed: bad,\n        passed: this.assertions.length - bad,\n        total: this.assertions.length,\n        runtime: skipped ? 0 : this.runtime,\n        // HTML Reporter use\n        assertions: this.assertions,\n        testId: this.testId,\n\n        // Source of Test\n        // generating stack trace is expensive, so using a getter will help defer this until we need it\n        get source() {\n          return test.stack;\n        }\n\n      }).then(function () {\n        if (allTestsExecuted(module)) {\n          var completedModules = [module]; // Check if the parent modules, iteratively, are done. If that the case,\n          // we emit the `suiteEnd` event and trigger `moduleDone` callback.\n\n          var parent = module.parentModule;\n\n          while (parent && allTestsExecuted(parent)) {\n            completedModules.push(parent);\n            parent = parent.parentModule;\n          }\n\n          return completedModules.reduce(function (promiseChain, completedModule) {\n            return promiseChain.then(function () {\n              return logSuiteEnd(completedModule);\n            });\n          }, promisePolyfill.resolve([]));\n        }\n      }).then(function () {\n        config.current = undefined;\n      });\n\n      function logSuiteEnd(module) {\n        // Reset `module.hooks` to ensure that anything referenced in these hooks\n        // has been released to be garbage collected.\n        module.hooks = {};\n        emit(\"suiteEnd\", module.suiteReport.end(true));\n        return runLoggingCallbacks(\"moduleDone\", {\n          name: module.name,\n          tests: module.tests,\n          failed: module.stats.bad,\n          passed: module.stats.all - module.stats.bad,\n          total: module.stats.all,\n          runtime: now() - module.stats.started\n        });\n      }\n    },\n    preserveTestEnvironment: function preserveTestEnvironment() {\n      if (this.preserveEnvironment) {\n        this.module.testEnvironment = this.testEnvironment;\n        this.testEnvironment = extend({}, this.module.testEnvironment);\n      }\n    },\n    queue: function queue() {\n      var test = this;\n\n      if (!this.valid()) {\n        incrementTestsIgnored(this.module);\n        return;\n      }\n\n      function runTest() {\n        return [function () {\n          return test.before();\n        }].concat(_toConsumableArray(test.hooks(\"before\")), [function () {\n          test.preserveTestEnvironment();\n        }], _toConsumableArray(test.hooks(\"beforeEach\")), [function () {\n          test.run();\n        }], _toConsumableArray(test.hooks(\"afterEach\").reverse()), _toConsumableArray(test.hooks(\"after\").reverse()), [function () {\n          test.after();\n        }, function () {\n          return test.finish();\n        }]);\n      }\n\n      var previousFailCount = config.storage && +config.storage.getItem(\"qunit-test-\" + this.module.name + \"-\" + this.testName); // Prioritize previously failed tests, detected from storage\n\n      var prioritize = config.reorder && !!previousFailCount;\n      this.previousFailure = !!previousFailCount;\n      ProcessingQueue.add(runTest, prioritize, config.seed); // If the queue has already finished, we manually process the new test\n\n      if (ProcessingQueue.finished) {\n        ProcessingQueue.advance();\n      }\n    },\n    pushResult: function pushResult(resultInfo) {\n      if (this !== config.current) {\n        var message = resultInfo && resultInfo.message || \"\";\n        var testName = this && this.testName || \"\";\n        var error = \"Assertion occurred after test finished.\\n\" + \"> Test: \" + testName + \"\\n\" + \"> Message: \" + message + \"\\n\";\n        throw new Error(error);\n      } // Destructure of resultInfo = { result, actual, expected, message, negative }\n\n\n      var details = {\n        module: this.module.name,\n        name: this.testName,\n        result: resultInfo.result,\n        message: resultInfo.message,\n        actual: resultInfo.actual,\n        testId: this.testId,\n        negative: resultInfo.negative || false,\n        runtime: now() - this.started,\n        todo: !!this.todo\n      };\n\n      if (hasOwn.call(resultInfo, \"expected\")) {\n        details.expected = resultInfo.expected;\n      }\n\n      if (!resultInfo.result) {\n        var source = resultInfo.source || sourceFromStacktrace();\n\n        if (source) {\n          details.source = source;\n        }\n      }\n\n      this.logAssertion(details);\n      this.assertions.push({\n        result: !!resultInfo.result,\n        message: resultInfo.message\n      });\n    },\n    pushFailure: function pushFailure(message, source, actual) {\n      if (!(this instanceof Test)) {\n        throw new Error(\"pushFailure() assertion outside test context, was \" + sourceFromStacktrace(2));\n      }\n\n      this.pushResult({\n        result: false,\n        message: message || \"error\",\n        actual: actual || null,\n        source: source\n      });\n    },\n\n    /**\n     * Log assertion details using both the old QUnit.log interface and\n     * QUnit.on( \"assertion\" ) interface.\n     *\n     * @private\n     */\n    logAssertion: function logAssertion(details) {\n      runLoggingCallbacks(\"log\", details);\n      var assertion = {\n        passed: details.result,\n        actual: details.actual,\n        expected: details.expected,\n        message: details.message,\n        stack: details.source,\n        todo: details.todo\n      };\n      this.testReport.pushAssertion(assertion);\n      emit(\"assertion\", assertion);\n    },\n    resolvePromise: function resolvePromise(promise, phase) {\n      if (promise != null) {\n        var _test = this;\n\n        var then = promise.then;\n\n        if (objectType(then) === \"function\") {\n          var resume = internalStop(_test);\n\n          if (config.notrycatch) {\n            then.call(promise, function () {\n              resume();\n            });\n          } else {\n            then.call(promise, function () {\n              resume();\n            }, function (error) {\n              var message = \"Promise rejected \" + (!phase ? \"during\" : phase.replace(/Each$/, \"\")) + \" \\\"\" + _test.testName + \"\\\": \" + (error && error.message || error);\n\n              _test.pushFailure(message, extractStacktrace(error, 0)); // Else next test will carry the responsibility\n\n\n              saveGlobal(); // Unblock\n\n              internalRecover(_test);\n            });\n          }\n        }\n      }\n    },\n    valid: function valid() {\n      var filter = config.filter;\n      var regexFilter = /^(!?)\\/([\\w\\W]*)\\/(i?$)/.exec(filter);\n      var module = config.module && config.module.toLowerCase();\n      var fullName = this.module.name + \": \" + this.testName;\n\n      function moduleChainNameMatch(testModule) {\n        var testModuleName = testModule.name ? testModule.name.toLowerCase() : null;\n\n        if (testModuleName === module) {\n          return true;\n        } else if (testModule.parentModule) {\n          return moduleChainNameMatch(testModule.parentModule);\n        } else {\n          return false;\n        }\n      }\n\n      function moduleChainIdMatch(testModule) {\n        return inArray(testModule.moduleId, config.moduleId) || testModule.parentModule && moduleChainIdMatch(testModule.parentModule);\n      } // Internally-generated tests are always valid\n\n\n      if (this.callback && this.callback.validTest) {\n        return true;\n      }\n\n      if (config.moduleId && config.moduleId.length > 0 && !moduleChainIdMatch(this.module)) {\n        return false;\n      }\n\n      if (config.testId && config.testId.length > 0 && !inArray(this.testId, config.testId)) {\n        return false;\n      }\n\n      if (module && !moduleChainNameMatch(this.module)) {\n        return false;\n      }\n\n      if (!filter) {\n        return true;\n      }\n\n      return regexFilter ? this.regexFilter(!!regexFilter[1], regexFilter[2], regexFilter[3], fullName) : this.stringFilter(filter, fullName);\n    },\n    regexFilter: function regexFilter(exclude, pattern, flags, fullName) {\n      var regex = new RegExp(pattern, flags);\n      var match = regex.test(fullName);\n      return match !== exclude;\n    },\n    stringFilter: function stringFilter(filter, fullName) {\n      filter = filter.toLowerCase();\n      fullName = fullName.toLowerCase();\n      var include = filter.charAt(0) !== \"!\";\n\n      if (!include) {\n        filter = filter.slice(1);\n      } // If the filter matches, we need to honour include\n\n\n      if (fullName.indexOf(filter) !== -1) {\n        return include;\n      } // Otherwise, do the opposite\n\n\n      return !include;\n    }\n  };\n\n  function pushFailure() {\n    if (!config.current) {\n      throw new Error(\"pushFailure() assertion outside test context, in \" + sourceFromStacktrace(2));\n    } // Gets current test obj\n\n\n    var currentTest = config.current;\n    return currentTest.pushFailure.apply(currentTest, arguments);\n  }\n\n  function saveGlobal() {\n    config.pollution = [];\n\n    if (config.noglobals) {\n      for (var key in globalThis$1) {\n        if (hasOwn.call(globalThis$1, key)) {\n          // In Opera sometimes DOM element ids show up here, ignore them\n          if (/^qunit-test-output/.test(key)) {\n            continue;\n          }\n\n          config.pollution.push(key);\n        }\n      }\n    }\n  }\n\n  function checkPollution() {\n    var old = config.pollution;\n    saveGlobal();\n    var newGlobals = diff(config.pollution, old);\n\n    if (newGlobals.length > 0) {\n      pushFailure(\"Introduced global variable(s): \" + newGlobals.join(\", \"));\n    }\n\n    var deletedGlobals = diff(old, config.pollution);\n\n    if (deletedGlobals.length > 0) {\n      pushFailure(\"Deleted global variable(s): \" + deletedGlobals.join(\", \"));\n    }\n  }\n\n  var focused = false; // indicates that the \"only\" filter was used\n  // Will be exposed as QUnit.test\n\n  function test(testName, callback) {\n    if (focused || config.currentModule.ignored) {\n      return;\n    }\n\n    var newTest = new Test({\n      testName: testName,\n      callback: callback\n    });\n    newTest.queue();\n  }\n\n  extend(test, {\n    todo: function todo(testName, callback) {\n      if (focused || config.currentModule.ignored) {\n        return;\n      }\n\n      var newTest = new Test({\n        testName: testName,\n        callback: callback,\n        todo: true\n      });\n      newTest.queue();\n    },\n    skip: function skip(testName) {\n      if (focused || config.currentModule.ignored) {\n        return;\n      }\n\n      var test = new Test({\n        testName: testName,\n        skip: true\n      });\n      test.queue();\n    },\n    only: function only(testName, callback) {\n      if (config.currentModule.ignored) {\n        return;\n      }\n\n      if (!focused) {\n        config.queue.length = 0;\n        focused = true;\n      }\n\n      var newTest = new Test({\n        testName: testName,\n        callback: callback\n      });\n      newTest.queue();\n    }\n  }); // Resets config.timeout with a new timeout duration.\n\n  function resetTestTimeout(timeoutDuration) {\n    clearTimeout(config.timeout);\n    config.timeout = setTimeout$1(config.timeoutHandler(timeoutDuration), timeoutDuration);\n  } // Put a hold on processing and return a function that will release it.\n\n\n  function internalStop(test) {\n    var released = false;\n    test.semaphore += 1;\n    config.blocking = true; // Set a recovery timeout, if so configured.\n\n    if (setTimeout$1) {\n      var timeoutDuration;\n\n      if (typeof test.timeout === \"number\") {\n        timeoutDuration = test.timeout;\n      } else if (typeof config.testTimeout === \"number\") {\n        timeoutDuration = config.testTimeout;\n      }\n\n      if (typeof timeoutDuration === \"number\" && timeoutDuration > 0) {\n        config.timeoutHandler = function (timeout) {\n          return function () {\n            config.timeout = null;\n            pushFailure(\"Test took longer than \".concat(timeout, \"ms; test timed out.\"), sourceFromStacktrace(2));\n            released = true;\n            internalRecover(test);\n          };\n        };\n\n        clearTimeout(config.timeout);\n        config.timeout = setTimeout$1(config.timeoutHandler(timeoutDuration), timeoutDuration);\n      }\n    }\n\n    return function resume() {\n      if (released) {\n        return;\n      }\n\n      released = true;\n      test.semaphore -= 1;\n      internalStart(test);\n    };\n  } // Forcefully release all processing holds.\n\n\n  function internalRecover(test) {\n    test.semaphore = 0;\n    internalStart(test);\n  } // Release a processing hold, scheduling a resumption attempt if no holds remain.\n\n\n  function internalStart(test) {\n    // If semaphore is non-numeric, throw error\n    if (isNaN(test.semaphore)) {\n      test.semaphore = 0;\n      pushFailure(\"Invalid value on test.semaphore\", sourceFromStacktrace(2));\n      return;\n    } // Don't start until equal number of stop-calls\n\n\n    if (test.semaphore > 0) {\n      return;\n    } // Throw an Error if start is called more often than stop\n\n\n    if (test.semaphore < 0) {\n      test.semaphore = 0;\n      pushFailure(\"Tried to restart test while already started (test's semaphore was 0 already)\", sourceFromStacktrace(2));\n      return;\n    } // Add a slight delay to allow more assertions etc.\n\n\n    if (setTimeout$1) {\n      clearTimeout(config.timeout);\n      config.timeout = setTimeout$1(function () {\n        if (test.semaphore > 0) {\n          return;\n        }\n\n        clearTimeout(config.timeout);\n        config.timeout = null;\n        begin();\n      });\n    } else {\n      begin();\n    }\n  }\n\n  function collectTests(module) {\n    var tests = [].concat(module.tests);\n\n    var modules = _toConsumableArray(module.childModules); // Do a breadth-first traversal of the child modules\n\n\n    while (modules.length) {\n      var nextModule = modules.shift();\n      tests.push.apply(tests, nextModule.tests);\n      modules.push.apply(modules, _toConsumableArray(nextModule.childModules));\n    }\n\n    return tests;\n  } // This returns true after all executable and skippable tests\n  // in a module have been proccessed, and informs 'suiteEnd'\n  // and moduleDone().\n\n\n  function allTestsExecuted(module) {\n    return module.testsRun + module.testsIgnored === collectTests(module).length;\n  } // This returns true during the last executable non-skipped test\n  // within a module, and informs the running of the 'after' hook\n  // for a given module. This runs only once for a given module,\n  // but must run during the last non-skipped test. When it runs,\n  // there may be non-zero skipped tests left.\n\n\n  function lastTestWithinModuleExecuted(module) {\n    return module.testsRun === collectTests(module).filter(function (test) {\n      return !test.skip;\n    }).length - 1;\n  }\n\n  function incrementTestsRun(module) {\n    module.testsRun++;\n\n    while (module = module.parentModule) {\n      module.testsRun++;\n    }\n  }\n\n  function incrementTestsIgnored(module) {\n    module.testsIgnored++;\n\n    while (module = module.parentModule) {\n      module.testsIgnored++;\n    }\n  }\n\n  var Assert = /*#__PURE__*/function () {\n    function Assert(testContext) {\n      _classCallCheck(this, Assert);\n\n      this.test = testContext;\n    } // Assert helpers\n\n\n    _createClass(Assert, [{\n      key: \"timeout\",\n      value: function timeout(duration) {\n        if (typeof duration !== \"number\") {\n          throw new Error(\"You must pass a number as the duration to assert.timeout\");\n        }\n\n        this.test.timeout = duration; // If a timeout has been set, clear it and reset with the new duration\n\n        if (config.timeout) {\n          clearTimeout(config.timeout);\n          config.timeout = null;\n\n          if (config.timeoutHandler && this.test.timeout > 0) {\n            resetTestTimeout(this.test.timeout);\n          }\n        }\n      } // Documents a \"step\", which is a string value, in a test as a passing assertion\n\n    }, {\n      key: \"step\",\n      value: function step(message) {\n        var assertionMessage = message;\n        var result = !!message;\n        this.test.steps.push(message);\n\n        if (objectType(message) === \"undefined\" || message === \"\") {\n          assertionMessage = \"You must provide a message to assert.step\";\n        } else if (objectType(message) !== \"string\") {\n          assertionMessage = \"You must provide a string value to assert.step\";\n          result = false;\n        }\n\n        this.pushResult({\n          result: result,\n          message: assertionMessage\n        });\n      } // Verifies the steps in a test match a given array of string values\n\n    }, {\n      key: \"verifySteps\",\n      value: function verifySteps(steps, message) {\n        // Since the steps array is just string values, we can clone with slice\n        var actualStepsClone = this.test.steps.slice();\n        this.deepEqual(actualStepsClone, steps, message);\n        this.test.steps.length = 0;\n      } // Specify the number of expected assertions to guarantee that failed test\n      // (no assertions are run at all) don't slip through.\n\n    }, {\n      key: \"expect\",\n      value: function expect(asserts) {\n        if (arguments.length === 1) {\n          this.test.expected = asserts;\n        } else {\n          return this.test.expected;\n        }\n      } // Put a hold on processing and return a function that will release it a maximum of once.\n\n    }, {\n      key: \"async\",\n      value: function async(count) {\n        var test = this.test;\n        var popped = false,\n            acceptCallCount = count;\n\n        if (typeof acceptCallCount === \"undefined\") {\n          acceptCallCount = 1;\n        }\n\n        var resume = internalStop(test);\n        return function done() {\n          if (config.current !== test) {\n            throw Error(\"assert.async callback called after test finished.\");\n          }\n\n          if (popped) {\n            test.pushFailure(\"Too many calls to the `assert.async` callback\", sourceFromStacktrace(2));\n            return;\n          }\n\n          acceptCallCount -= 1;\n\n          if (acceptCallCount > 0) {\n            return;\n          }\n\n          popped = true;\n          resume();\n        };\n      } // Exports test.push() to the user API\n      // Alias of pushResult.\n\n    }, {\n      key: \"push\",\n      value: function push(result, actual, expected, message, negative) {\n        Logger.warn(\"assert.push is deprecated and will be removed in QUnit 3.0.\" + \" Please use assert.pushResult instead (https://api.qunitjs.com/assert/pushResult).\");\n        var currentAssert = this instanceof Assert ? this : config.current.assert;\n        return currentAssert.pushResult({\n          result: result,\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: negative\n        });\n      }\n    }, {\n      key: \"pushResult\",\n      value: function pushResult(resultInfo) {\n        // Destructure of resultInfo = { result, actual, expected, message, negative }\n        var assert = this;\n        var currentTest = assert instanceof Assert && assert.test || config.current; // Backwards compatibility fix.\n        // Allows the direct use of global exported assertions and QUnit.assert.*\n        // Although, it's use is not recommended as it can leak assertions\n        // to other tests from async tests, because we only get a reference to the current test,\n        // not exactly the test where assertion were intended to be called.\n\n        if (!currentTest) {\n          throw new Error(\"assertion outside test context, in \" + sourceFromStacktrace(2));\n        }\n\n        if (!(assert instanceof Assert)) {\n          assert = currentTest.assert;\n        }\n\n        return assert.test.pushResult(resultInfo);\n      }\n    }, {\n      key: \"ok\",\n      value: function ok(result, message) {\n        if (!message) {\n          message = result ? \"okay\" : \"failed, expected argument to be truthy, was: \".concat(dump.parse(result));\n        }\n\n        this.pushResult({\n          result: !!result,\n          actual: result,\n          expected: true,\n          message: message\n        });\n      }\n    }, {\n      key: \"notOk\",\n      value: function notOk(result, message) {\n        if (!message) {\n          message = !result ? \"okay\" : \"failed, expected argument to be falsy, was: \".concat(dump.parse(result));\n        }\n\n        this.pushResult({\n          result: !result,\n          actual: result,\n          expected: false,\n          message: message\n        });\n      }\n    }, {\n      key: \"true\",\n      value: function _true(result, message) {\n        this.pushResult({\n          result: result === true,\n          actual: result,\n          expected: true,\n          message: message\n        });\n      }\n    }, {\n      key: \"false\",\n      value: function _false(result, message) {\n        this.pushResult({\n          result: result === false,\n          actual: result,\n          expected: false,\n          message: message\n        });\n      }\n    }, {\n      key: \"equal\",\n      value: function equal(actual, expected, message) {\n        // eslint-disable-next-line eqeqeq\n        var result = expected == actual;\n        this.pushResult({\n          result: result,\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notEqual\",\n      value: function notEqual(actual, expected, message) {\n        // eslint-disable-next-line eqeqeq\n        var result = expected != actual;\n        this.pushResult({\n          result: result,\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: \"propEqual\",\n      value: function propEqual(actual, expected, message) {\n        actual = objectValues(actual);\n        expected = objectValues(expected);\n        this.pushResult({\n          result: equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notPropEqual\",\n      value: function notPropEqual(actual, expected, message) {\n        actual = objectValues(actual);\n        expected = objectValues(expected);\n        this.pushResult({\n          result: !equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: \"deepEqual\",\n      value: function deepEqual(actual, expected, message) {\n        this.pushResult({\n          result: equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notDeepEqual\",\n      value: function notDeepEqual(actual, expected, message) {\n        this.pushResult({\n          result: !equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: \"strictEqual\",\n      value: function strictEqual(actual, expected, message) {\n        this.pushResult({\n          result: expected === actual,\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notStrictEqual\",\n      value: function notStrictEqual(actual, expected, message) {\n        this.pushResult({\n          result: expected !== actual,\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: \"throws\",\n      value: function throws(block, expected, message) {\n        var actual,\n            result = false;\n        var currentTest = this instanceof Assert && this.test || config.current; // 'expected' is optional unless doing string comparison\n\n        if (objectType(expected) === \"string\") {\n          if (message == null) {\n            message = expected;\n            expected = null;\n          } else {\n            throw new Error(\"throws/raises does not accept a string value for the expected argument.\\n\" + \"Use a non-string object value (e.g. regExp) instead if it's necessary.\");\n          }\n        }\n\n        currentTest.ignoreGlobalErrors = true;\n\n        try {\n          block.call(currentTest.testEnvironment);\n        } catch (e) {\n          actual = e;\n        }\n\n        currentTest.ignoreGlobalErrors = false;\n\n        if (actual) {\n          var expectedType = objectType(expected); // We don't want to validate thrown error\n\n          if (!expected) {\n            result = true; // Expected is a regexp\n          } else if (expectedType === \"regexp\") {\n            result = expected.test(errorString(actual)); // Log the string form of the regexp\n\n            expected = String(expected); // Expected is a constructor, maybe an Error constructor.\n            // Note the extra check on its prototype - this is an implicit\n            // requirement of \"instanceof\", else it will throw a TypeError.\n          } else if (expectedType === \"function\" && expected.prototype !== undefined && actual instanceof expected) {\n            result = true; // Expected is an Error object\n          } else if (expectedType === \"object\") {\n            result = actual instanceof expected.constructor && actual.name === expected.name && actual.message === expected.message; // Log the string form of the Error object\n\n            expected = errorString(expected); // Expected is a validation function which returns true if validation passed\n          } else if (expectedType === \"function\") {\n            // protect against accidental semantics which could hard error in the test\n            try {\n              result = expected.call({}, actual) === true;\n              expected = null;\n            } catch (e) {\n              // assign the \"expected\" to a nice error string to communicate the local failure to the user\n              expected = errorString(e);\n            }\n          }\n        }\n\n        currentTest.assert.pushResult({\n          result: result,\n          // undefined if it didn't throw\n          actual: actual && errorString(actual),\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"rejects\",\n      value: function rejects(promise, expected, message) {\n        var result = false;\n        var currentTest = this instanceof Assert && this.test || config.current; // 'expected' is optional unless doing string comparison\n\n        if (objectType(expected) === \"string\") {\n          if (message === undefined) {\n            message = expected;\n            expected = undefined;\n          } else {\n            message = \"assert.rejects does not accept a string value for the expected \" + \"argument.\\nUse a non-string object value (e.g. validator function) instead \" + \"if necessary.\";\n            currentTest.assert.pushResult({\n              result: false,\n              message: message\n            });\n            return;\n          }\n        }\n\n        var then = promise && promise.then;\n\n        if (objectType(then) !== \"function\") {\n          var _message = \"The value provided to `assert.rejects` in \" + \"\\\"\" + currentTest.testName + \"\\\" was not a promise.\";\n\n          currentTest.assert.pushResult({\n            result: false,\n            message: _message,\n            actual: promise\n          });\n          return;\n        }\n\n        var done = this.async();\n        return then.call(promise, function handleFulfillment() {\n          var message = \"The promise returned by the `assert.rejects` callback in \" + \"\\\"\" + currentTest.testName + \"\\\" did not reject.\";\n          currentTest.assert.pushResult({\n            result: false,\n            message: message,\n            actual: promise\n          });\n          done();\n        }, function handleRejection(actual) {\n          var expectedType = objectType(expected); // We don't want to validate\n\n          if (expected === undefined) {\n            result = true; // Expected is a regexp\n          } else if (expectedType === \"regexp\") {\n            result = expected.test(errorString(actual)); // Log the string form of the regexp\n\n            expected = String(expected); // Expected is a constructor, maybe an Error constructor\n          } else if (expectedType === \"function\" && actual instanceof expected) {\n            result = true; // Expected is an Error object\n          } else if (expectedType === \"object\") {\n            result = actual instanceof expected.constructor && actual.name === expected.name && actual.message === expected.message; // Log the string form of the Error object\n\n            expected = errorString(expected); // Expected is a validation function which returns true if validation passed\n          } else {\n            if (expectedType === \"function\") {\n              result = expected.call({}, actual) === true;\n              expected = null; // Expected is some other invalid type\n            } else {\n              result = false;\n              message = \"invalid expected value provided to `assert.rejects` \" + \"callback in \\\"\" + currentTest.testName + \"\\\": \" + expectedType + \".\";\n            }\n          }\n\n          currentTest.assert.pushResult({\n            result: result,\n            // leave rejection value of undefined as-is\n            actual: actual && errorString(actual),\n            expected: expected,\n            message: message\n          });\n          done();\n        });\n      }\n    }]);\n\n    return Assert;\n  }(); // Provide an alternative to assert.throws(), for environments that consider throws a reserved word\n  // Known to us are: Closure Compiler, Narwhal\n  // eslint-disable-next-line dot-notation\n\n\n  Assert.prototype.raises = Assert.prototype[\"throws\"];\n  /**\n   * Converts an error into a simple string for comparisons.\n   *\n   * @param {Error|Object} error\n   * @return {string}\n   */\n\n  function errorString(error) {\n    var resultErrorString = error.toString(); // If the error wasn't a subclass of Error but something like\n    // an object literal with name and message properties...\n\n    if (resultErrorString.slice(0, 7) === \"[object\") {\n      // Based on https://es5.github.com/#x15.11.4.4\n      var name = error.name ? String(error.name) : \"Error\";\n      return error.message ? \"\".concat(name, \": \").concat(error.message) : name;\n    } else {\n      return resultErrorString;\n    }\n  }\n  /* global module, exports, define */\n\n\n  function exportQUnit(QUnit) {\n    var exportedModule = false;\n\n    if (window$1 && document) {\n      // QUnit may be defined when it is preconfigured but then only QUnit and QUnit.config may be defined.\n      if (window$1.QUnit && window$1.QUnit.version) {\n        throw new Error(\"QUnit has already been defined.\");\n      }\n\n      window$1.QUnit = QUnit;\n      exportedModule = true;\n    } // For Node.js\n\n\n    if ( true && module && module.exports) {\n      module.exports = QUnit; // For consistency with CommonJS environments' exports\n\n      module.exports.QUnit = QUnit;\n      exportedModule = true;\n    } // For CommonJS with exports, but without module.exports, like Rhino\n\n\n    if ( true && exports) {\n      exports.QUnit = QUnit;\n      exportedModule = true;\n    } // For AMD\n\n\n    if (true) {\n      !(__WEBPACK_AMD_DEFINE_RESULT__ = (function () {\n        return QUnit;\n      }).call(exports, __webpack_require__, exports, module),\n\t\t\t\t__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));\n      QUnit.config.autostart = false;\n      exportedModule = true;\n    } // For Web/Service Workers\n\n\n    if (self$1 && self$1.WorkerGlobalScope && self$1 instanceof self$1.WorkerGlobalScope) {\n      self$1.QUnit = QUnit;\n      exportedModule = true;\n    } // For other environments, such as SpiderMonkey (mozjs) and other\n    // embedded JavaScript engines\n\n\n    if (!exportedModule) {\n      globalThis$1.QUnit = QUnit;\n    }\n  } // error handling should be suppressed and false otherwise.\n  // In this case, we will only suppress further error handling if the\n  // \"ignoreGlobalErrors\" configuration option is enabled.\n\n\n  function onError(error) {\n    for (var _len = arguments.length, args = new Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {\n      args[_key - 1] = arguments[_key];\n    }\n\n    if (config.current) {\n      if (config.current.ignoreGlobalErrors) {\n        return true;\n      }\n\n      pushFailure.apply(void 0, [error.message, error.stacktrace || error.fileName + \":\" + error.lineNumber].concat(args));\n    } else {\n      test(\"global failure\", extend(function () {\n        pushFailure.apply(void 0, [error.message, error.stacktrace || error.fileName + \":\" + error.lineNumber].concat(args));\n      }, {\n        validTest: true\n      }));\n    }\n\n    return false;\n  }\n\n  function onUnhandledRejection(reason) {\n    var resultInfo = {\n      result: false,\n      message: reason.message || \"error\",\n      actual: reason,\n      source: reason.stack || sourceFromStacktrace(3)\n    };\n    var currentTest = config.current;\n\n    if (currentTest) {\n      currentTest.assert.pushResult(resultInfo);\n    } else {\n      test(\"global failure\", extend(function (assert) {\n        assert.pushResult(resultInfo);\n      }, {\n        validTest: true\n      }));\n    }\n  }\n\n  var QUnit = {};\n  var globalSuite = new SuiteReport(); // The initial \"currentModule\" represents the global (or top-level) module that\n  // is not explicitly defined by the user, therefore we add the \"globalSuite\" to\n  // it since each module has a suiteReport associated with it.\n\n  config.currentModule.suiteReport = globalSuite;\n  var globalStartCalled = false;\n  var runStarted = false; // Figure out if we're running the tests from a server or not\n\n  QUnit.isLocal = window$1 && window$1.location && window$1.location.protocol === \"file:\"; // Expose the current QUnit version\n\n  QUnit.version = \"2.15.0\";\n  extend(QUnit, {\n    config: config,\n    dump: dump,\n    equiv: equiv,\n    is: is,\n    objectType: objectType,\n    on: on,\n    onError: onError,\n    onUnhandledRejection: onUnhandledRejection,\n    pushFailure: pushFailure,\n    assert: Assert.prototype,\n    module: module$1,\n    test: test,\n    // alias other test flavors for easy access\n    todo: test.todo,\n    skip: test.skip,\n    only: test.only,\n    start: function start(count) {\n      if (config.current) {\n        throw new Error(\"QUnit.start cannot be called inside a test context.\");\n      }\n\n      var globalStartAlreadyCalled = globalStartCalled;\n      globalStartCalled = true;\n\n      if (runStarted) {\n        throw new Error(\"Called start() while test already started running\");\n      }\n\n      if (globalStartAlreadyCalled || count > 1) {\n        throw new Error(\"Called start() outside of a test context too many times\");\n      }\n\n      if (config.autostart) {\n        throw new Error(\"Called start() outside of a test context when \" + \"QUnit.config.autostart was true\");\n      }\n\n      if (!config.pageLoaded) {\n        // The page isn't completely loaded yet, so we set autostart and then\n        // load if we're in Node or wait for the browser's load event.\n        config.autostart = true; // Starts from Node even if .load was not previously called. We still return\n        // early otherwise we'll wind up \"beginning\" twice.\n\n        if (!document) {\n          QUnit.load();\n        }\n\n        return;\n      }\n\n      scheduleBegin();\n    },\n    extend: function extend$1() {\n      Logger.warn(\"QUnit.extend is deprecated and will be removed in QUnit 3.0.\" + \" Please use Object.assign instead.\"); // delegate to utility implementation, which does not warn and can be used elsewhere internally\n\n      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {\n        args[_key] = arguments[_key];\n      }\n\n      return extend.apply(this, args);\n    },\n    load: function load() {\n      config.pageLoaded = true; // Initialize the configuration options\n\n      extend(config, {\n        stats: {\n          all: 0,\n          bad: 0,\n          testCount: 0\n        },\n        started: 0,\n        updateRate: 1000,\n        autostart: true,\n        filter: \"\"\n      }, true);\n\n      if (!runStarted) {\n        config.blocking = false;\n\n        if (config.autostart) {\n          scheduleBegin();\n        }\n      }\n    },\n    stack: function stack(offset) {\n      offset = (offset || 0) + 2;\n      return sourceFromStacktrace(offset);\n    }\n  });\n  registerLoggingCallbacks(QUnit);\n\n  function scheduleBegin() {\n    runStarted = true; // Add a slight delay to allow definition of more modules and tests.\n\n    if (setTimeout$1) {\n      setTimeout$1(function () {\n        begin();\n      });\n    } else {\n      begin();\n    }\n  }\n\n  function unblockAndAdvanceQueue() {\n    config.blocking = false;\n    ProcessingQueue.advance();\n  }\n\n  function begin() {\n    if (config.started) {\n      unblockAndAdvanceQueue();\n      return;\n    } // The test run hasn't officially begun yet\n    // Record the time of the test run's beginning\n\n\n    config.started = now(); // Delete the loose unnamed module if unused.\n\n    if (config.modules[0].name === \"\" && config.modules[0].tests.length === 0) {\n      config.modules.shift();\n    } // Avoid unnecessary information by not logging modules' test environments\n\n\n    var l = config.modules.length;\n    var modulesLog = [];\n\n    for (var i = 0; i < l; i++) {\n      modulesLog.push({\n        name: config.modules[i].name,\n        tests: config.modules[i].tests\n      });\n    } // The test run is officially beginning now\n\n\n    emit(\"runStart\", globalSuite.start(true));\n    runLoggingCallbacks(\"begin\", {\n      totalTests: Test.count,\n      modules: modulesLog\n    }).then(unblockAndAdvanceQueue);\n  }\n\n  exportQUnit(QUnit);\n\n  (function () {\n    if (!window$1 || !document) {\n      return;\n    }\n\n    var config = QUnit.config,\n        hasOwn = Object.prototype.hasOwnProperty; // Stores fixture HTML for resetting later\n\n    function storeFixture() {\n      // Avoid overwriting user-defined values\n      if (hasOwn.call(config, \"fixture\")) {\n        return;\n      }\n\n      var fixture = document.getElementById(\"qunit-fixture\");\n\n      if (fixture) {\n        config.fixture = fixture.cloneNode(true);\n      }\n    }\n\n    QUnit.begin(storeFixture); // Resets the fixture DOM element if available.\n\n    function resetFixture() {\n      if (config.fixture == null) {\n        return;\n      }\n\n      var fixture = document.getElementById(\"qunit-fixture\");\n\n      var resetFixtureType = _typeof(config.fixture);\n\n      if (resetFixtureType === \"string\") {\n        // support user defined values for `config.fixture`\n        var newFixture = document.createElement(\"div\");\n        newFixture.setAttribute(\"id\", \"qunit-fixture\");\n        newFixture.innerHTML = config.fixture;\n        fixture.parentNode.replaceChild(newFixture, fixture);\n      } else {\n        var clonedFixture = config.fixture.cloneNode(true);\n        fixture.parentNode.replaceChild(clonedFixture, fixture);\n      }\n    }\n\n    QUnit.testStart(resetFixture);\n  })();\n\n  (function () {\n    // Only interact with URLs via window.location\n    var location = typeof window$1 !== \"undefined\" && window$1.location;\n\n    if (!location) {\n      return;\n    }\n\n    var urlParams = getUrlParams();\n    QUnit.urlParams = urlParams; // Match module/test by inclusion in an array\n\n    QUnit.config.moduleId = [].concat(urlParams.moduleId || []);\n    QUnit.config.testId = [].concat(urlParams.testId || []); // Exact case-insensitive match of the module name\n\n    QUnit.config.module = urlParams.module; // Regular expression or case-insenstive substring match against \"moduleName: testName\"\n\n    QUnit.config.filter = urlParams.filter; // Test order randomization\n\n    if (urlParams.seed === true) {\n      // Generate a random seed if the option is specified without a value\n      QUnit.config.seed = Math.random().toString(36).slice(2);\n    } else if (urlParams.seed) {\n      QUnit.config.seed = urlParams.seed;\n    } // Add URL-parameter-mapped config values with UI form rendering data\n\n\n    QUnit.config.urlConfig.push({\n      id: \"hidepassed\",\n      label: \"Hide passed tests\",\n      tooltip: \"Only show tests and assertions that fail. Stored as query-strings.\"\n    }, {\n      id: \"noglobals\",\n      label: \"Check for Globals\",\n      tooltip: \"Enabling this will test if any test introduces new properties on the \" + \"global object (`window` in Browsers). Stored as query-strings.\"\n    }, {\n      id: \"notrycatch\",\n      label: \"No try-catch\",\n      tooltip: \"Enabling this will run tests outside of a try-catch block. Makes debugging \" + \"exceptions in IE reasonable. Stored as query-strings.\"\n    });\n    QUnit.begin(function () {\n      var i,\n          option,\n          urlConfig = QUnit.config.urlConfig;\n\n      for (i = 0; i < urlConfig.length; i++) {\n        // Options can be either strings or objects with nonempty \"id\" properties\n        option = QUnit.config.urlConfig[i];\n\n        if (typeof option !== \"string\") {\n          option = option.id;\n        }\n\n        if (QUnit.config[option] === undefined) {\n          QUnit.config[option] = urlParams[option];\n        }\n      }\n    });\n\n    function getUrlParams() {\n      var i, param, name, value;\n      var urlParams = Object.create(null);\n      var params = location.search.slice(1).split(\"&\");\n      var length = params.length;\n\n      for (i = 0; i < length; i++) {\n        if (params[i]) {\n          param = params[i].split(\"=\");\n          name = decodeQueryParam(param[0]); // Allow just a key to turn on a flag, e.g., test.html?noglobals\n\n          value = param.length === 1 || decodeQueryParam(param.slice(1).join(\"=\"));\n\n          if (name in urlParams) {\n            urlParams[name] = [].concat(urlParams[name], value);\n          } else {\n            urlParams[name] = value;\n          }\n        }\n      }\n\n      return urlParams;\n    }\n\n    function decodeQueryParam(param) {\n      return decodeURIComponent(param.replace(/\\+/g, \"%20\"));\n    }\n  })();\n  /*\n  WHAT: SublimeText-like Fuzzy Search\n   USAGE:\n    fuzzysort.single('fs', 'Fuzzy Search') // {score: -16}\n    fuzzysort.single('test', 'test') // {score: 0}\n    fuzzysort.single('doesnt exist', 'target') // null\n     fuzzysort.go('mr', ['Monitor.cpp', 'MeshRenderer.cpp'])\n    // [{score: -18, target: \"MeshRenderer.cpp\"}, {score: -6009, target: \"Monitor.cpp\"}]\n     fuzzysort.highlight(fuzzysort.single('fs', 'Fuzzy Search'), '<b>', '</b>')\n    // <b>F</b>uzzy <b>S</b>earch\n  */\n\n\n  var fuzzysort = createCommonjsModule(function (module) {\n    (function (root, UMD) {\n      if (module.exports) module.exports = UMD();else root.fuzzysort = UMD();\n    })(commonjsGlobal, function UMD() {\n      function fuzzysortNew(instanceOptions) {\n        var fuzzysort = {\n          single: function single(search, target, options) {\n            if (!search) return null;\n            if (!isObj(search)) search = fuzzysort.getPreparedSearch(search);\n            if (!target) return null;\n            if (!isObj(target)) target = fuzzysort.getPrepared(target);\n            var allowTypo = options && options.allowTypo !== undefined ? options.allowTypo : instanceOptions && instanceOptions.allowTypo !== undefined ? instanceOptions.allowTypo : true;\n            var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo;\n            return algorithm(search, target, search[0]); // var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991\n            // var result = algorithm(search, target, search[0])\n            // if(result === null) return null\n            // if(result.score < threshold) return null\n            // return result\n          },\n          go: function go(search, targets, options) {\n            if (!search) return noResults;\n            search = fuzzysort.prepareSearch(search);\n            var searchLowerCode = search[0];\n            var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991;\n            var limit = options && options.limit || instanceOptions && instanceOptions.limit || 9007199254740991;\n            var allowTypo = options && options.allowTypo !== undefined ? options.allowTypo : instanceOptions && instanceOptions.allowTypo !== undefined ? instanceOptions.allowTypo : true;\n            var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo;\n            var resultsLen = 0;\n            var limitedCount = 0;\n            var targetsLen = targets.length; // This code is copy/pasted 3 times for performance reasons [options.keys, options.key, no keys]\n            // options.keys\n\n            if (options && options.keys) {\n              var scoreFn = options.scoreFn || defaultScoreFn;\n              var keys = options.keys;\n              var keysLen = keys.length;\n\n              for (var i = targetsLen - 1; i >= 0; --i) {\n                var obj = targets[i];\n                var objResults = new Array(keysLen);\n\n                for (var keyI = keysLen - 1; keyI >= 0; --keyI) {\n                  var key = keys[keyI];\n                  var target = getValue(obj, key);\n\n                  if (!target) {\n                    objResults[keyI] = null;\n                    continue;\n                  }\n\n                  if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                  objResults[keyI] = algorithm(search, target, searchLowerCode);\n                }\n\n                objResults.obj = obj; // before scoreFn so scoreFn can use it\n\n                var score = scoreFn(objResults);\n                if (score === null) continue;\n                if (score < threshold) continue;\n                objResults.score = score;\n\n                if (resultsLen < limit) {\n                  q.add(objResults);\n                  ++resultsLen;\n                } else {\n                  ++limitedCount;\n                  if (score > q.peek().score) q.replaceTop(objResults);\n                }\n              } // options.key\n\n            } else if (options && options.key) {\n              var key = options.key;\n\n              for (var i = targetsLen - 1; i >= 0; --i) {\n                var obj = targets[i];\n                var target = getValue(obj, key);\n                if (!target) continue;\n                if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                var result = algorithm(search, target, searchLowerCode);\n                if (result === null) continue;\n                if (result.score < threshold) continue; // have to clone result so duplicate targets from different obj can each reference the correct obj\n\n                result = {\n                  target: result.target,\n                  _targetLowerCodes: null,\n                  _nextBeginningIndexes: null,\n                  score: result.score,\n                  indexes: result.indexes,\n                  obj: obj\n                }; // hidden\n\n                if (resultsLen < limit) {\n                  q.add(result);\n                  ++resultsLen;\n                } else {\n                  ++limitedCount;\n                  if (result.score > q.peek().score) q.replaceTop(result);\n                }\n              } // no keys\n\n            } else {\n              for (var i = targetsLen - 1; i >= 0; --i) {\n                var target = targets[i];\n                if (!target) continue;\n                if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                var result = algorithm(search, target, searchLowerCode);\n                if (result === null) continue;\n                if (result.score < threshold) continue;\n\n                if (resultsLen < limit) {\n                  q.add(result);\n                  ++resultsLen;\n                } else {\n                  ++limitedCount;\n                  if (result.score > q.peek().score) q.replaceTop(result);\n                }\n              }\n            }\n\n            if (resultsLen === 0) return noResults;\n            var results = new Array(resultsLen);\n\n            for (var i = resultsLen - 1; i >= 0; --i) {\n              results[i] = q.poll();\n            }\n\n            results.total = resultsLen + limitedCount;\n            return results;\n          },\n          goAsync: function goAsync(search, targets, options) {\n            var canceled = false;\n            var p = new Promise(function (resolve, reject) {\n              if (!search) return resolve(noResults);\n              search = fuzzysort.prepareSearch(search);\n              var searchLowerCode = search[0];\n              var q = fastpriorityqueue();\n              var iCurrent = targets.length - 1;\n              var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991;\n              var limit = options && options.limit || instanceOptions && instanceOptions.limit || 9007199254740991;\n              var allowTypo = options && options.allowTypo !== undefined ? options.allowTypo : instanceOptions && instanceOptions.allowTypo !== undefined ? instanceOptions.allowTypo : true;\n              var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo;\n              var resultsLen = 0;\n              var limitedCount = 0;\n\n              function step() {\n                if (canceled) return reject('canceled');\n                var startMs = Date.now(); // This code is copy/pasted 3 times for performance reasons [options.keys, options.key, no keys]\n                // options.keys\n\n                if (options && options.keys) {\n                  var scoreFn = options.scoreFn || defaultScoreFn;\n                  var keys = options.keys;\n                  var keysLen = keys.length;\n\n                  for (; iCurrent >= 0; --iCurrent) {\n                    var obj = targets[iCurrent];\n                    var objResults = new Array(keysLen);\n\n                    for (var keyI = keysLen - 1; keyI >= 0; --keyI) {\n                      var key = keys[keyI];\n                      var target = getValue(obj, key);\n\n                      if (!target) {\n                        objResults[keyI] = null;\n                        continue;\n                      }\n\n                      if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                      objResults[keyI] = algorithm(search, target, searchLowerCode);\n                    }\n\n                    objResults.obj = obj; // before scoreFn so scoreFn can use it\n\n                    var score = scoreFn(objResults);\n                    if (score === null) continue;\n                    if (score < threshold) continue;\n                    objResults.score = score;\n\n                    if (resultsLen < limit) {\n                      q.add(objResults);\n                      ++resultsLen;\n                    } else {\n                      ++limitedCount;\n                      if (score > q.peek().score) q.replaceTop(objResults);\n                    }\n\n                    if (iCurrent % 1000\n                    /*itemsPerCheck*/\n                    === 0) {\n                      if (Date.now() - startMs >= 10\n                      /*asyncInterval*/\n                      ) {\n                          isNode ? setImmediate(step) : setTimeout(step);\n                          return;\n                        }\n                    }\n                  } // options.key\n\n                } else if (options && options.key) {\n                  var key = options.key;\n\n                  for (; iCurrent >= 0; --iCurrent) {\n                    var obj = targets[iCurrent];\n                    var target = getValue(obj, key);\n                    if (!target) continue;\n                    if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                    var result = algorithm(search, target, searchLowerCode);\n                    if (result === null) continue;\n                    if (result.score < threshold) continue; // have to clone result so duplicate targets from different obj can each reference the correct obj\n\n                    result = {\n                      target: result.target,\n                      _targetLowerCodes: null,\n                      _nextBeginningIndexes: null,\n                      score: result.score,\n                      indexes: result.indexes,\n                      obj: obj\n                    }; // hidden\n\n                    if (resultsLen < limit) {\n                      q.add(result);\n                      ++resultsLen;\n                    } else {\n                      ++limitedCount;\n                      if (result.score > q.peek().score) q.replaceTop(result);\n                    }\n\n                    if (iCurrent % 1000\n                    /*itemsPerCheck*/\n                    === 0) {\n                      if (Date.now() - startMs >= 10\n                      /*asyncInterval*/\n                      ) {\n                          isNode ? setImmediate(step) : setTimeout(step);\n                          return;\n                        }\n                    }\n                  } // no keys\n\n                } else {\n                  for (; iCurrent >= 0; --iCurrent) {\n                    var target = targets[iCurrent];\n                    if (!target) continue;\n                    if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                    var result = algorithm(search, target, searchLowerCode);\n                    if (result === null) continue;\n                    if (result.score < threshold) continue;\n\n                    if (resultsLen < limit) {\n                      q.add(result);\n                      ++resultsLen;\n                    } else {\n                      ++limitedCount;\n                      if (result.score > q.peek().score) q.replaceTop(result);\n                    }\n\n                    if (iCurrent % 1000\n                    /*itemsPerCheck*/\n                    === 0) {\n                      if (Date.now() - startMs >= 10\n                      /*asyncInterval*/\n                      ) {\n                          isNode ? setImmediate(step) : setTimeout(step);\n                          return;\n                        }\n                    }\n                  }\n                }\n\n                if (resultsLen === 0) return resolve(noResults);\n                var results = new Array(resultsLen);\n\n                for (var i = resultsLen - 1; i >= 0; --i) {\n                  results[i] = q.poll();\n                }\n\n                results.total = resultsLen + limitedCount;\n                resolve(results);\n              }\n\n              isNode ? setImmediate(step) : step();\n            });\n\n            p.cancel = function () {\n              canceled = true;\n            };\n\n            return p;\n          },\n          highlight: function highlight(result, hOpen, hClose) {\n            if (result === null) return null;\n            if (hOpen === undefined) hOpen = '<b>';\n            if (hClose === undefined) hClose = '</b>';\n            var highlighted = '';\n            var matchesIndex = 0;\n            var opened = false;\n            var target = result.target;\n            var targetLen = target.length;\n            var matchesBest = result.indexes;\n\n            for (var i = 0; i < targetLen; ++i) {\n              var char = target[i];\n\n              if (matchesBest[matchesIndex] === i) {\n                ++matchesIndex;\n\n                if (!opened) {\n                  opened = true;\n                  highlighted += hOpen;\n                }\n\n                if (matchesIndex === matchesBest.length) {\n                  highlighted += char + hClose + target.substr(i + 1);\n                  break;\n                }\n              } else {\n                if (opened) {\n                  opened = false;\n                  highlighted += hClose;\n                }\n              }\n\n              highlighted += char;\n            }\n\n            return highlighted;\n          },\n          prepare: function prepare(target) {\n            if (!target) return;\n            return {\n              target: target,\n              _targetLowerCodes: fuzzysort.prepareLowerCodes(target),\n              _nextBeginningIndexes: null,\n              score: null,\n              indexes: null,\n              obj: null\n            }; // hidden\n          },\n          prepareSlow: function prepareSlow(target) {\n            if (!target) return;\n            return {\n              target: target,\n              _targetLowerCodes: fuzzysort.prepareLowerCodes(target),\n              _nextBeginningIndexes: fuzzysort.prepareNextBeginningIndexes(target),\n              score: null,\n              indexes: null,\n              obj: null\n            }; // hidden\n          },\n          prepareSearch: function prepareSearch(search) {\n            if (!search) return;\n            return fuzzysort.prepareLowerCodes(search);\n          },\n          // Below this point is only internal code\n          // Below this point is only internal code\n          // Below this point is only internal code\n          // Below this point is only internal code\n          getPrepared: function getPrepared(target) {\n            if (target.length > 999) return fuzzysort.prepare(target); // don't cache huge targets\n\n            var targetPrepared = preparedCache.get(target);\n            if (targetPrepared !== undefined) return targetPrepared;\n            targetPrepared = fuzzysort.prepare(target);\n            preparedCache.set(target, targetPrepared);\n            return targetPrepared;\n          },\n          getPreparedSearch: function getPreparedSearch(search) {\n            if (search.length > 999) return fuzzysort.prepareSearch(search); // don't cache huge searches\n\n            var searchPrepared = preparedSearchCache.get(search);\n            if (searchPrepared !== undefined) return searchPrepared;\n            searchPrepared = fuzzysort.prepareSearch(search);\n            preparedSearchCache.set(search, searchPrepared);\n            return searchPrepared;\n          },\n          algorithm: function algorithm(searchLowerCodes, prepared, searchLowerCode) {\n            var targetLowerCodes = prepared._targetLowerCodes;\n            var searchLen = searchLowerCodes.length;\n            var targetLen = targetLowerCodes.length;\n            var searchI = 0; // where we at\n\n            var targetI = 0; // where you at\n\n            var typoSimpleI = 0;\n            var matchesSimpleLen = 0; // very basic fuzzy match; to remove non-matching targets ASAP!\n            // walk through target. find sequential matches.\n            // if all chars aren't found then exit\n\n            for (;;) {\n              var isMatch = searchLowerCode === targetLowerCodes[targetI];\n\n              if (isMatch) {\n                matchesSimple[matchesSimpleLen++] = targetI;\n                ++searchI;\n                if (searchI === searchLen) break;\n                searchLowerCode = searchLowerCodes[typoSimpleI === 0 ? searchI : typoSimpleI === searchI ? searchI + 1 : typoSimpleI === searchI - 1 ? searchI - 1 : searchI];\n              }\n\n              ++targetI;\n\n              if (targetI >= targetLen) {\n                // Failed to find searchI\n                // Check for typo or exit\n                // we go as far as possible before trying to transpose\n                // then we transpose backwards until we reach the beginning\n                for (;;) {\n                  if (searchI <= 1) return null; // not allowed to transpose first char\n\n                  if (typoSimpleI === 0) {\n                    // we haven't tried to transpose yet\n                    --searchI;\n                    var searchLowerCodeNew = searchLowerCodes[searchI];\n                    if (searchLowerCode === searchLowerCodeNew) continue; // doesn't make sense to transpose a repeat char\n\n                    typoSimpleI = searchI;\n                  } else {\n                    if (typoSimpleI === 1) return null; // reached the end of the line for transposing\n\n                    --typoSimpleI;\n                    searchI = typoSimpleI;\n                    searchLowerCode = searchLowerCodes[searchI + 1];\n                    var searchLowerCodeNew = searchLowerCodes[searchI];\n                    if (searchLowerCode === searchLowerCodeNew) continue; // doesn't make sense to transpose a repeat char\n                  }\n\n                  matchesSimpleLen = searchI;\n                  targetI = matchesSimple[matchesSimpleLen - 1] + 1;\n                  break;\n                }\n              }\n            }\n\n            var searchI = 0;\n            var typoStrictI = 0;\n            var successStrict = false;\n            var matchesStrictLen = 0;\n            var nextBeginningIndexes = prepared._nextBeginningIndexes;\n            if (nextBeginningIndexes === null) nextBeginningIndexes = prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);\n            var firstPossibleI = targetI = matchesSimple[0] === 0 ? 0 : nextBeginningIndexes[matchesSimple[0] - 1]; // Our target string successfully matched all characters in sequence!\n            // Let's try a more advanced and strict test to improve the score\n            // only count it as a match if it's consecutive or a beginning character!\n\n            if (targetI !== targetLen) for (;;) {\n              if (targetI >= targetLen) {\n                // We failed to find a good spot for this search char, go back to the previous search char and force it forward\n                if (searchI <= 0) {\n                  // We failed to push chars forward for a better match\n                  // transpose, starting from the beginning\n                  ++typoStrictI;\n                  if (typoStrictI > searchLen - 2) break;\n                  if (searchLowerCodes[typoStrictI] === searchLowerCodes[typoStrictI + 1]) continue; // doesn't make sense to transpose a repeat char\n\n                  targetI = firstPossibleI;\n                  continue;\n                }\n\n                --searchI;\n                var lastMatch = matchesStrict[--matchesStrictLen];\n                targetI = nextBeginningIndexes[lastMatch];\n              } else {\n                var isMatch = searchLowerCodes[typoStrictI === 0 ? searchI : typoStrictI === searchI ? searchI + 1 : typoStrictI === searchI - 1 ? searchI - 1 : searchI] === targetLowerCodes[targetI];\n\n                if (isMatch) {\n                  matchesStrict[matchesStrictLen++] = targetI;\n                  ++searchI;\n\n                  if (searchI === searchLen) {\n                    successStrict = true;\n                    break;\n                  }\n\n                  ++targetI;\n                } else {\n                  targetI = nextBeginningIndexes[targetI];\n                }\n              }\n            }\n            {\n              // tally up the score & keep track of matches for highlighting later\n              if (successStrict) {\n                var matchesBest = matchesStrict;\n                var matchesBestLen = matchesStrictLen;\n              } else {\n                var matchesBest = matchesSimple;\n                var matchesBestLen = matchesSimpleLen;\n              }\n\n              var score = 0;\n              var lastTargetI = -1;\n\n              for (var i = 0; i < searchLen; ++i) {\n                var targetI = matchesBest[i]; // score only goes down if they're not consecutive\n\n                if (lastTargetI !== targetI - 1) score -= targetI;\n                lastTargetI = targetI;\n              }\n\n              if (!successStrict) {\n                score *= 1000;\n                if (typoSimpleI !== 0) score += -20;\n                /*typoPenalty*/\n              } else {\n                if (typoStrictI !== 0) score += -20;\n                /*typoPenalty*/\n              }\n\n              score -= targetLen - searchLen;\n              prepared.score = score;\n              prepared.indexes = new Array(matchesBestLen);\n\n              for (var i = matchesBestLen - 1; i >= 0; --i) {\n                prepared.indexes[i] = matchesBest[i];\n              }\n\n              return prepared;\n            }\n          },\n          algorithmNoTypo: function algorithmNoTypo(searchLowerCodes, prepared, searchLowerCode) {\n            var targetLowerCodes = prepared._targetLowerCodes;\n            var searchLen = searchLowerCodes.length;\n            var targetLen = targetLowerCodes.length;\n            var searchI = 0; // where we at\n\n            var targetI = 0; // where you at\n\n            var matchesSimpleLen = 0; // very basic fuzzy match; to remove non-matching targets ASAP!\n            // walk through target. find sequential matches.\n            // if all chars aren't found then exit\n\n            for (;;) {\n              var isMatch = searchLowerCode === targetLowerCodes[targetI];\n\n              if (isMatch) {\n                matchesSimple[matchesSimpleLen++] = targetI;\n                ++searchI;\n                if (searchI === searchLen) break;\n                searchLowerCode = searchLowerCodes[searchI];\n              }\n\n              ++targetI;\n              if (targetI >= targetLen) return null; // Failed to find searchI\n            }\n\n            var searchI = 0;\n            var successStrict = false;\n            var matchesStrictLen = 0;\n            var nextBeginningIndexes = prepared._nextBeginningIndexes;\n            if (nextBeginningIndexes === null) nextBeginningIndexes = prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);\n            targetI = matchesSimple[0] === 0 ? 0 : nextBeginningIndexes[matchesSimple[0] - 1]; // Our target string successfully matched all characters in sequence!\n            // Let's try a more advanced and strict test to improve the score\n            // only count it as a match if it's consecutive or a beginning character!\n\n            if (targetI !== targetLen) for (;;) {\n              if (targetI >= targetLen) {\n                // We failed to find a good spot for this search char, go back to the previous search char and force it forward\n                if (searchI <= 0) break; // We failed to push chars forward for a better match\n\n                --searchI;\n                var lastMatch = matchesStrict[--matchesStrictLen];\n                targetI = nextBeginningIndexes[lastMatch];\n              } else {\n                var isMatch = searchLowerCodes[searchI] === targetLowerCodes[targetI];\n\n                if (isMatch) {\n                  matchesStrict[matchesStrictLen++] = targetI;\n                  ++searchI;\n\n                  if (searchI === searchLen) {\n                    successStrict = true;\n                    break;\n                  }\n\n                  ++targetI;\n                } else {\n                  targetI = nextBeginningIndexes[targetI];\n                }\n              }\n            }\n            {\n              // tally up the score & keep track of matches for highlighting later\n              if (successStrict) {\n                var matchesBest = matchesStrict;\n                var matchesBestLen = matchesStrictLen;\n              } else {\n                var matchesBest = matchesSimple;\n                var matchesBestLen = matchesSimpleLen;\n              }\n\n              var score = 0;\n              var lastTargetI = -1;\n\n              for (var i = 0; i < searchLen; ++i) {\n                var targetI = matchesBest[i]; // score only goes down if they're not consecutive\n\n                if (lastTargetI !== targetI - 1) score -= targetI;\n                lastTargetI = targetI;\n              }\n\n              if (!successStrict) score *= 1000;\n              score -= targetLen - searchLen;\n              prepared.score = score;\n              prepared.indexes = new Array(matchesBestLen);\n\n              for (var i = matchesBestLen - 1; i >= 0; --i) {\n                prepared.indexes[i] = matchesBest[i];\n              }\n\n              return prepared;\n            }\n          },\n          prepareLowerCodes: function prepareLowerCodes(str) {\n            var strLen = str.length;\n            var lowerCodes = []; // new Array(strLen)    sparse array is too slow\n\n            var lower = str.toLowerCase();\n\n            for (var i = 0; i < strLen; ++i) {\n              lowerCodes[i] = lower.charCodeAt(i);\n            }\n\n            return lowerCodes;\n          },\n          prepareBeginningIndexes: function prepareBeginningIndexes(target) {\n            var targetLen = target.length;\n            var beginningIndexes = [];\n            var beginningIndexesLen = 0;\n            var wasUpper = false;\n            var wasAlphanum = false;\n\n            for (var i = 0; i < targetLen; ++i) {\n              var targetCode = target.charCodeAt(i);\n              var isUpper = targetCode >= 65 && targetCode <= 90;\n              var isAlphanum = isUpper || targetCode >= 97 && targetCode <= 122 || targetCode >= 48 && targetCode <= 57;\n              var isBeginning = isUpper && !wasUpper || !wasAlphanum || !isAlphanum;\n              wasUpper = isUpper;\n              wasAlphanum = isAlphanum;\n              if (isBeginning) beginningIndexes[beginningIndexesLen++] = i;\n            }\n\n            return beginningIndexes;\n          },\n          prepareNextBeginningIndexes: function prepareNextBeginningIndexes(target) {\n            var targetLen = target.length;\n            var beginningIndexes = fuzzysort.prepareBeginningIndexes(target);\n            var nextBeginningIndexes = []; // new Array(targetLen)     sparse array is too slow\n\n            var lastIsBeginning = beginningIndexes[0];\n            var lastIsBeginningI = 0;\n\n            for (var i = 0; i < targetLen; ++i) {\n              if (lastIsBeginning > i) {\n                nextBeginningIndexes[i] = lastIsBeginning;\n              } else {\n                lastIsBeginning = beginningIndexes[++lastIsBeginningI];\n                nextBeginningIndexes[i] = lastIsBeginning === undefined ? targetLen : lastIsBeginning;\n              }\n            }\n\n            return nextBeginningIndexes;\n          },\n          cleanup: cleanup,\n          new: fuzzysortNew\n        };\n        return fuzzysort;\n      } // fuzzysortNew\n      // This stuff is outside fuzzysortNew, because it's shared with instances of fuzzysort.new()\n\n\n      var isNode = typeof commonjsRequire !== 'undefined' && typeof window === 'undefined'; // var MAX_INT = Number.MAX_SAFE_INTEGER\n      // var MIN_INT = Number.MIN_VALUE\n\n      var preparedCache = new Map();\n      var preparedSearchCache = new Map();\n      var noResults = [];\n      noResults.total = 0;\n      var matchesSimple = [];\n      var matchesStrict = [];\n\n      function cleanup() {\n        preparedCache.clear();\n        preparedSearchCache.clear();\n        matchesSimple = [];\n        matchesStrict = [];\n      }\n\n      function defaultScoreFn(a) {\n        var max = -9007199254740991;\n\n        for (var i = a.length - 1; i >= 0; --i) {\n          var result = a[i];\n          if (result === null) continue;\n          var score = result.score;\n          if (score > max) max = score;\n        }\n\n        if (max === -9007199254740991) return null;\n        return max;\n      } // prop = 'key'              2.5ms optimized for this case, seems to be about as fast as direct obj[prop]\n      // prop = 'key1.key2'        10ms\n      // prop = ['key1', 'key2']   27ms\n\n\n      function getValue(obj, prop) {\n        var tmp = obj[prop];\n        if (tmp !== undefined) return tmp;\n        var segs = prop;\n        if (!Array.isArray(prop)) segs = prop.split('.');\n        var len = segs.length;\n        var i = -1;\n\n        while (obj && ++i < len) {\n          obj = obj[segs[i]];\n        }\n\n        return obj;\n      }\n\n      function isObj(x) {\n        return _typeof2(x) === 'object';\n      } // faster as a function\n      // Hacked version of https://github.com/lemire/FastPriorityQueue.js\n\n\n      var fastpriorityqueue = function fastpriorityqueue() {\n        var r = [],\n            o = 0,\n            e = {};\n\n        function n() {\n          for (var e = 0, n = r[e], c = 1; c < o;) {\n            var f = c + 1;\n            e = c, f < o && r[f].score < r[c].score && (e = f), r[e - 1 >> 1] = r[e], c = 1 + (e << 1);\n          }\n\n          for (var a = e - 1 >> 1; e > 0 && n.score < r[a].score; a = (e = a) - 1 >> 1) {\n            r[e] = r[a];\n          }\n\n          r[e] = n;\n        }\n\n        return e.add = function (e) {\n          var n = o;\n          r[o++] = e;\n\n          for (var c = n - 1 >> 1; n > 0 && e.score < r[c].score; c = (n = c) - 1 >> 1) {\n            r[n] = r[c];\n          }\n\n          r[n] = e;\n        }, e.poll = function () {\n          if (0 !== o) {\n            var e = r[0];\n            return r[0] = r[--o], n(), e;\n          }\n        }, e.peek = function (e) {\n          if (0 !== o) return r[0];\n        }, e.replaceTop = function (o) {\n          r[0] = o, n();\n        }, e;\n      };\n\n      var q = fastpriorityqueue(); // reuse this, except for async, it needs to make its own\n\n      return fuzzysortNew();\n    }); // UMD\n    // TODO: (performance) wasm version!?\n    // TODO: (performance) layout memory in an optimal way to go fast by avoiding cache misses\n    // TODO: (performance) preparedCache is a memory leak\n    // TODO: (like sublime) backslash === forwardslash\n    // TODO: (performance) i have no idea how well optizmied the allowing typos algorithm is\n\n  });\n  var stats = {\n    passedTests: 0,\n    failedTests: 0,\n    skippedTests: 0,\n    todoTests: 0\n  }; // Escape text for attribute or text content.\n\n  function escapeText(s) {\n    if (!s) {\n      return \"\";\n    }\n\n    s = s + \"\"; // Both single quotes and double quotes (for attributes)\n\n    return s.replace(/['\"<>&]/g, function (s) {\n      switch (s) {\n        case \"'\":\n          return \"&#039;\";\n\n        case \"\\\"\":\n          return \"&quot;\";\n\n        case \"<\":\n          return \"&lt;\";\n\n        case \">\":\n          return \"&gt;\";\n\n        case \"&\":\n          return \"&amp;\";\n      }\n    });\n  }\n\n  (function () {\n    // Don't load the HTML Reporter on non-browser environments\n    if (!window$1 || !document) {\n      return;\n    }\n\n    var config = QUnit.config,\n        hiddenTests = [],\n        collapseNext = false,\n        hasOwn = Object.prototype.hasOwnProperty,\n        unfilteredUrl = setUrl({\n      filter: undefined,\n      module: undefined,\n      moduleId: undefined,\n      testId: undefined\n    });\n\n    function trim(string) {\n      if (typeof string.trim === \"function\") {\n        return string.trim();\n      } else {\n        return string.replace(/^\\s+|\\s+$/g, \"\");\n      }\n    }\n\n    function addEvent(elem, type, fn) {\n      elem.addEventListener(type, fn, false);\n    }\n\n    function removeEvent(elem, type, fn) {\n      elem.removeEventListener(type, fn, false);\n    }\n\n    function addEvents(elems, type, fn) {\n      var i = elems.length;\n\n      while (i--) {\n        addEvent(elems[i], type, fn);\n      }\n    }\n\n    function hasClass(elem, name) {\n      return (\" \" + elem.className + \" \").indexOf(\" \" + name + \" \") >= 0;\n    }\n\n    function addClass(elem, name) {\n      if (!hasClass(elem, name)) {\n        elem.className += (elem.className ? \" \" : \"\") + name;\n      }\n    }\n\n    function toggleClass(elem, name, force) {\n      if (force || typeof force === \"undefined\" && !hasClass(elem, name)) {\n        addClass(elem, name);\n      } else {\n        removeClass(elem, name);\n      }\n    }\n\n    function removeClass(elem, name) {\n      var set = \" \" + elem.className + \" \"; // Class name may appear multiple times\n\n      while (set.indexOf(\" \" + name + \" \") >= 0) {\n        set = set.replace(\" \" + name + \" \", \" \");\n      } // Trim for prettiness\n\n\n      elem.className = trim(set);\n    }\n\n    function id(name) {\n      return document.getElementById && document.getElementById(name);\n    }\n\n    function abortTests() {\n      var abortButton = id(\"qunit-abort-tests-button\");\n\n      if (abortButton) {\n        abortButton.disabled = true;\n        abortButton.innerHTML = \"Aborting...\";\n      }\n\n      QUnit.config.queue.length = 0;\n      return false;\n    }\n\n    function interceptNavigation(ev) {\n      // Trim potential accidental whitespace so that QUnit doesn't throw an error about no tests matching the filter.\n      var filterInputElem = id(\"qunit-filter-input\");\n      filterInputElem.value = trim(filterInputElem.value);\n      applyUrlParams();\n\n      if (ev && ev.preventDefault) {\n        ev.preventDefault();\n      }\n\n      return false;\n    }\n\n    function getUrlConfigHtml() {\n      var i,\n          j,\n          val,\n          escaped,\n          escapedTooltip,\n          selection = false,\n          urlConfig = config.urlConfig,\n          urlConfigHtml = \"\";\n\n      for (i = 0; i < urlConfig.length; i++) {\n        // Options can be either strings or objects with nonempty \"id\" properties\n        val = config.urlConfig[i];\n\n        if (typeof val === \"string\") {\n          val = {\n            id: val,\n            label: val\n          };\n        }\n\n        escaped = escapeText(val.id);\n        escapedTooltip = escapeText(val.tooltip);\n\n        if (!val.value || typeof val.value === \"string\") {\n          urlConfigHtml += \"<label for='qunit-urlconfig-\" + escaped + \"' title='\" + escapedTooltip + \"'><input id='qunit-urlconfig-\" + escaped + \"' name='\" + escaped + \"' type='checkbox'\" + (val.value ? \" value='\" + escapeText(val.value) + \"'\" : \"\") + (config[val.id] ? \" checked='checked'\" : \"\") + \" title='\" + escapedTooltip + \"' />\" + escapeText(val.label) + \"</label>\";\n        } else {\n          urlConfigHtml += \"<label for='qunit-urlconfig-\" + escaped + \"' title='\" + escapedTooltip + \"'>\" + val.label + \": </label><select id='qunit-urlconfig-\" + escaped + \"' name='\" + escaped + \"' title='\" + escapedTooltip + \"'><option></option>\";\n\n          if (QUnit.is(\"array\", val.value)) {\n            for (j = 0; j < val.value.length; j++) {\n              escaped = escapeText(val.value[j]);\n              urlConfigHtml += \"<option value='\" + escaped + \"'\" + (config[val.id] === val.value[j] ? (selection = true) && \" selected='selected'\" : \"\") + \">\" + escaped + \"</option>\";\n            }\n          } else {\n            for (j in val.value) {\n              if (hasOwn.call(val.value, j)) {\n                urlConfigHtml += \"<option value='\" + escapeText(j) + \"'\" + (config[val.id] === j ? (selection = true) && \" selected='selected'\" : \"\") + \">\" + escapeText(val.value[j]) + \"</option>\";\n              }\n            }\n          }\n\n          if (config[val.id] && !selection) {\n            escaped = escapeText(config[val.id]);\n            urlConfigHtml += \"<option value='\" + escaped + \"' selected='selected' disabled='disabled'>\" + escaped + \"</option>\";\n          }\n\n          urlConfigHtml += \"</select>\";\n        }\n      }\n\n      return urlConfigHtml;\n    } // Handle \"click\" events on toolbar checkboxes and \"change\" for select menus.\n    // Updates the URL with the new state of `config.urlConfig` values.\n\n\n    function toolbarChanged() {\n      var updatedUrl,\n          value,\n          tests,\n          field = this,\n          params = {}; // Detect if field is a select menu or a checkbox\n\n      if (\"selectedIndex\" in field) {\n        value = field.options[field.selectedIndex].value || undefined;\n      } else {\n        value = field.checked ? field.defaultValue || true : undefined;\n      }\n\n      params[field.name] = value;\n      updatedUrl = setUrl(params); // Check if we can apply the change without a page refresh\n\n      if (\"hidepassed\" === field.name && \"replaceState\" in window$1.history) {\n        QUnit.urlParams[field.name] = value;\n        config[field.name] = value || false;\n        tests = id(\"qunit-tests\");\n\n        if (tests) {\n          var length = tests.children.length;\n          var children = tests.children;\n\n          if (field.checked) {\n            for (var i = 0; i < length; i++) {\n              var test = children[i];\n              var className = test ? test.className : \"\";\n              var classNameHasPass = className.indexOf(\"pass\") > -1;\n              var classNameHasSkipped = className.indexOf(\"skipped\") > -1;\n\n              if (classNameHasPass || classNameHasSkipped) {\n                hiddenTests.push(test);\n              }\n            }\n\n            var _iterator = _createForOfIteratorHelper(hiddenTests),\n                _step;\n\n            try {\n              for (_iterator.s(); !(_step = _iterator.n()).done;) {\n                var hiddenTest = _step.value;\n                tests.removeChild(hiddenTest);\n              }\n            } catch (err) {\n              _iterator.e(err);\n            } finally {\n              _iterator.f();\n            }\n          } else {\n            while ((test = hiddenTests.pop()) != null) {\n              tests.appendChild(test);\n            }\n          }\n        }\n\n        window$1.history.replaceState(null, \"\", updatedUrl);\n      } else {\n        window$1.location = updatedUrl;\n      }\n    }\n\n    function setUrl(params) {\n      var key,\n          arrValue,\n          i,\n          querystring = \"?\",\n          location = window$1.location;\n      params = extend(extend({}, QUnit.urlParams), params);\n\n      for (key in params) {\n        // Skip inherited or undefined properties\n        if (hasOwn.call(params, key) && params[key] !== undefined) {\n          // Output a parameter for each value of this key\n          // (but usually just one)\n          arrValue = [].concat(params[key]);\n\n          for (i = 0; i < arrValue.length; i++) {\n            querystring += encodeURIComponent(key);\n\n            if (arrValue[i] !== true) {\n              querystring += \"=\" + encodeURIComponent(arrValue[i]);\n            }\n\n            querystring += \"&\";\n          }\n        }\n      }\n\n      return location.protocol + \"//\" + location.host + location.pathname + querystring.slice(0, -1);\n    }\n\n    function applyUrlParams() {\n      var i,\n          selectedModules = [],\n          modulesList = id(\"qunit-modulefilter-dropdown-list\").getElementsByTagName(\"input\"),\n          filter = id(\"qunit-filter-input\").value;\n\n      for (i = 0; i < modulesList.length; i++) {\n        if (modulesList[i].checked) {\n          selectedModules.push(modulesList[i].value);\n        }\n      }\n\n      window$1.location = setUrl({\n        filter: filter === \"\" ? undefined : filter,\n        moduleId: selectedModules.length === 0 ? undefined : selectedModules,\n        // Remove module and testId filter\n        module: undefined,\n        testId: undefined\n      });\n    }\n\n    function toolbarUrlConfigContainer() {\n      var urlConfigContainer = document.createElement(\"span\");\n      urlConfigContainer.innerHTML = getUrlConfigHtml();\n      addClass(urlConfigContainer, \"qunit-url-config\");\n      addEvents(urlConfigContainer.getElementsByTagName(\"input\"), \"change\", toolbarChanged);\n      addEvents(urlConfigContainer.getElementsByTagName(\"select\"), \"change\", toolbarChanged);\n      return urlConfigContainer;\n    }\n\n    function abortTestsButton() {\n      var button = document.createElement(\"button\");\n      button.id = \"qunit-abort-tests-button\";\n      button.innerHTML = \"Abort\";\n      addEvent(button, \"click\", abortTests);\n      return button;\n    }\n\n    function toolbarLooseFilter() {\n      var filter = document.createElement(\"form\"),\n          label = document.createElement(\"label\"),\n          input = document.createElement(\"input\"),\n          button = document.createElement(\"button\");\n      addClass(filter, \"qunit-filter\");\n      label.innerHTML = \"Filter: \";\n      input.type = \"text\";\n      input.value = config.filter || \"\";\n      input.name = \"filter\";\n      input.id = \"qunit-filter-input\";\n      button.innerHTML = \"Go\";\n      label.appendChild(input);\n      filter.appendChild(label);\n      filter.appendChild(document.createTextNode(\" \"));\n      filter.appendChild(button);\n      addEvent(filter, \"submit\", interceptNavigation);\n      return filter;\n    }\n\n    function moduleListHtml(modules) {\n      var i,\n          checked,\n          html = \"\";\n\n      for (i = 0; i < modules.length; i++) {\n        if (modules[i].name !== \"\") {\n          checked = config.moduleId.indexOf(modules[i].moduleId) > -1;\n          html += \"<li><label class='clickable\" + (checked ? \" checked\" : \"\") + \"'><input type='checkbox' \" + \"value='\" + modules[i].moduleId + \"'\" + (checked ? \" checked='checked'\" : \"\") + \" />\" + escapeText(modules[i].name) + \"</label></li>\";\n        }\n      }\n\n      return html;\n    }\n\n    function toolbarModuleFilter() {\n      var commit,\n          reset,\n          moduleFilter = document.createElement(\"form\"),\n          label = document.createElement(\"label\"),\n          moduleSearch = document.createElement(\"input\"),\n          dropDown = document.createElement(\"div\"),\n          actions = document.createElement(\"span\"),\n          applyButton = document.createElement(\"button\"),\n          resetButton = document.createElement(\"button\"),\n          allModulesLabel = document.createElement(\"label\"),\n          allCheckbox = document.createElement(\"input\"),\n          dropDownList = document.createElement(\"ul\"),\n          dirty = false;\n      moduleSearch.id = \"qunit-modulefilter-search\";\n      moduleSearch.autocomplete = \"off\";\n      addEvent(moduleSearch, \"input\", searchInput);\n      addEvent(moduleSearch, \"input\", searchFocus);\n      addEvent(moduleSearch, \"focus\", searchFocus);\n      addEvent(moduleSearch, \"click\", searchFocus);\n      config.modules.forEach(function (module) {\n        return module.namePrepared = fuzzysort.prepare(module.name);\n      });\n      label.id = \"qunit-modulefilter-search-container\";\n      label.innerHTML = \"Module: \";\n      label.appendChild(moduleSearch);\n      applyButton.textContent = \"Apply\";\n      applyButton.style.display = \"none\";\n      resetButton.textContent = \"Reset\";\n      resetButton.type = \"reset\";\n      resetButton.style.display = \"none\";\n      allCheckbox.type = \"checkbox\";\n      allCheckbox.checked = config.moduleId.length === 0;\n      allModulesLabel.className = \"clickable\";\n\n      if (config.moduleId.length) {\n        allModulesLabel.className = \"checked\";\n      }\n\n      allModulesLabel.appendChild(allCheckbox);\n      allModulesLabel.appendChild(document.createTextNode(\"All modules\"));\n      actions.id = \"qunit-modulefilter-actions\";\n      actions.appendChild(applyButton);\n      actions.appendChild(resetButton);\n      actions.appendChild(allModulesLabel);\n      commit = actions.firstChild;\n      reset = commit.nextSibling;\n      addEvent(commit, \"click\", applyUrlParams);\n      dropDownList.id = \"qunit-modulefilter-dropdown-list\";\n      dropDownList.innerHTML = moduleListHtml(config.modules);\n      dropDown.id = \"qunit-modulefilter-dropdown\";\n      dropDown.style.display = \"none\";\n      dropDown.appendChild(actions);\n      dropDown.appendChild(dropDownList);\n      addEvent(dropDown, \"change\", selectionChange);\n      selectionChange();\n      moduleFilter.id = \"qunit-modulefilter\";\n      moduleFilter.appendChild(label);\n      moduleFilter.appendChild(dropDown);\n      addEvent(moduleFilter, \"submit\", interceptNavigation);\n      addEvent(moduleFilter, \"reset\", function () {\n        // Let the reset happen, then update styles\n        window$1.setTimeout(selectionChange);\n      }); // Enables show/hide for the dropdown\n\n      function searchFocus() {\n        if (dropDown.style.display !== \"none\") {\n          return;\n        }\n\n        dropDown.style.display = \"block\";\n        addEvent(document, \"click\", hideHandler);\n        addEvent(document, \"keydown\", hideHandler); // Hide on Escape keydown or outside-container click\n\n        function hideHandler(e) {\n          var inContainer = moduleFilter.contains(e.target);\n\n          if (e.keyCode === 27 || !inContainer) {\n            if (e.keyCode === 27 && inContainer) {\n              moduleSearch.focus();\n            }\n\n            dropDown.style.display = \"none\";\n            removeEvent(document, \"click\", hideHandler);\n            removeEvent(document, \"keydown\", hideHandler);\n            moduleSearch.value = \"\";\n            searchInput();\n          }\n        }\n      }\n\n      function filterModules(searchText) {\n        if (searchText === \"\") {\n          return config.modules;\n        }\n\n        return fuzzysort.go(searchText, config.modules, {\n          key: \"namePrepared\",\n          threshold: -10000\n        }).map(function (module) {\n          return module.obj;\n        });\n      } // Processes module search box input\n\n\n      var searchInputTimeout;\n\n      function searchInput() {\n        window$1.clearTimeout(searchInputTimeout);\n        searchInputTimeout = window$1.setTimeout(function () {\n          var searchText = moduleSearch.value.toLowerCase(),\n              filteredModules = filterModules(searchText);\n          dropDownList.innerHTML = moduleListHtml(filteredModules);\n        }, 200);\n      } // Processes selection changes\n\n\n      function selectionChange(evt) {\n        var i,\n            item,\n            checkbox = evt && evt.target || allCheckbox,\n            modulesList = dropDownList.getElementsByTagName(\"input\"),\n            selectedNames = [];\n        toggleClass(checkbox.parentNode, \"checked\", checkbox.checked);\n        dirty = false;\n\n        if (checkbox.checked && checkbox !== allCheckbox) {\n          allCheckbox.checked = false;\n          removeClass(allCheckbox.parentNode, \"checked\");\n        }\n\n        for (i = 0; i < modulesList.length; i++) {\n          item = modulesList[i];\n\n          if (!evt) {\n            toggleClass(item.parentNode, \"checked\", item.checked);\n          } else if (checkbox === allCheckbox && checkbox.checked) {\n            item.checked = false;\n            removeClass(item.parentNode, \"checked\");\n          }\n\n          dirty = dirty || item.checked !== item.defaultChecked;\n\n          if (item.checked) {\n            selectedNames.push(item.parentNode.textContent);\n          }\n        }\n\n        commit.style.display = reset.style.display = dirty ? \"\" : \"none\";\n        moduleSearch.placeholder = selectedNames.join(\", \") || allCheckbox.parentNode.textContent;\n        moduleSearch.title = \"Type to filter list. Current selection:\\n\" + (selectedNames.join(\"\\n\") || allCheckbox.parentNode.textContent);\n      }\n\n      return moduleFilter;\n    }\n\n    function toolbarFilters() {\n      var toolbarFilters = document.createElement(\"span\");\n      toolbarFilters.id = \"qunit-toolbar-filters\";\n      toolbarFilters.appendChild(toolbarLooseFilter());\n      toolbarFilters.appendChild(toolbarModuleFilter());\n      return toolbarFilters;\n    }\n\n    function appendToolbar() {\n      var toolbar = id(\"qunit-testrunner-toolbar\");\n\n      if (toolbar) {\n        toolbar.appendChild(toolbarUrlConfigContainer());\n        toolbar.appendChild(toolbarFilters());\n        toolbar.appendChild(document.createElement(\"div\")).className = \"clearfix\";\n      }\n    }\n\n    function appendHeader() {\n      var header = id(\"qunit-header\");\n\n      if (header) {\n        header.innerHTML = \"<a href='\" + escapeText(unfilteredUrl) + \"'>\" + header.innerHTML + \"</a> \";\n      }\n    }\n\n    function appendBanner() {\n      var banner = id(\"qunit-banner\");\n\n      if (banner) {\n        banner.className = \"\";\n      }\n    }\n\n    function appendTestResults() {\n      var tests = id(\"qunit-tests\"),\n          result = id(\"qunit-testresult\"),\n          controls;\n\n      if (result) {\n        result.parentNode.removeChild(result);\n      }\n\n      if (tests) {\n        tests.innerHTML = \"\";\n        result = document.createElement(\"p\");\n        result.id = \"qunit-testresult\";\n        result.className = \"result\";\n        tests.parentNode.insertBefore(result, tests);\n        result.innerHTML = \"<div id=\\\"qunit-testresult-display\\\">Running...<br />&#160;</div>\" + \"<div id=\\\"qunit-testresult-controls\\\"></div>\" + \"<div class=\\\"clearfix\\\"></div>\";\n        controls = id(\"qunit-testresult-controls\");\n      }\n\n      if (controls) {\n        controls.appendChild(abortTestsButton());\n      }\n    }\n\n    function appendFilteredTest() {\n      var testId = QUnit.config.testId;\n\n      if (!testId || testId.length <= 0) {\n        return \"\";\n      }\n\n      return \"<div id='qunit-filteredTest'>Rerunning selected tests: \" + escapeText(testId.join(\", \")) + \" <a id='qunit-clearFilter' href='\" + escapeText(unfilteredUrl) + \"'>Run all tests</a></div>\";\n    }\n\n    function appendUserAgent() {\n      var userAgent = id(\"qunit-userAgent\");\n\n      if (userAgent) {\n        userAgent.innerHTML = \"\";\n        userAgent.appendChild(document.createTextNode(\"QUnit \" + QUnit.version + \"; \" + navigator.userAgent));\n      }\n    }\n\n    function appendInterface() {\n      var qunit = id(\"qunit\"); // For compat with QUnit 1.2, and to support fully custom theme HTML,\n      // we will use any existing elements if no id=\"qunit\" element exists.\n      //\n      // Note that we don't fail or fallback to creating it ourselves,\n      // because not having id=\"qunit\" (and not having the below elements)\n      // simply means QUnit acts headless, allowing users to use their own\n      // reporters, or for a test runner to listen for events directly without\n      // having the HTML reporter actively render anything.\n\n      if (qunit) {\n        qunit.setAttribute(\"role\", \"main\"); // Since QUnit 1.3, these are created automatically if the page\n        // contains id=\"qunit\".\n\n        qunit.innerHTML = \"<h1 id='qunit-header'>\" + escapeText(document.title) + \"</h1>\" + \"<h2 id='qunit-banner'></h2>\" + \"<div id='qunit-testrunner-toolbar' role='navigation'></div>\" + appendFilteredTest() + \"<h2 id='qunit-userAgent'></h2>\" + \"<ol id='qunit-tests'></ol>\";\n      }\n\n      appendHeader();\n      appendBanner();\n      appendTestResults();\n      appendUserAgent();\n      appendToolbar();\n    }\n\n    function appendTest(name, testId, moduleName) {\n      var title,\n          rerunTrigger,\n          testBlock,\n          assertList,\n          tests = id(\"qunit-tests\");\n\n      if (!tests) {\n        return;\n      }\n\n      title = document.createElement(\"strong\");\n      title.innerHTML = getNameHtml(name, moduleName);\n      rerunTrigger = document.createElement(\"a\");\n      rerunTrigger.innerHTML = \"Rerun\";\n      rerunTrigger.href = setUrl({\n        testId: testId\n      });\n      testBlock = document.createElement(\"li\");\n      testBlock.appendChild(title);\n      testBlock.appendChild(rerunTrigger);\n      testBlock.id = \"qunit-test-output-\" + testId;\n      assertList = document.createElement(\"ol\");\n      assertList.className = \"qunit-assert-list\";\n      testBlock.appendChild(assertList);\n      tests.appendChild(testBlock);\n    } // HTML Reporter initialization and load\n\n\n    QUnit.begin(function () {\n      // Initialize QUnit elements\n      appendInterface();\n    });\n    QUnit.done(function (details) {\n      var banner = id(\"qunit-banner\"),\n          tests = id(\"qunit-tests\"),\n          abortButton = id(\"qunit-abort-tests-button\"),\n          totalTests = stats.passedTests + stats.skippedTests + stats.todoTests + stats.failedTests,\n          html = [totalTests, \" tests completed in \", details.runtime, \" milliseconds, with \", stats.failedTests, \" failed, \", stats.skippedTests, \" skipped, and \", stats.todoTests, \" todo.<br />\", \"<span class='passed'>\", details.passed, \"</span> assertions of <span class='total'>\", details.total, \"</span> passed, <span class='failed'>\", details.failed, \"</span> failed.\"].join(\"\"),\n          test,\n          assertLi,\n          assertList; // Update remaining tests to aborted\n\n      if (abortButton && abortButton.disabled) {\n        html = \"Tests aborted after \" + details.runtime + \" milliseconds.\";\n\n        for (var i = 0; i < tests.children.length; i++) {\n          test = tests.children[i];\n\n          if (test.className === \"\" || test.className === \"running\") {\n            test.className = \"aborted\";\n            assertList = test.getElementsByTagName(\"ol\")[0];\n            assertLi = document.createElement(\"li\");\n            assertLi.className = \"fail\";\n            assertLi.innerHTML = \"Test aborted.\";\n            assertList.appendChild(assertLi);\n          }\n        }\n      }\n\n      if (banner && (!abortButton || abortButton.disabled === false)) {\n        banner.className = stats.failedTests ? \"qunit-fail\" : \"qunit-pass\";\n      }\n\n      if (abortButton) {\n        abortButton.parentNode.removeChild(abortButton);\n      }\n\n      if (tests) {\n        id(\"qunit-testresult-display\").innerHTML = html;\n      }\n\n      if (config.altertitle && document.title) {\n        // Show ✖ for good, ✔ for bad suite result in title\n        // use escape sequences in case file gets loaded with non-utf-8\n        // charset\n        document.title = [stats.failedTests ? \"\\u2716\" : \"\\u2714\", document.title.replace(/^[\\u2714\\u2716] /i, \"\")].join(\" \");\n      } // Scroll back to top to show results\n\n\n      if (config.scrolltop && window$1.scrollTo) {\n        window$1.scrollTo(0, 0);\n      }\n    });\n\n    function getNameHtml(name, module) {\n      var nameHtml = \"\";\n\n      if (module) {\n        nameHtml = \"<span class='module-name'>\" + escapeText(module) + \"</span>: \";\n      }\n\n      nameHtml += \"<span class='test-name'>\" + escapeText(name) + \"</span>\";\n      return nameHtml;\n    }\n\n    function getProgressHtml(runtime, stats, total) {\n      var completed = stats.passedTests + stats.skippedTests + stats.todoTests + stats.failedTests;\n      return [\"<br />\", completed, \" / \", total, \" tests completed in \", runtime, \" milliseconds, with \", stats.failedTests, \" failed, \", stats.skippedTests, \" skipped, and \", stats.todoTests, \" todo.\"].join(\"\");\n    }\n\n    QUnit.testStart(function (details) {\n      var running, bad;\n      appendTest(details.name, details.testId, details.module);\n      running = id(\"qunit-testresult-display\");\n\n      if (running) {\n        addClass(running, \"running\");\n        bad = QUnit.config.reorder && details.previousFailure;\n        running.innerHTML = [bad ? \"Rerunning previously failed test: <br />\" : \"Running: <br />\", getNameHtml(details.name, details.module), getProgressHtml(now() - config.started, stats, Test.count)].join(\"\");\n      }\n    });\n\n    function stripHtml(string) {\n      // Strip tags, html entity and whitespaces\n      return string.replace(/<\\/?[^>]+(>|$)/g, \"\").replace(/&quot;/g, \"\").replace(/\\s+/g, \"\");\n    }\n\n    QUnit.log(function (details) {\n      var assertList,\n          assertLi,\n          message,\n          expected,\n          actual,\n          diff,\n          showDiff = false,\n          testItem = id(\"qunit-test-output-\" + details.testId);\n\n      if (!testItem) {\n        return;\n      }\n\n      message = escapeText(details.message) || (details.result ? \"okay\" : \"failed\");\n      message = \"<span class='test-message'>\" + message + \"</span>\";\n      message += \"<span class='runtime'>@ \" + details.runtime + \" ms</span>\"; // The pushFailure doesn't provide details.expected\n      // when it calls, it's implicit to also not show expected and diff stuff\n      // Also, we need to check details.expected existence, as it can exist and be undefined\n\n      if (!details.result && hasOwn.call(details, \"expected\")) {\n        if (details.negative) {\n          expected = \"NOT \" + QUnit.dump.parse(details.expected);\n        } else {\n          expected = QUnit.dump.parse(details.expected);\n        }\n\n        actual = QUnit.dump.parse(details.actual);\n        message += \"<table><tr class='test-expected'><th>Expected: </th><td><pre>\" + escapeText(expected) + \"</pre></td></tr>\";\n\n        if (actual !== expected) {\n          message += \"<tr class='test-actual'><th>Result: </th><td><pre>\" + escapeText(actual) + \"</pre></td></tr>\";\n\n          if (typeof details.actual === \"number\" && typeof details.expected === \"number\") {\n            if (!isNaN(details.actual) && !isNaN(details.expected)) {\n              showDiff = true;\n              diff = details.actual - details.expected;\n              diff = (diff > 0 ? \"+\" : \"\") + diff;\n            }\n          } else if (typeof details.actual !== \"boolean\" && typeof details.expected !== \"boolean\") {\n            diff = QUnit.diff(expected, actual); // don't show diff if there is zero overlap\n\n            showDiff = stripHtml(diff).length !== stripHtml(expected).length + stripHtml(actual).length;\n          }\n\n          if (showDiff) {\n            message += \"<tr class='test-diff'><th>Diff: </th><td><pre>\" + diff + \"</pre></td></tr>\";\n          }\n        } else if (expected.indexOf(\"[object Array]\") !== -1 || expected.indexOf(\"[object Object]\") !== -1) {\n          message += \"<tr class='test-message'><th>Message: </th><td>\" + \"Diff suppressed as the depth of object is more than current max depth (\" + QUnit.config.maxDepth + \").<p>Hint: Use <code>QUnit.dump.maxDepth</code> to \" + \" run with a higher max depth or <a href='\" + escapeText(setUrl({\n            maxDepth: -1\n          })) + \"'>\" + \"Rerun</a> without max depth.</p></td></tr>\";\n        } else {\n          message += \"<tr class='test-message'><th>Message: </th><td>\" + \"Diff suppressed as the expected and actual results have an equivalent\" + \" serialization</td></tr>\";\n        }\n\n        if (details.source) {\n          message += \"<tr class='test-source'><th>Source: </th><td><pre>\" + escapeText(details.source) + \"</pre></td></tr>\";\n        }\n\n        message += \"</table>\"; // This occurs when pushFailure is set and we have an extracted stack trace\n      } else if (!details.result && details.source) {\n        message += \"<table>\" + \"<tr class='test-source'><th>Source: </th><td><pre>\" + escapeText(details.source) + \"</pre></td></tr>\" + \"</table>\";\n      }\n\n      assertList = testItem.getElementsByTagName(\"ol\")[0];\n      assertLi = document.createElement(\"li\");\n      assertLi.className = details.result ? \"pass\" : \"fail\";\n      assertLi.innerHTML = message;\n      assertList.appendChild(assertLi);\n    });\n    QUnit.testDone(function (details) {\n      var testTitle,\n          time,\n          assertList,\n          status,\n          good,\n          bad,\n          testCounts,\n          skipped,\n          sourceName,\n          tests = id(\"qunit-tests\"),\n          testItem = id(\"qunit-test-output-\" + details.testId);\n\n      if (!tests || !testItem) {\n        return;\n      }\n\n      removeClass(testItem, \"running\");\n\n      if (details.failed > 0) {\n        status = \"failed\";\n      } else if (details.todo) {\n        status = \"todo\";\n      } else {\n        status = details.skipped ? \"skipped\" : \"passed\";\n      }\n\n      assertList = testItem.getElementsByTagName(\"ol\")[0];\n      good = details.passed;\n      bad = details.failed; // This test passed if it has no unexpected failed assertions\n\n      var testPassed = details.failed > 0 ? details.todo : !details.todo;\n\n      if (testPassed) {\n        // Collapse the passing tests\n        addClass(assertList, \"qunit-collapsed\");\n      } else if (config.collapse) {\n        if (!collapseNext) {\n          // Skip collapsing the first failing test\n          collapseNext = true;\n        } else {\n          // Collapse remaining tests\n          addClass(assertList, \"qunit-collapsed\");\n        }\n      } // The testItem.firstChild is the test name\n\n\n      testTitle = testItem.firstChild;\n      testCounts = bad ? \"<b class='failed'>\" + bad + \"</b>, \" + \"<b class='passed'>\" + good + \"</b>, \" : \"\";\n      testTitle.innerHTML += \" <b class='counts'>(\" + testCounts + details.assertions.length + \")</b>\";\n\n      if (details.skipped) {\n        stats.skippedTests++;\n        testItem.className = \"skipped\";\n        skipped = document.createElement(\"em\");\n        skipped.className = \"qunit-skipped-label\";\n        skipped.innerHTML = \"skipped\";\n        testItem.insertBefore(skipped, testTitle);\n      } else {\n        addEvent(testTitle, \"click\", function () {\n          toggleClass(assertList, \"qunit-collapsed\");\n        });\n        testItem.className = testPassed ? \"pass\" : \"fail\";\n\n        if (details.todo) {\n          var todoLabel = document.createElement(\"em\");\n          todoLabel.className = \"qunit-todo-label\";\n          todoLabel.innerHTML = \"todo\";\n          testItem.className += \" todo\";\n          testItem.insertBefore(todoLabel, testTitle);\n        }\n\n        time = document.createElement(\"span\");\n        time.className = \"runtime\";\n        time.innerHTML = details.runtime + \" ms\";\n        testItem.insertBefore(time, assertList);\n\n        if (!testPassed) {\n          stats.failedTests++;\n        } else if (details.todo) {\n          stats.todoTests++;\n        } else {\n          stats.passedTests++;\n        }\n      } // Show the source of the test when showing assertions\n\n\n      if (details.source) {\n        sourceName = document.createElement(\"p\");\n        sourceName.innerHTML = \"<strong>Source: </strong>\" + escapeText(details.source);\n        addClass(sourceName, \"qunit-source\");\n\n        if (testPassed) {\n          addClass(sourceName, \"qunit-collapsed\");\n        }\n\n        addEvent(testTitle, \"click\", function () {\n          toggleClass(sourceName, \"qunit-collapsed\");\n        });\n        testItem.appendChild(sourceName);\n      }\n\n      if (config.hidepassed && (status === \"passed\" || details.skipped)) {\n        // use removeChild instead of remove because of support\n        hiddenTests.push(testItem);\n        tests.removeChild(testItem);\n      }\n    }); // Avoid readyState issue with phantomjs\n    // Ref: #818\n\n    var usingPhantom = function (p) {\n      return p && p.version && p.version.major > 0;\n    }(window$1.phantom);\n\n    if (usingPhantom) {\n      console$1.warn(\"Support for PhantomJS is deprecated and will be removed in QUnit 3.0.\");\n    }\n\n    if (!usingPhantom && document.readyState === \"complete\") {\n      QUnit.load();\n    } else {\n      addEvent(window$1, \"load\", QUnit.load);\n    } // Wrap window.onerror. We will call the original window.onerror to see if\n    // the existing handler fully handles the error; if not, we will call the\n    // QUnit.onError function.\n\n\n    var originalWindowOnError = window$1.onerror; // Cover uncaught exceptions\n    // Returning true will suppress the default browser handler,\n    // returning false will let it run.\n\n    window$1.onerror = function (message, fileName, lineNumber, columnNumber, errorObj) {\n      var ret = false;\n\n      if (originalWindowOnError) {\n        for (var _len = arguments.length, args = new Array(_len > 5 ? _len - 5 : 0), _key = 5; _key < _len; _key++) {\n          args[_key - 5] = arguments[_key];\n        }\n\n        ret = originalWindowOnError.call.apply(originalWindowOnError, [this, message, fileName, lineNumber, columnNumber, errorObj].concat(args));\n      } // Treat return value as window.onerror itself does,\n      // Only do our handling if not suppressed.\n\n\n      if (ret !== true) {\n        var error = {\n          message: message,\n          fileName: fileName,\n          lineNumber: lineNumber\n        }; // According to\n        // https://blog.sentry.io/2016/01/04/client-javascript-reporting-window-onerror,\n        // most modern browsers support an errorObj argument; use that to\n        // get a full stack trace if it's available.\n\n        if (errorObj && errorObj.stack) {\n          error.stacktrace = extractStacktrace(errorObj, 0);\n        }\n\n        ret = QUnit.onError(error);\n      }\n\n      return ret;\n    }; // Listen for unhandled rejections, and call QUnit.onUnhandledRejection\n\n\n    window$1.addEventListener(\"unhandledrejection\", function (event) {\n      QUnit.onUnhandledRejection(event.reason);\n    });\n  })();\n  /*\n   * This file is a modified version of google-diff-match-patch's JavaScript implementation\n   * (https://code.google.com/p/google-diff-match-patch/source/browse/trunk/javascript/diff_match_patch_uncompressed.js),\n   * modifications are licensed as more fully set forth in LICENSE.txt.\n   *\n   * The original source of google-diff-match-patch is attributable and licensed as follows:\n   *\n   * Copyright 2006 Google Inc.\n   * https://code.google.com/p/google-diff-match-patch/\n   *\n   * Licensed under the Apache License, Version 2.0 (the \"License\");\n   * you may not use this file except in compliance with the License.\n   * You may obtain a copy of the License at\n   *\n   * https://www.apache.org/licenses/LICENSE-2.0\n   *\n   * Unless required by applicable law or agreed to in writing, software\n   * distributed under the License is distributed on an \"AS IS\" BASIS,\n   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   * See the License for the specific language governing permissions and\n   * limitations under the License.\n   *\n   * More Info:\n   *  https://code.google.com/p/google-diff-match-patch/\n   *\n   * Usage: QUnit.diff(expected, actual)\n   *\n   */\n\n\n  QUnit.diff = function () {\n    function DiffMatchPatch() {} //  DIFF FUNCTIONS\n\n    /**\n     * The data structure representing a diff is an array of tuples:\n     * [[DIFF_DELETE, 'Hello'], [DIFF_INSERT, 'Goodbye'], [DIFF_EQUAL, ' world.']]\n     * which means: delete 'Hello', add 'Goodbye' and keep ' world.'\n     */\n\n\n    var DIFF_DELETE = -1,\n        DIFF_INSERT = 1,\n        DIFF_EQUAL = 0,\n        hasOwn = Object.prototype.hasOwnProperty;\n    /**\n     * Find the differences between two texts.  Simplifies the problem by stripping\n     * any common prefix or suffix off the texts before diffing.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {boolean=} optChecklines Optional speedup flag. If present and false,\n     *     then don't run a line-level diff first to identify the changed areas.\n     *     Defaults to true, which does a faster, slightly less optimal diff.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     */\n\n    DiffMatchPatch.prototype.DiffMain = function (text1, text2, optChecklines) {\n      var deadline, checklines, commonlength, commonprefix, commonsuffix, diffs; // The diff must be complete in up to 1 second.\n\n      deadline = new Date().getTime() + 1000; // Check for null inputs.\n\n      if (text1 === null || text2 === null) {\n        throw new Error(\"Null input. (DiffMain)\");\n      } // Check for equality (speedup).\n\n\n      if (text1 === text2) {\n        if (text1) {\n          return [[DIFF_EQUAL, text1]];\n        }\n\n        return [];\n      }\n\n      if (typeof optChecklines === \"undefined\") {\n        optChecklines = true;\n      }\n\n      checklines = optChecklines; // Trim off common prefix (speedup).\n\n      commonlength = this.diffCommonPrefix(text1, text2);\n      commonprefix = text1.substring(0, commonlength);\n      text1 = text1.substring(commonlength);\n      text2 = text2.substring(commonlength); // Trim off common suffix (speedup).\n\n      commonlength = this.diffCommonSuffix(text1, text2);\n      commonsuffix = text1.substring(text1.length - commonlength);\n      text1 = text1.substring(0, text1.length - commonlength);\n      text2 = text2.substring(0, text2.length - commonlength); // Compute the diff on the middle block.\n\n      diffs = this.diffCompute(text1, text2, checklines, deadline); // Restore the prefix and suffix.\n\n      if (commonprefix) {\n        diffs.unshift([DIFF_EQUAL, commonprefix]);\n      }\n\n      if (commonsuffix) {\n        diffs.push([DIFF_EQUAL, commonsuffix]);\n      }\n\n      this.diffCleanupMerge(diffs);\n      return diffs;\n    };\n    /**\n     * Reduce the number of edits by eliminating operationally trivial equalities.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     */\n\n\n    DiffMatchPatch.prototype.diffCleanupEfficiency = function (diffs) {\n      var changes, equalities, equalitiesLength, lastequality, pointer, preIns, preDel, postIns, postDel;\n      changes = false;\n      equalities = []; // Stack of indices where equalities are found.\n\n      equalitiesLength = 0; // Keeping our own length var is faster in JS.\n\n      /** @type {?string} */\n\n      lastequality = null; // Always equal to diffs[equalities[equalitiesLength - 1]][1]\n\n      pointer = 0; // Index of current position.\n      // Is there an insertion operation before the last equality.\n\n      preIns = false; // Is there a deletion operation before the last equality.\n\n      preDel = false; // Is there an insertion operation after the last equality.\n\n      postIns = false; // Is there a deletion operation after the last equality.\n\n      postDel = false;\n\n      while (pointer < diffs.length) {\n        // Equality found.\n        if (diffs[pointer][0] === DIFF_EQUAL) {\n          if (diffs[pointer][1].length < 4 && (postIns || postDel)) {\n            // Candidate found.\n            equalities[equalitiesLength++] = pointer;\n            preIns = postIns;\n            preDel = postDel;\n            lastequality = diffs[pointer][1];\n          } else {\n            // Not a candidate, and can never become one.\n            equalitiesLength = 0;\n            lastequality = null;\n          }\n\n          postIns = postDel = false; // An insertion or deletion.\n        } else {\n          if (diffs[pointer][0] === DIFF_DELETE) {\n            postDel = true;\n          } else {\n            postIns = true;\n          }\n          /*\n           * Five types to be split:\n           * <ins>A</ins><del>B</del>XY<ins>C</ins><del>D</del>\n           * <ins>A</ins>X<ins>C</ins><del>D</del>\n           * <ins>A</ins><del>B</del>X<ins>C</ins>\n           * <ins>A</del>X<ins>C</ins><del>D</del>\n           * <ins>A</ins><del>B</del>X<del>C</del>\n           */\n\n\n          if (lastequality && (preIns && preDel && postIns && postDel || lastequality.length < 2 && preIns + preDel + postIns + postDel === 3)) {\n            // Duplicate record.\n            diffs.splice(equalities[equalitiesLength - 1], 0, [DIFF_DELETE, lastequality]); // Change second copy to insert.\n\n            diffs[equalities[equalitiesLength - 1] + 1][0] = DIFF_INSERT;\n            equalitiesLength--; // Throw away the equality we just deleted;\n\n            lastequality = null;\n\n            if (preIns && preDel) {\n              // No changes made which could affect previous entry, keep going.\n              postIns = postDel = true;\n              equalitiesLength = 0;\n            } else {\n              equalitiesLength--; // Throw away the previous equality.\n\n              pointer = equalitiesLength > 0 ? equalities[equalitiesLength - 1] : -1;\n              postIns = postDel = false;\n            }\n\n            changes = true;\n          }\n        }\n\n        pointer++;\n      }\n\n      if (changes) {\n        this.diffCleanupMerge(diffs);\n      }\n    };\n    /**\n     * Convert a diff array into a pretty HTML report.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     * @param {integer} string to be beautified.\n     * @return {string} HTML representation.\n     */\n\n\n    DiffMatchPatch.prototype.diffPrettyHtml = function (diffs) {\n      var op,\n          data,\n          x,\n          html = [];\n\n      for (x = 0; x < diffs.length; x++) {\n        op = diffs[x][0]; // Operation (insert, delete, equal)\n\n        data = diffs[x][1]; // Text of change.\n\n        switch (op) {\n          case DIFF_INSERT:\n            html[x] = \"<ins>\" + escapeText(data) + \"</ins>\";\n            break;\n\n          case DIFF_DELETE:\n            html[x] = \"<del>\" + escapeText(data) + \"</del>\";\n            break;\n\n          case DIFF_EQUAL:\n            html[x] = \"<span>\" + escapeText(data) + \"</span>\";\n            break;\n        }\n      }\n\n      return html.join(\"\");\n    };\n    /**\n     * Determine the common prefix of two strings.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {number} The number of characters common to the start of each\n     *     string.\n     */\n\n\n    DiffMatchPatch.prototype.diffCommonPrefix = function (text1, text2) {\n      var pointermid, pointermax, pointermin, pointerstart; // Quick check for common null cases.\n\n      if (!text1 || !text2 || text1.charAt(0) !== text2.charAt(0)) {\n        return 0;\n      } // Binary search.\n      // Performance analysis: https://neil.fraser.name/news/2007/10/09/\n\n\n      pointermin = 0;\n      pointermax = Math.min(text1.length, text2.length);\n      pointermid = pointermax;\n      pointerstart = 0;\n\n      while (pointermin < pointermid) {\n        if (text1.substring(pointerstart, pointermid) === text2.substring(pointerstart, pointermid)) {\n          pointermin = pointermid;\n          pointerstart = pointermin;\n        } else {\n          pointermax = pointermid;\n        }\n\n        pointermid = Math.floor((pointermax - pointermin) / 2 + pointermin);\n      }\n\n      return pointermid;\n    };\n    /**\n     * Determine the common suffix of two strings.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {number} The number of characters common to the end of each string.\n     */\n\n\n    DiffMatchPatch.prototype.diffCommonSuffix = function (text1, text2) {\n      var pointermid, pointermax, pointermin, pointerend; // Quick check for common null cases.\n\n      if (!text1 || !text2 || text1.charAt(text1.length - 1) !== text2.charAt(text2.length - 1)) {\n        return 0;\n      } // Binary search.\n      // Performance analysis: https://neil.fraser.name/news/2007/10/09/\n\n\n      pointermin = 0;\n      pointermax = Math.min(text1.length, text2.length);\n      pointermid = pointermax;\n      pointerend = 0;\n\n      while (pointermin < pointermid) {\n        if (text1.substring(text1.length - pointermid, text1.length - pointerend) === text2.substring(text2.length - pointermid, text2.length - pointerend)) {\n          pointermin = pointermid;\n          pointerend = pointermin;\n        } else {\n          pointermax = pointermid;\n        }\n\n        pointermid = Math.floor((pointermax - pointermin) / 2 + pointermin);\n      }\n\n      return pointermid;\n    };\n    /**\n     * Find the differences between two texts.  Assumes that the texts do not\n     * have any common prefix or suffix.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {boolean} checklines Speedup flag.  If false, then don't run a\n     *     line-level diff first to identify the changed areas.\n     *     If true, then run a faster, slightly less optimal diff.\n     * @param {number} deadline Time when the diff should be complete by.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffCompute = function (text1, text2, checklines, deadline) {\n      var diffs, longtext, shorttext, i, hm, text1A, text2A, text1B, text2B, midCommon, diffsA, diffsB;\n\n      if (!text1) {\n        // Just add some text (speedup).\n        return [[DIFF_INSERT, text2]];\n      }\n\n      if (!text2) {\n        // Just delete some text (speedup).\n        return [[DIFF_DELETE, text1]];\n      }\n\n      longtext = text1.length > text2.length ? text1 : text2;\n      shorttext = text1.length > text2.length ? text2 : text1;\n      i = longtext.indexOf(shorttext);\n\n      if (i !== -1) {\n        // Shorter text is inside the longer text (speedup).\n        diffs = [[DIFF_INSERT, longtext.substring(0, i)], [DIFF_EQUAL, shorttext], [DIFF_INSERT, longtext.substring(i + shorttext.length)]]; // Swap insertions for deletions if diff is reversed.\n\n        if (text1.length > text2.length) {\n          diffs[0][0] = diffs[2][0] = DIFF_DELETE;\n        }\n\n        return diffs;\n      }\n\n      if (shorttext.length === 1) {\n        // Single character string.\n        // After the previous speedup, the character can't be an equality.\n        return [[DIFF_DELETE, text1], [DIFF_INSERT, text2]];\n      } // Check to see if the problem can be split in two.\n\n\n      hm = this.diffHalfMatch(text1, text2);\n\n      if (hm) {\n        // A half-match was found, sort out the return data.\n        text1A = hm[0];\n        text1B = hm[1];\n        text2A = hm[2];\n        text2B = hm[3];\n        midCommon = hm[4]; // Send both pairs off for separate processing.\n\n        diffsA = this.DiffMain(text1A, text2A, checklines, deadline);\n        diffsB = this.DiffMain(text1B, text2B, checklines, deadline); // Merge the results.\n\n        return diffsA.concat([[DIFF_EQUAL, midCommon]], diffsB);\n      }\n\n      if (checklines && text1.length > 100 && text2.length > 100) {\n        return this.diffLineMode(text1, text2, deadline);\n      }\n\n      return this.diffBisect(text1, text2, deadline);\n    };\n    /**\n     * Do the two texts share a substring which is at least half the length of the\n     * longer text?\n     * This speedup can produce non-minimal diffs.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {Array.<string>} Five element Array, containing the prefix of\n     *     text1, the suffix of text1, the prefix of text2, the suffix of\n     *     text2 and the common middle.  Or null if there was no match.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffHalfMatch = function (text1, text2) {\n      var longtext, shorttext, dmp, text1A, text2B, text2A, text1B, midCommon, hm1, hm2, hm;\n      longtext = text1.length > text2.length ? text1 : text2;\n      shorttext = text1.length > text2.length ? text2 : text1;\n\n      if (longtext.length < 4 || shorttext.length * 2 < longtext.length) {\n        return null; // Pointless.\n      }\n\n      dmp = this; // 'this' becomes 'window' in a closure.\n\n      /**\n       * Does a substring of shorttext exist within longtext such that the substring\n       * is at least half the length of longtext?\n       * Closure, but does not reference any external variables.\n       * @param {string} longtext Longer string.\n       * @param {string} shorttext Shorter string.\n       * @param {number} i Start index of quarter length substring within longtext.\n       * @return {Array.<string>} Five element Array, containing the prefix of\n       *     longtext, the suffix of longtext, the prefix of shorttext, the suffix\n       *     of shorttext and the common middle.  Or null if there was no match.\n       * @private\n       */\n\n      function diffHalfMatchI(longtext, shorttext, i) {\n        var seed, j, bestCommon, prefixLength, suffixLength, bestLongtextA, bestLongtextB, bestShorttextA, bestShorttextB; // Start with a 1/4 length substring at position i as a seed.\n\n        seed = longtext.substring(i, i + Math.floor(longtext.length / 4));\n        j = -1;\n        bestCommon = \"\";\n\n        while ((j = shorttext.indexOf(seed, j + 1)) !== -1) {\n          prefixLength = dmp.diffCommonPrefix(longtext.substring(i), shorttext.substring(j));\n          suffixLength = dmp.diffCommonSuffix(longtext.substring(0, i), shorttext.substring(0, j));\n\n          if (bestCommon.length < suffixLength + prefixLength) {\n            bestCommon = shorttext.substring(j - suffixLength, j) + shorttext.substring(j, j + prefixLength);\n            bestLongtextA = longtext.substring(0, i - suffixLength);\n            bestLongtextB = longtext.substring(i + prefixLength);\n            bestShorttextA = shorttext.substring(0, j - suffixLength);\n            bestShorttextB = shorttext.substring(j + prefixLength);\n          }\n        }\n\n        if (bestCommon.length * 2 >= longtext.length) {\n          return [bestLongtextA, bestLongtextB, bestShorttextA, bestShorttextB, bestCommon];\n        } else {\n          return null;\n        }\n      } // First check if the second quarter is the seed for a half-match.\n\n\n      hm1 = diffHalfMatchI(longtext, shorttext, Math.ceil(longtext.length / 4)); // Check again based on the third quarter.\n\n      hm2 = diffHalfMatchI(longtext, shorttext, Math.ceil(longtext.length / 2));\n\n      if (!hm1 && !hm2) {\n        return null;\n      } else if (!hm2) {\n        hm = hm1;\n      } else if (!hm1) {\n        hm = hm2;\n      } else {\n        // Both matched.  Select the longest.\n        hm = hm1[4].length > hm2[4].length ? hm1 : hm2;\n      } // A half-match was found, sort out the return data.\n\n\n      if (text1.length > text2.length) {\n        text1A = hm[0];\n        text1B = hm[1];\n        text2A = hm[2];\n        text2B = hm[3];\n      } else {\n        text2A = hm[0];\n        text2B = hm[1];\n        text1A = hm[2];\n        text1B = hm[3];\n      }\n\n      midCommon = hm[4];\n      return [text1A, text1B, text2A, text2B, midCommon];\n    };\n    /**\n     * Do a quick line-level diff on both strings, then rediff the parts for\n     * greater accuracy.\n     * This speedup can produce non-minimal diffs.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {number} deadline Time when the diff should be complete by.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffLineMode = function (text1, text2, deadline) {\n      var a, diffs, linearray, pointer, countInsert, countDelete, textInsert, textDelete, j; // Scan the text on a line-by-line basis first.\n\n      a = this.diffLinesToChars(text1, text2);\n      text1 = a.chars1;\n      text2 = a.chars2;\n      linearray = a.lineArray;\n      diffs = this.DiffMain(text1, text2, false, deadline); // Convert the diff back to original text.\n\n      this.diffCharsToLines(diffs, linearray); // Eliminate freak matches (e.g. blank lines)\n\n      this.diffCleanupSemantic(diffs); // Rediff any replacement blocks, this time character-by-character.\n      // Add a dummy entry at the end.\n\n      diffs.push([DIFF_EQUAL, \"\"]);\n      pointer = 0;\n      countDelete = 0;\n      countInsert = 0;\n      textDelete = \"\";\n      textInsert = \"\";\n\n      while (pointer < diffs.length) {\n        switch (diffs[pointer][0]) {\n          case DIFF_INSERT:\n            countInsert++;\n            textInsert += diffs[pointer][1];\n            break;\n\n          case DIFF_DELETE:\n            countDelete++;\n            textDelete += diffs[pointer][1];\n            break;\n\n          case DIFF_EQUAL:\n            // Upon reaching an equality, check for prior redundancies.\n            if (countDelete >= 1 && countInsert >= 1) {\n              // Delete the offending records and add the merged ones.\n              diffs.splice(pointer - countDelete - countInsert, countDelete + countInsert);\n              pointer = pointer - countDelete - countInsert;\n              a = this.DiffMain(textDelete, textInsert, false, deadline);\n\n              for (j = a.length - 1; j >= 0; j--) {\n                diffs.splice(pointer, 0, a[j]);\n              }\n\n              pointer = pointer + a.length;\n            }\n\n            countInsert = 0;\n            countDelete = 0;\n            textDelete = \"\";\n            textInsert = \"\";\n            break;\n        }\n\n        pointer++;\n      }\n\n      diffs.pop(); // Remove the dummy entry at the end.\n\n      return diffs;\n    };\n    /**\n     * Find the 'middle snake' of a diff, split the problem in two\n     * and return the recursively constructed diff.\n     * See Myers 1986 paper: An O(ND) Difference Algorithm and Its Variations.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {number} deadline Time at which to bail if not yet complete.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffBisect = function (text1, text2, deadline) {\n      var text1Length, text2Length, maxD, vOffset, vLength, v1, v2, x, delta, front, k1start, k1end, k2start, k2end, k2Offset, k1Offset, x1, x2, y1, y2, d, k1, k2; // Cache the text lengths to prevent multiple calls.\n\n      text1Length = text1.length;\n      text2Length = text2.length;\n      maxD = Math.ceil((text1Length + text2Length) / 2);\n      vOffset = maxD;\n      vLength = 2 * maxD;\n      v1 = new Array(vLength);\n      v2 = new Array(vLength); // Setting all elements to -1 is faster in Chrome & Firefox than mixing\n      // integers and undefined.\n\n      for (x = 0; x < vLength; x++) {\n        v1[x] = -1;\n        v2[x] = -1;\n      }\n\n      v1[vOffset + 1] = 0;\n      v2[vOffset + 1] = 0;\n      delta = text1Length - text2Length; // If the total number of characters is odd, then the front path will collide\n      // with the reverse path.\n\n      front = delta % 2 !== 0; // Offsets for start and end of k loop.\n      // Prevents mapping of space beyond the grid.\n\n      k1start = 0;\n      k1end = 0;\n      k2start = 0;\n      k2end = 0;\n\n      for (d = 0; d < maxD; d++) {\n        // Bail out if deadline is reached.\n        if (new Date().getTime() > deadline) {\n          break;\n        } // Walk the front path one step.\n\n\n        for (k1 = -d + k1start; k1 <= d - k1end; k1 += 2) {\n          k1Offset = vOffset + k1;\n\n          if (k1 === -d || k1 !== d && v1[k1Offset - 1] < v1[k1Offset + 1]) {\n            x1 = v1[k1Offset + 1];\n          } else {\n            x1 = v1[k1Offset - 1] + 1;\n          }\n\n          y1 = x1 - k1;\n\n          while (x1 < text1Length && y1 < text2Length && text1.charAt(x1) === text2.charAt(y1)) {\n            x1++;\n            y1++;\n          }\n\n          v1[k1Offset] = x1;\n\n          if (x1 > text1Length) {\n            // Ran off the right of the graph.\n            k1end += 2;\n          } else if (y1 > text2Length) {\n            // Ran off the bottom of the graph.\n            k1start += 2;\n          } else if (front) {\n            k2Offset = vOffset + delta - k1;\n\n            if (k2Offset >= 0 && k2Offset < vLength && v2[k2Offset] !== -1) {\n              // Mirror x2 onto top-left coordinate system.\n              x2 = text1Length - v2[k2Offset];\n\n              if (x1 >= x2) {\n                // Overlap detected.\n                return this.diffBisectSplit(text1, text2, x1, y1, deadline);\n              }\n            }\n          }\n        } // Walk the reverse path one step.\n\n\n        for (k2 = -d + k2start; k2 <= d - k2end; k2 += 2) {\n          k2Offset = vOffset + k2;\n\n          if (k2 === -d || k2 !== d && v2[k2Offset - 1] < v2[k2Offset + 1]) {\n            x2 = v2[k2Offset + 1];\n          } else {\n            x2 = v2[k2Offset - 1] + 1;\n          }\n\n          y2 = x2 - k2;\n\n          while (x2 < text1Length && y2 < text2Length && text1.charAt(text1Length - x2 - 1) === text2.charAt(text2Length - y2 - 1)) {\n            x2++;\n            y2++;\n          }\n\n          v2[k2Offset] = x2;\n\n          if (x2 > text1Length) {\n            // Ran off the left of the graph.\n            k2end += 2;\n          } else if (y2 > text2Length) {\n            // Ran off the top of the graph.\n            k2start += 2;\n          } else if (!front) {\n            k1Offset = vOffset + delta - k2;\n\n            if (k1Offset >= 0 && k1Offset < vLength && v1[k1Offset] !== -1) {\n              x1 = v1[k1Offset];\n              y1 = vOffset + x1 - k1Offset; // Mirror x2 onto top-left coordinate system.\n\n              x2 = text1Length - x2;\n\n              if (x1 >= x2) {\n                // Overlap detected.\n                return this.diffBisectSplit(text1, text2, x1, y1, deadline);\n              }\n            }\n          }\n        }\n      } // Diff took too long and hit the deadline or\n      // number of diffs equals number of characters, no commonality at all.\n\n\n      return [[DIFF_DELETE, text1], [DIFF_INSERT, text2]];\n    };\n    /**\n     * Given the location of the 'middle snake', split the diff in two parts\n     * and recurse.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {number} x Index of split point in text1.\n     * @param {number} y Index of split point in text2.\n     * @param {number} deadline Time at which to bail if not yet complete.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffBisectSplit = function (text1, text2, x, y, deadline) {\n      var text1a, text1b, text2a, text2b, diffs, diffsb;\n      text1a = text1.substring(0, x);\n      text2a = text2.substring(0, y);\n      text1b = text1.substring(x);\n      text2b = text2.substring(y); // Compute both diffs serially.\n\n      diffs = this.DiffMain(text1a, text2a, false, deadline);\n      diffsb = this.DiffMain(text1b, text2b, false, deadline);\n      return diffs.concat(diffsb);\n    };\n    /**\n     * Reduce the number of edits by eliminating semantically trivial equalities.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     */\n\n\n    DiffMatchPatch.prototype.diffCleanupSemantic = function (diffs) {\n      var changes, equalities, equalitiesLength, lastequality, pointer, lengthInsertions2, lengthDeletions2, lengthInsertions1, lengthDeletions1, deletion, insertion, overlapLength1, overlapLength2;\n      changes = false;\n      equalities = []; // Stack of indices where equalities are found.\n\n      equalitiesLength = 0; // Keeping our own length var is faster in JS.\n\n      /** @type {?string} */\n\n      lastequality = null; // Always equal to diffs[equalities[equalitiesLength - 1]][1]\n\n      pointer = 0; // Index of current position.\n      // Number of characters that changed prior to the equality.\n\n      lengthInsertions1 = 0;\n      lengthDeletions1 = 0; // Number of characters that changed after the equality.\n\n      lengthInsertions2 = 0;\n      lengthDeletions2 = 0;\n\n      while (pointer < diffs.length) {\n        if (diffs[pointer][0] === DIFF_EQUAL) {\n          // Equality found.\n          equalities[equalitiesLength++] = pointer;\n          lengthInsertions1 = lengthInsertions2;\n          lengthDeletions1 = lengthDeletions2;\n          lengthInsertions2 = 0;\n          lengthDeletions2 = 0;\n          lastequality = diffs[pointer][1];\n        } else {\n          // An insertion or deletion.\n          if (diffs[pointer][0] === DIFF_INSERT) {\n            lengthInsertions2 += diffs[pointer][1].length;\n          } else {\n            lengthDeletions2 += diffs[pointer][1].length;\n          } // Eliminate an equality that is smaller or equal to the edits on both\n          // sides of it.\n\n\n          if (lastequality && lastequality.length <= Math.max(lengthInsertions1, lengthDeletions1) && lastequality.length <= Math.max(lengthInsertions2, lengthDeletions2)) {\n            // Duplicate record.\n            diffs.splice(equalities[equalitiesLength - 1], 0, [DIFF_DELETE, lastequality]); // Change second copy to insert.\n\n            diffs[equalities[equalitiesLength - 1] + 1][0] = DIFF_INSERT; // Throw away the equality we just deleted.\n\n            equalitiesLength--; // Throw away the previous equality (it needs to be reevaluated).\n\n            equalitiesLength--;\n            pointer = equalitiesLength > 0 ? equalities[equalitiesLength - 1] : -1; // Reset the counters.\n\n            lengthInsertions1 = 0;\n            lengthDeletions1 = 0;\n            lengthInsertions2 = 0;\n            lengthDeletions2 = 0;\n            lastequality = null;\n            changes = true;\n          }\n        }\n\n        pointer++;\n      } // Normalize the diff.\n\n\n      if (changes) {\n        this.diffCleanupMerge(diffs);\n      } // Find any overlaps between deletions and insertions.\n      // e.g: <del>abcxxx</del><ins>xxxdef</ins>\n      //   -> <del>abc</del>xxx<ins>def</ins>\n      // e.g: <del>xxxabc</del><ins>defxxx</ins>\n      //   -> <ins>def</ins>xxx<del>abc</del>\n      // Only extract an overlap if it is as big as the edit ahead or behind it.\n\n\n      pointer = 1;\n\n      while (pointer < diffs.length) {\n        if (diffs[pointer - 1][0] === DIFF_DELETE && diffs[pointer][0] === DIFF_INSERT) {\n          deletion = diffs[pointer - 1][1];\n          insertion = diffs[pointer][1];\n          overlapLength1 = this.diffCommonOverlap(deletion, insertion);\n          overlapLength2 = this.diffCommonOverlap(insertion, deletion);\n\n          if (overlapLength1 >= overlapLength2) {\n            if (overlapLength1 >= deletion.length / 2 || overlapLength1 >= insertion.length / 2) {\n              // Overlap found.  Insert an equality and trim the surrounding edits.\n              diffs.splice(pointer, 0, [DIFF_EQUAL, insertion.substring(0, overlapLength1)]);\n              diffs[pointer - 1][1] = deletion.substring(0, deletion.length - overlapLength1);\n              diffs[pointer + 1][1] = insertion.substring(overlapLength1);\n              pointer++;\n            }\n          } else {\n            if (overlapLength2 >= deletion.length / 2 || overlapLength2 >= insertion.length / 2) {\n              // Reverse overlap found.\n              // Insert an equality and swap and trim the surrounding edits.\n              diffs.splice(pointer, 0, [DIFF_EQUAL, deletion.substring(0, overlapLength2)]);\n              diffs[pointer - 1][0] = DIFF_INSERT;\n              diffs[pointer - 1][1] = insertion.substring(0, insertion.length - overlapLength2);\n              diffs[pointer + 1][0] = DIFF_DELETE;\n              diffs[pointer + 1][1] = deletion.substring(overlapLength2);\n              pointer++;\n            }\n          }\n\n          pointer++;\n        }\n\n        pointer++;\n      }\n    };\n    /**\n     * Determine if the suffix of one string is the prefix of another.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {number} The number of characters common to the end of the first\n     *     string and the start of the second string.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffCommonOverlap = function (text1, text2) {\n      var text1Length, text2Length, textLength, best, length, pattern, found; // Cache the text lengths to prevent multiple calls.\n\n      text1Length = text1.length;\n      text2Length = text2.length; // Eliminate the null case.\n\n      if (text1Length === 0 || text2Length === 0) {\n        return 0;\n      } // Truncate the longer string.\n\n\n      if (text1Length > text2Length) {\n        text1 = text1.substring(text1Length - text2Length);\n      } else if (text1Length < text2Length) {\n        text2 = text2.substring(0, text1Length);\n      }\n\n      textLength = Math.min(text1Length, text2Length); // Quick check for the worst case.\n\n      if (text1 === text2) {\n        return textLength;\n      } // Start by looking for a single character match\n      // and increase length until no match is found.\n      // Performance analysis: https://neil.fraser.name/news/2010/11/04/\n\n\n      best = 0;\n      length = 1;\n\n      while (true) {\n        pattern = text1.substring(textLength - length);\n        found = text2.indexOf(pattern);\n\n        if (found === -1) {\n          return best;\n        }\n\n        length += found;\n\n        if (found === 0 || text1.substring(textLength - length) === text2.substring(0, length)) {\n          best = length;\n          length++;\n        }\n      }\n    };\n    /**\n     * Split two texts into an array of strings.  Reduce the texts to a string of\n     * hashes where each Unicode character represents one line.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {{chars1: string, chars2: string, lineArray: !Array.<string>}}\n     *     An object containing the encoded text1, the encoded text2 and\n     *     the array of unique strings.\n     *     The zeroth element of the array of unique strings is intentionally blank.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffLinesToChars = function (text1, text2) {\n      var lineArray, lineHash, chars1, chars2;\n      lineArray = []; // E.g. lineArray[4] === 'Hello\\n'\n\n      lineHash = {}; // E.g. lineHash['Hello\\n'] === 4\n      // '\\x00' is a valid character, but various debuggers don't like it.\n      // So we'll insert a junk entry to avoid generating a null character.\n\n      lineArray[0] = \"\";\n      /**\n       * Split a text into an array of strings.  Reduce the texts to a string of\n       * hashes where each Unicode character represents one line.\n       * Modifies linearray and linehash through being a closure.\n       * @param {string} text String to encode.\n       * @return {string} Encoded string.\n       * @private\n       */\n\n      function diffLinesToCharsMunge(text) {\n        var chars, lineStart, lineEnd, lineArrayLength, line;\n        chars = \"\"; // Walk the text, pulling out a substring for each line.\n        // text.split('\\n') would would temporarily double our memory footprint.\n        // Modifying text would create many large strings to garbage collect.\n\n        lineStart = 0;\n        lineEnd = -1; // Keeping our own length variable is faster than looking it up.\n\n        lineArrayLength = lineArray.length;\n\n        while (lineEnd < text.length - 1) {\n          lineEnd = text.indexOf(\"\\n\", lineStart);\n\n          if (lineEnd === -1) {\n            lineEnd = text.length - 1;\n          }\n\n          line = text.substring(lineStart, lineEnd + 1);\n          lineStart = lineEnd + 1;\n\n          if (hasOwn.call(lineHash, line)) {\n            chars += String.fromCharCode(lineHash[line]);\n          } else {\n            chars += String.fromCharCode(lineArrayLength);\n            lineHash[line] = lineArrayLength;\n            lineArray[lineArrayLength++] = line;\n          }\n        }\n\n        return chars;\n      }\n\n      chars1 = diffLinesToCharsMunge(text1);\n      chars2 = diffLinesToCharsMunge(text2);\n      return {\n        chars1: chars1,\n        chars2: chars2,\n        lineArray: lineArray\n      };\n    };\n    /**\n     * Rehydrate the text in a diff from a string of line hashes to real lines of\n     * text.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     * @param {!Array.<string>} lineArray Array of unique strings.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffCharsToLines = function (diffs, lineArray) {\n      var x, chars, text, y;\n\n      for (x = 0; x < diffs.length; x++) {\n        chars = diffs[x][1];\n        text = [];\n\n        for (y = 0; y < chars.length; y++) {\n          text[y] = lineArray[chars.charCodeAt(y)];\n        }\n\n        diffs[x][1] = text.join(\"\");\n      }\n    };\n    /**\n     * Reorder and merge like edit sections.  Merge equalities.\n     * Any edit section can move as long as it doesn't cross an equality.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     */\n\n\n    DiffMatchPatch.prototype.diffCleanupMerge = function (diffs) {\n      var pointer, countDelete, countInsert, textInsert, textDelete, commonlength, changes, diffPointer, position;\n      diffs.push([DIFF_EQUAL, \"\"]); // Add a dummy entry at the end.\n\n      pointer = 0;\n      countDelete = 0;\n      countInsert = 0;\n      textDelete = \"\";\n      textInsert = \"\";\n\n      while (pointer < diffs.length) {\n        switch (diffs[pointer][0]) {\n          case DIFF_INSERT:\n            countInsert++;\n            textInsert += diffs[pointer][1];\n            pointer++;\n            break;\n\n          case DIFF_DELETE:\n            countDelete++;\n            textDelete += diffs[pointer][1];\n            pointer++;\n            break;\n\n          case DIFF_EQUAL:\n            // Upon reaching an equality, check for prior redundancies.\n            if (countDelete + countInsert > 1) {\n              if (countDelete !== 0 && countInsert !== 0) {\n                // Factor out any common prefixes.\n                commonlength = this.diffCommonPrefix(textInsert, textDelete);\n\n                if (commonlength !== 0) {\n                  if (pointer - countDelete - countInsert > 0 && diffs[pointer - countDelete - countInsert - 1][0] === DIFF_EQUAL) {\n                    diffs[pointer - countDelete - countInsert - 1][1] += textInsert.substring(0, commonlength);\n                  } else {\n                    diffs.splice(0, 0, [DIFF_EQUAL, textInsert.substring(0, commonlength)]);\n                    pointer++;\n                  }\n\n                  textInsert = textInsert.substring(commonlength);\n                  textDelete = textDelete.substring(commonlength);\n                } // Factor out any common suffixies.\n\n\n                commonlength = this.diffCommonSuffix(textInsert, textDelete);\n\n                if (commonlength !== 0) {\n                  diffs[pointer][1] = textInsert.substring(textInsert.length - commonlength) + diffs[pointer][1];\n                  textInsert = textInsert.substring(0, textInsert.length - commonlength);\n                  textDelete = textDelete.substring(0, textDelete.length - commonlength);\n                }\n              } // Delete the offending records and add the merged ones.\n\n\n              if (countDelete === 0) {\n                diffs.splice(pointer - countInsert, countDelete + countInsert, [DIFF_INSERT, textInsert]);\n              } else if (countInsert === 0) {\n                diffs.splice(pointer - countDelete, countDelete + countInsert, [DIFF_DELETE, textDelete]);\n              } else {\n                diffs.splice(pointer - countDelete - countInsert, countDelete + countInsert, [DIFF_DELETE, textDelete], [DIFF_INSERT, textInsert]);\n              }\n\n              pointer = pointer - countDelete - countInsert + (countDelete ? 1 : 0) + (countInsert ? 1 : 0) + 1;\n            } else if (pointer !== 0 && diffs[pointer - 1][0] === DIFF_EQUAL) {\n              // Merge this equality with the previous one.\n              diffs[pointer - 1][1] += diffs[pointer][1];\n              diffs.splice(pointer, 1);\n            } else {\n              pointer++;\n            }\n\n            countInsert = 0;\n            countDelete = 0;\n            textDelete = \"\";\n            textInsert = \"\";\n            break;\n        }\n      }\n\n      if (diffs[diffs.length - 1][1] === \"\") {\n        diffs.pop(); // Remove the dummy entry at the end.\n      } // Second pass: look for single edits surrounded on both sides by equalities\n      // which can be shifted sideways to eliminate an equality.\n      // e.g: A<ins>BA</ins>C -> <ins>AB</ins>AC\n\n\n      changes = false;\n      pointer = 1; // Intentionally ignore the first and last element (don't need checking).\n\n      while (pointer < diffs.length - 1) {\n        if (diffs[pointer - 1][0] === DIFF_EQUAL && diffs[pointer + 1][0] === DIFF_EQUAL) {\n          diffPointer = diffs[pointer][1];\n          position = diffPointer.substring(diffPointer.length - diffs[pointer - 1][1].length); // This is a single edit surrounded by equalities.\n\n          if (position === diffs[pointer - 1][1]) {\n            // Shift the edit over the previous equality.\n            diffs[pointer][1] = diffs[pointer - 1][1] + diffs[pointer][1].substring(0, diffs[pointer][1].length - diffs[pointer - 1][1].length);\n            diffs[pointer + 1][1] = diffs[pointer - 1][1] + diffs[pointer + 1][1];\n            diffs.splice(pointer - 1, 1);\n            changes = true;\n          } else if (diffPointer.substring(0, diffs[pointer + 1][1].length) === diffs[pointer + 1][1]) {\n            // Shift the edit over the next equality.\n            diffs[pointer - 1][1] += diffs[pointer + 1][1];\n            diffs[pointer][1] = diffs[pointer][1].substring(diffs[pointer + 1][1].length) + diffs[pointer + 1][1];\n            diffs.splice(pointer + 1, 1);\n            changes = true;\n          }\n        }\n\n        pointer++;\n      } // If shifts were made, the diff needs reordering and another shift sweep.\n\n\n      if (changes) {\n        this.diffCleanupMerge(diffs);\n      }\n    };\n\n    return function (o, n) {\n      var diff, output, text;\n      diff = new DiffMatchPatch();\n      output = diff.DiffMain(o, n);\n      diff.diffCleanupEfficiency(output);\n      text = diff.diffPrettyHtml(output);\n      return text;\n    };\n  }();\n})();\n/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../webpack/buildin/module.js */ \"./node_modules/webpack/buildin/module.js\")(module)))\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/qunit/qunit/qunit.js?");
+eval("/* WEBPACK VAR INJECTION */(function(module) {var __WEBPACK_AMD_DEFINE_RESULT__;/*!\n * QUnit 2.19.1\n * https://qunitjs.com/\n *\n * Copyright OpenJS Foundation and other contributors\n * Released under the MIT license\n * https://jquery.org/license\n */\n(function () {\n  'use strict';\n\n  function _typeof(obj) {\n    \"@babel/helpers - typeof\";\n\n    return _typeof = \"function\" == typeof Symbol && \"symbol\" == typeof Symbol.iterator ? function (obj) {\n      return typeof obj;\n    } : function (obj) {\n      return obj && \"function\" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? \"symbol\" : typeof obj;\n    }, _typeof(obj);\n  }\n\n  function _classCallCheck(instance, Constructor) {\n    if (!(instance instanceof Constructor)) {\n      throw new TypeError(\"Cannot call a class as a function\");\n    }\n  }\n\n  function _defineProperties(target, props) {\n    for (var i = 0; i < props.length; i++) {\n      var descriptor = props[i];\n      descriptor.enumerable = descriptor.enumerable || false;\n      descriptor.configurable = true;\n      if (\"value\" in descriptor) descriptor.writable = true;\n      Object.defineProperty(target, descriptor.key, descriptor);\n    }\n  }\n\n  function _createClass(Constructor, protoProps, staticProps) {\n    if (protoProps) _defineProperties(Constructor.prototype, protoProps);\n    if (staticProps) _defineProperties(Constructor, staticProps);\n    Object.defineProperty(Constructor, \"prototype\", {\n      writable: false\n    });\n    return Constructor;\n  }\n\n  function _slicedToArray(arr, i) {\n    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest();\n  }\n\n  function _toConsumableArray(arr) {\n    return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread();\n  }\n\n  function _arrayWithoutHoles(arr) {\n    if (Array.isArray(arr)) return _arrayLikeToArray(arr);\n  }\n\n  function _arrayWithHoles(arr) {\n    if (Array.isArray(arr)) return arr;\n  }\n\n  function _iterableToArray(iter) {\n    if (typeof Symbol !== \"undefined\" && iter[Symbol.iterator] != null || iter[\"@@iterator\"] != null) return Array.from(iter);\n  }\n\n  function _iterableToArrayLimit(arr, i) {\n    var _i = arr == null ? null : typeof Symbol !== \"undefined\" && arr[Symbol.iterator] || arr[\"@@iterator\"];\n\n    if (_i == null) return;\n    var _arr = [];\n    var _n = true;\n    var _d = false;\n\n    var _s, _e;\n\n    try {\n      for (_i = _i.call(arr); !(_n = (_s = _i.next()).done); _n = true) {\n        _arr.push(_s.value);\n\n        if (i && _arr.length === i) break;\n      }\n    } catch (err) {\n      _d = true;\n      _e = err;\n    } finally {\n      try {\n        if (!_n && _i[\"return\"] != null) _i[\"return\"]();\n      } finally {\n        if (_d) throw _e;\n      }\n    }\n\n    return _arr;\n  }\n\n  function _unsupportedIterableToArray(o, minLen) {\n    if (!o) return;\n    if (typeof o === \"string\") return _arrayLikeToArray(o, minLen);\n    var n = Object.prototype.toString.call(o).slice(8, -1);\n    if (n === \"Object\" && o.constructor) n = o.constructor.name;\n    if (n === \"Map\" || n === \"Set\") return Array.from(o);\n    if (n === \"Arguments\" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);\n  }\n\n  function _arrayLikeToArray(arr, len) {\n    if (len == null || len > arr.length) len = arr.length;\n\n    for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];\n\n    return arr2;\n  }\n\n  function _nonIterableSpread() {\n    throw new TypeError(\"Invalid attempt to spread non-iterable instance.\\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.\");\n  }\n\n  function _nonIterableRest() {\n    throw new TypeError(\"Invalid attempt to destructure non-iterable instance.\\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.\");\n  }\n\n  function _createForOfIteratorHelper(o, allowArrayLike) {\n    var it = typeof Symbol !== \"undefined\" && o[Symbol.iterator] || o[\"@@iterator\"];\n\n    if (!it) {\n      if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === \"number\") {\n        if (it) o = it;\n        var i = 0;\n\n        var F = function () {};\n\n        return {\n          s: F,\n          n: function () {\n            if (i >= o.length) return {\n              done: true\n            };\n            return {\n              done: false,\n              value: o[i++]\n            };\n          },\n          e: function (e) {\n            throw e;\n          },\n          f: F\n        };\n      }\n\n      throw new TypeError(\"Invalid attempt to iterate non-iterable instance.\\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.\");\n    }\n\n    var normalCompletion = true,\n        didErr = false,\n        err;\n    return {\n      s: function () {\n        it = it.call(o);\n      },\n      n: function () {\n        var step = it.next();\n        normalCompletion = step.done;\n        return step;\n      },\n      e: function (e) {\n        didErr = true;\n        err = e;\n      },\n      f: function () {\n        try {\n          if (!normalCompletion && it.return != null) it.return();\n        } finally {\n          if (didErr) throw err;\n        }\n      }\n    };\n  } // We don't use global-this-polyfill [1], because it modifies\n  // the globals scope by default. QUnit must not affect the host context\n  // as developers may test their project may be such a polyfill, and/or\n  // they may intentionally test their project with and without certain\n  // polyfills and we must not affect that. It also uses an obscure\n  // mechanism that seems to sometimes causes a runtime error in older\n  // browsers (specifically Safari and IE versions that support\n  // Object.defineProperty but then report _T_ as undefined).\n  // [1] https://github.com/ungap/global-this/blob/v0.4.4/esm/index.js\n  //\n  // Another way is `Function('return this')()`, but doing so relies\n  // on eval which will cause a CSP error on some servers.\n  //\n  // Instead, simply check the four options that already exist\n  // in all supported environments.\n\n\n  function getGlobalThis() {\n    if (typeof globalThis !== 'undefined') {\n      // For SpiderMonkey, modern browsers, and recent Node.js\n      // eslint-disable-next-line no-undef\n      return globalThis;\n    }\n\n    if (typeof self !== 'undefined') {\n      // For web workers\n      // eslint-disable-next-line no-undef\n      return self;\n    }\n\n    if (typeof window$1 !== 'undefined') {\n      // For document context in browsers\n      return window$1;\n    }\n\n    if (typeof global !== 'undefined') {\n      // For Node.js\n      // eslint-disable-next-line no-undef\n      return global;\n    }\n\n    throw new Error('Unable to locate global object');\n  } // This avoids a simple `export const` assignment as that would lead Rollup\n  // to change getGlobalThis and use the same (generated) variable name there.\n\n\n  var g = getGlobalThis();\n  var window$1 = g.window;\n  var console$1 = g.console;\n  var setTimeout$1 = g.setTimeout;\n  var clearTimeout = g.clearTimeout;\n  var document = window$1 && window$1.document;\n  var navigator = window$1 && window$1.navigator;\n\n  var localSessionStorage = function () {\n    var x = 'qunit-test-string';\n\n    try {\n      g.sessionStorage.setItem(x, x);\n      g.sessionStorage.removeItem(x);\n      return g.sessionStorage;\n    } catch (e) {\n      return undefined;\n    }\n  }(); // Basic fallback for ES6 Map\n  // Support: IE 9-10, Safari 7, PhantomJS; Map is undefined\n  // Support: iOS 8; `new Map(iterable)` is not supported\n  //\n  // Fallback for ES7 Map#keys\n  // Support: IE 11; Map#keys is undefined\n\n\n  var StringMap = typeof g.Map === 'function' && typeof g.Map.prototype.keys === 'function' && typeof g.Symbol === 'function' && _typeof(g.Symbol.iterator) === 'symbol' ? g.Map : function StringMap(input) {\n    var _this = this;\n\n    var store = Object.create(null);\n    var hasOwn = Object.prototype.hasOwnProperty;\n\n    this.has = function (strKey) {\n      return hasOwn.call(store, strKey);\n    };\n\n    this.get = function (strKey) {\n      return store[strKey];\n    };\n\n    this.set = function (strKey, val) {\n      if (!hasOwn.call(store, strKey)) {\n        this.size++;\n      }\n\n      store[strKey] = val;\n      return this;\n    };\n\n    this.delete = function (strKey) {\n      if (hasOwn.call(store, strKey)) {\n        delete store[strKey];\n        this.size--;\n      }\n    };\n\n    this.forEach = function (callback) {\n      for (var strKey in store) {\n        callback(store[strKey], strKey);\n      }\n    };\n\n    this.keys = function () {\n      return Object.keys(store);\n    };\n\n    this.clear = function () {\n      store = Object.create(null);\n      this.size = 0;\n    };\n\n    this.size = 0;\n\n    if (input) {\n      input.forEach(function (val, strKey) {\n        _this.set(strKey, val);\n      });\n    }\n  }; // Detect if the console object exists and no-op otherwise.\n  // This allows support for IE 9, which doesn't have a console\n  // object if the developer tools are not open.\n  // Support: IE 9\n  // Function#bind is supported, but no console.log.bind().\n  // Support: SpiderMonkey (mozjs 68+)\n  // The console object has a log method, but no warn method.\n\n  var Logger = {\n    warn: console$1 ? Function.prototype.bind.call(console$1.warn || console$1.log, console$1) : function () {}\n  };\n  var toString = Object.prototype.toString;\n  var hasOwn$1 = Object.prototype.hasOwnProperty;\n  var nativePerf = getNativePerf(); // TODO: Consider using globalThis instead so that perf marks work\n  // in Node.js as well. As they can have overhead, we should also\n  // have a way to disable these, and/or make them an opt-in reporter\n  // in QUnit 3 and then support globalThis.\n  // For example: `QUnit.addReporter(QUnit.reporters.perf)`.\n\n  function getNativePerf() {\n    if (window$1 && typeof window$1.performance !== 'undefined' && typeof window$1.performance.mark === 'function' && typeof window$1.performance.measure === 'function') {\n      return window$1.performance;\n    } else {\n      return undefined;\n    }\n  }\n\n  var performance = {\n    now: nativePerf ? nativePerf.now.bind(nativePerf) : Date.now,\n    measure: nativePerf ? function (comment, startMark, endMark) {\n      // `performance.measure` may fail if the mark could not be found.\n      // reasons a specific mark could not be found include: outside code invoking `performance.clearMarks()`\n      try {\n        nativePerf.measure(comment, startMark, endMark);\n      } catch (ex) {\n        Logger.warn('performance.measure could not be executed because of ', ex.message);\n      }\n    } : function () {},\n    mark: nativePerf ? nativePerf.mark.bind(nativePerf) : function () {}\n  }; // Returns a new Array with the elements that are in a but not in b\n\n  function diff(a, b) {\n    var result = a.slice();\n\n    for (var i = 0; i < result.length; i++) {\n      for (var j = 0; j < b.length; j++) {\n        if (result[i] === b[j]) {\n          result.splice(i, 1);\n          i--;\n          break;\n        }\n      }\n    }\n\n    return result;\n  }\n  /**\n   * Determines whether an element exists in a given array or not.\n   *\n   * @method inArray\n   * @param {any} elem\n   * @param {Array} array\n   * @return {boolean}\n   */\n\n\n  function inArray(elem, array) {\n    return array.indexOf(elem) !== -1;\n  }\n  /**\n   * Recursively clone an object into a plain array or object, taking only the\n   * own enumerable properties.\n   *\n   * @param {any} obj\n   * @param {bool} [allowArray=true]\n   * @return {Object|Array}\n   */\n\n\n  function objectValues(obj) {\n    var allowArray = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;\n    var vals = allowArray && is('array', obj) ? [] : {};\n\n    for (var key in obj) {\n      if (hasOwn$1.call(obj, key)) {\n        var val = obj[key];\n        vals[key] = val === Object(val) ? objectValues(val, allowArray) : val;\n      }\n    }\n\n    return vals;\n  }\n  /**\n   * Recursively clone an object into a plain object, taking only the\n   * subset of own enumerable properties that exist a given model.\n   *\n   * @param {any} obj\n   * @param {any} model\n   * @return {Object}\n   */\n\n\n  function objectValuesSubset(obj, model) {\n    // Return primitive values unchanged to avoid false positives or confusing\n    // results from assert.propContains().\n    // E.g. an actual null or false wrongly equaling an empty object,\n    // or an actual string being reported as object not matching a partial object.\n    if (obj !== Object(obj)) {\n      return obj;\n    } // Unlike objectValues(), subset arrays to a plain objects as well.\n    // This enables subsetting [20, 30] with {1: 30}.\n\n\n    var subset = {};\n\n    for (var key in model) {\n      if (hasOwn$1.call(model, key) && hasOwn$1.call(obj, key)) {\n        subset[key] = objectValuesSubset(obj[key], model[key]);\n      }\n    }\n\n    return subset;\n  }\n\n  function extend(a, b, undefOnly) {\n    for (var prop in b) {\n      if (hasOwn$1.call(b, prop)) {\n        if (b[prop] === undefined) {\n          delete a[prop];\n        } else if (!(undefOnly && typeof a[prop] !== 'undefined')) {\n          a[prop] = b[prop];\n        }\n      }\n    }\n\n    return a;\n  }\n\n  function objectType(obj) {\n    if (typeof obj === 'undefined') {\n      return 'undefined';\n    } // Consider: typeof null === object\n\n\n    if (obj === null) {\n      return 'null';\n    }\n\n    var match = toString.call(obj).match(/^\\[object\\s(.*)\\]$/);\n    var type = match && match[1];\n\n    switch (type) {\n      case 'Number':\n        if (isNaN(obj)) {\n          return 'nan';\n        }\n\n        return 'number';\n\n      case 'String':\n      case 'Boolean':\n      case 'Array':\n      case 'Set':\n      case 'Map':\n      case 'Date':\n      case 'RegExp':\n      case 'Function':\n      case 'Symbol':\n        return type.toLowerCase();\n\n      default:\n        return _typeof(obj);\n    }\n  } // Safe object type checking\n\n\n  function is(type, obj) {\n    return objectType(obj) === type;\n  } // Based on Java's String.hashCode, a simple but not\n  // rigorously collision resistant hashing function\n\n\n  function generateHash(module, testName) {\n    var str = module + '\\x1C' + testName;\n    var hash = 0;\n\n    for (var i = 0; i < str.length; i++) {\n      hash = (hash << 5) - hash + str.charCodeAt(i);\n      hash |= 0;\n    } // Convert the possibly negative integer hash code into an 8 character hex string, which isn't\n    // strictly necessary but increases user understanding that the id is a SHA-like hash\n\n\n    var hex = (0x100000000 + hash).toString(16);\n\n    if (hex.length < 8) {\n      hex = '0000000' + hex;\n    }\n\n    return hex.slice(-8);\n  }\n  /**\n   * Converts an error into a simple string for comparisons.\n   *\n   * @param {Error|any} error\n   * @return {string}\n   */\n\n\n  function errorString(error) {\n    // Use String() instead of toString() to handle non-object values like undefined or null.\n    var resultErrorString = String(error); // If the error wasn't a subclass of Error but something like\n    // an object literal with name and message properties...\n\n    if (resultErrorString.slice(0, 7) === '[object') {\n      // Based on https://es5.github.io/#x15.11.4.4\n      return (error.name || 'Error') + (error.message ? \": \".concat(error.message) : '');\n    } else {\n      return resultErrorString;\n    }\n  } // Authors: Philippe Rathé <prathe@gmail.com>, David Chan <david@troi.org>\n\n\n  var equiv = function () {\n    // Value pairs queued for comparison. Used for breadth-first processing order, recursion\n    // detection and avoiding repeated comparison (see below for details).\n    // Elements are { a: val, b: val }.\n    var pairs = [];\n\n    function useStrictEquality(a, b) {\n      // This only gets called if a and b are not strict equal, and is used to compare on\n      // the primitive values inside object wrappers. For example:\n      // `var i = 1;`\n      // `var j = new Number(1);`\n      // Neither a nor b can be null, as a !== b and they have the same type.\n      if (_typeof(a) === 'object') {\n        a = a.valueOf();\n      }\n\n      if (_typeof(b) === 'object') {\n        b = b.valueOf();\n      }\n\n      return a === b;\n    }\n\n    function compareConstructors(a, b) {\n      var protoA = Object.getPrototypeOf(a);\n      var protoB = Object.getPrototypeOf(b); // Comparing constructors is more strict than using `instanceof`\n\n      if (a.constructor === b.constructor) {\n        return true;\n      } // Ref #851\n      // If the obj prototype descends from a null constructor, treat it\n      // as a null prototype.\n\n\n      if (protoA && protoA.constructor === null) {\n        protoA = null;\n      }\n\n      if (protoB && protoB.constructor === null) {\n        protoB = null;\n      } // Allow objects with no prototype to be equivalent to\n      // objects with Object as their constructor.\n\n\n      if (protoA === null && protoB === Object.prototype || protoB === null && protoA === Object.prototype) {\n        return true;\n      }\n\n      return false;\n    }\n\n    function getRegExpFlags(regexp) {\n      return 'flags' in regexp ? regexp.flags : regexp.toString().match(/[gimuy]*$/)[0];\n    }\n\n    function isContainer(val) {\n      return ['object', 'array', 'map', 'set'].indexOf(objectType(val)) !== -1;\n    }\n\n    function breadthFirstCompareChild(a, b) {\n      // If a is a container not reference-equal to b, postpone the comparison to the\n      // end of the pairs queue -- unless (a, b) has been seen before, in which case skip\n      // over the pair.\n      if (a === b) {\n        return true;\n      }\n\n      if (!isContainer(a)) {\n        return typeEquiv(a, b);\n      }\n\n      if (pairs.every(function (pair) {\n        return pair.a !== a || pair.b !== b;\n      })) {\n        // Not yet started comparing this pair\n        pairs.push({\n          a: a,\n          b: b\n        });\n      }\n\n      return true;\n    }\n\n    var callbacks = {\n      string: useStrictEquality,\n      boolean: useStrictEquality,\n      number: useStrictEquality,\n      null: useStrictEquality,\n      undefined: useStrictEquality,\n      symbol: useStrictEquality,\n      date: useStrictEquality,\n      nan: function nan() {\n        return true;\n      },\n      regexp: function regexp(a, b) {\n        return a.source === b.source && // Include flags in the comparison\n        getRegExpFlags(a) === getRegExpFlags(b);\n      },\n      // abort (identical references / instance methods were skipped earlier)\n      function: function _function() {\n        return false;\n      },\n      array: function array(a, b) {\n        var len = a.length;\n\n        if (len !== b.length) {\n          // Safe and faster\n          return false;\n        }\n\n        for (var i = 0; i < len; i++) {\n          // Compare non-containers; queue non-reference-equal containers\n          if (!breadthFirstCompareChild(a[i], b[i])) {\n            return false;\n          }\n        }\n\n        return true;\n      },\n      // Define sets a and b to be equivalent if for each element aVal in a, there\n      // is some element bVal in b such that aVal and bVal are equivalent. Element\n      // repetitions are not counted, so these are equivalent:\n      // a = new Set( [ {}, [], [] ] );\n      // b = new Set( [ {}, {}, [] ] );\n      set: function set(a, b) {\n        if (a.size !== b.size) {\n          // This optimization has certain quirks because of the lack of\n          // repetition counting. For instance, adding the same\n          // (reference-identical) element to two equivalent sets can\n          // make them non-equivalent.\n          return false;\n        }\n\n        var outerEq = true;\n        a.forEach(function (aVal) {\n          // Short-circuit if the result is already known. (Using for...of\n          // with a break clause would be cleaner here, but it would cause\n          // a syntax error on older JavaScript implementations even if\n          // Set is unused)\n          if (!outerEq) {\n            return;\n          }\n\n          var innerEq = false;\n          b.forEach(function (bVal) {\n            // Likewise, short-circuit if the result is already known\n            if (innerEq) {\n              return;\n            } // Swap out the global pairs list, as the nested call to\n            // innerEquiv will clobber its contents\n\n\n            var parentPairs = pairs;\n\n            if (innerEquiv(bVal, aVal)) {\n              innerEq = true;\n            } // Replace the global pairs list\n\n\n            pairs = parentPairs;\n          });\n\n          if (!innerEq) {\n            outerEq = false;\n          }\n        });\n        return outerEq;\n      },\n      // Define maps a and b to be equivalent if for each key-value pair (aKey, aVal)\n      // in a, there is some key-value pair (bKey, bVal) in b such that\n      // [ aKey, aVal ] and [ bKey, bVal ] are equivalent. Key repetitions are not\n      // counted, so these are equivalent:\n      // a = new Map( [ [ {}, 1 ], [ {}, 1 ], [ [], 1 ] ] );\n      // b = new Map( [ [ {}, 1 ], [ [], 1 ], [ [], 1 ] ] );\n      map: function map(a, b) {\n        if (a.size !== b.size) {\n          // This optimization has certain quirks because of the lack of\n          // repetition counting. For instance, adding the same\n          // (reference-identical) key-value pair to two equivalent maps\n          // can make them non-equivalent.\n          return false;\n        }\n\n        var outerEq = true;\n        a.forEach(function (aVal, aKey) {\n          // Short-circuit if the result is already known. (Using for...of\n          // with a break clause would be cleaner here, but it would cause\n          // a syntax error on older JavaScript implementations even if\n          // Map is unused)\n          if (!outerEq) {\n            return;\n          }\n\n          var innerEq = false;\n          b.forEach(function (bVal, bKey) {\n            // Likewise, short-circuit if the result is already known\n            if (innerEq) {\n              return;\n            } // Swap out the global pairs list, as the nested call to\n            // innerEquiv will clobber its contents\n\n\n            var parentPairs = pairs;\n\n            if (innerEquiv([bVal, bKey], [aVal, aKey])) {\n              innerEq = true;\n            } // Replace the global pairs list\n\n\n            pairs = parentPairs;\n          });\n\n          if (!innerEq) {\n            outerEq = false;\n          }\n        });\n        return outerEq;\n      },\n      object: function object(a, b) {\n        if (compareConstructors(a, b) === false) {\n          return false;\n        }\n\n        var aProperties = [];\n        var bProperties = []; // Be strict: don't ensure hasOwnProperty and go deep\n\n        for (var i in a) {\n          // Collect a's properties\n          aProperties.push(i); // Skip OOP methods that look the same\n\n          if (a.constructor !== Object && typeof a.constructor !== 'undefined' && typeof a[i] === 'function' && typeof b[i] === 'function' && a[i].toString() === b[i].toString()) {\n            continue;\n          } // Compare non-containers; queue non-reference-equal containers\n\n\n          if (!breadthFirstCompareChild(a[i], b[i])) {\n            return false;\n          }\n        }\n\n        for (var _i in b) {\n          // Collect b's properties\n          bProperties.push(_i);\n        } // Ensures identical properties name\n\n\n        return typeEquiv(aProperties.sort(), bProperties.sort());\n      }\n    };\n\n    function typeEquiv(a, b) {\n      var type = objectType(a); // Callbacks for containers will append to the pairs queue to achieve breadth-first\n      // search order. The pairs queue is also used to avoid reprocessing any pair of\n      // containers that are reference-equal to a previously visited pair (a special case\n      // this being recursion detection).\n      //\n      // Because of this approach, once typeEquiv returns a false value, it should not be\n      // called again without clearing the pair queue else it may wrongly report a visited\n      // pair as being equivalent.\n\n      return objectType(b) === type && callbacks[type](a, b);\n    }\n\n    function innerEquiv(a, b) {\n      // We're done when there's nothing more to compare\n      if (arguments.length < 2) {\n        return true;\n      } // Clear the global pair queue and add the top-level values being compared\n\n\n      pairs = [{\n        a: a,\n        b: b\n      }];\n\n      for (var i = 0; i < pairs.length; i++) {\n        var pair = pairs[i]; // Perform type-specific comparison on any pairs that are not strictly\n        // equal. For container types, that comparison will postpone comparison\n        // of any sub-container pair to the end of the pair queue. This gives\n        // breadth-first search order. It also avoids the reprocessing of\n        // reference-equal siblings, cousins etc, which can have a significant speed\n        // impact when comparing a container of small objects each of which has a\n        // reference to the same (singleton) large object.\n\n        if (pair.a !== pair.b && !typeEquiv(pair.a, pair.b)) {\n          return false;\n        }\n      } // ...across all consecutive argument pairs\n\n\n      return arguments.length === 2 || innerEquiv.apply(this, [].slice.call(arguments, 1));\n    }\n\n    return function () {\n      var result = innerEquiv.apply(void 0, arguments); // Release any retained objects\n\n      pairs.length = 0;\n      return result;\n    };\n  }();\n  /**\n   * Config object: Maintain internal state\n   * Later exposed as QUnit.config\n   * `config` initialized at top of scope\n   */\n\n\n  var config = {\n    // HTML Reporter: Modify document.title when suite is done\n    altertitle: true,\n    // HTML Reporter: collapse every test except the first failing test\n    // If false, all failing tests will be expanded\n    collapse: true,\n    // whether or not to fail when there are zero tests\n    // defaults to `true`\n    failOnZeroTests: true,\n    // Select by pattern or case-insenstive substring match against \"moduleName: testName\"\n    filter: undefined,\n    // Depth up-to which object will be dumped\n    maxDepth: 5,\n    // Select case-insensitive match of the module name\n    module: undefined,\n    // HTML Reporter: Select module/test by array of internal IDs\n    moduleId: undefined,\n    // By default, run previously failed tests first\n    // very useful in combination with \"Hide passed tests\" checked\n    reorder: true,\n    // When enabled, all tests must call expect()\n    requireExpects: false,\n    // By default, scroll to top of the page when suite is done\n    scrolltop: true,\n    // The storage module to use for reordering tests\n    storage: localSessionStorage,\n    testId: undefined,\n    // HTML Reporter: List of URL parameters that are given visual controls\n    urlConfig: [],\n    // Internal: The first unnamed module\n    //\n    // By being defined as the intial value for currentModule, it is the\n    // receptacle and implied parent for any global tests. It is as if we\n    // called `QUnit.module( \"\" );` before any other tests were defined.\n    //\n    // If we reach begin() and no tests were put in it, we dequeue it as if it\n    // never existed, and in that case never expose it to the events and\n    // callbacks API.\n    //\n    // When global tests are defined, then this unnamed module will execute\n    // as any other module, including moduleStart/moduleDone events etc.\n    //\n    // Since this module isn't explicitly created by the user, they have no\n    // access to add hooks for it. The hooks object is defined to comply\n    // with internal expectations of test.js, but they will be empty.\n    // To apply hooks, place tests explicitly in a QUnit.module(), and use\n    // its hooks accordingly.\n    //\n    // For global hooks that apply to all tests and all modules, use QUnit.hooks.\n    //\n    // NOTE: This is *not* a \"global module\". It is not an ancestor of all modules\n    // and tests. It is merely the parent for any tests defined globally,\n    // before the first QUnit.module(). As such, the events for this unnamed\n    // module will fire as normal, right after its last test, and *not* at\n    // the end of the test run.\n    //\n    // NOTE: This also should probably also not become a global module, unless\n    // we keep it out of the public API. For example, it would likely not\n    // improve the user interface and plugin behaviour if all modules became\n    // wrapped between the start and end events of this module, and thus\n    // needlessly add indentation, indirection, or other visible noise.\n    // Unit tests for the callbacks API would detect that as a regression.\n    currentModule: {\n      name: '',\n      tests: [],\n      childModules: [],\n      testsRun: 0,\n      testsIgnored: 0,\n      hooks: {\n        before: [],\n        beforeEach: [],\n        afterEach: [],\n        after: []\n      }\n    },\n    // Internal: Exposed to make resets easier\n    // Ref https://github.com/qunitjs/qunit/pull/1598\n    globalHooks: {},\n    // Internal state\n    blocking: true,\n    callbacks: {},\n    modules: [],\n    queue: [],\n    stats: {\n      all: 0,\n      bad: 0,\n      testCount: 0\n    }\n  }; // Apply a predefined QUnit.config object\n  //\n  // Ignore QUnit.config if it is a QUnit distribution instead of preconfig.\n  // That means QUnit was loaded twice! (Use the same approach as export.js)\n\n  var preConfig = g && g.QUnit && !g.QUnit.version && g.QUnit.config;\n\n  if (preConfig) {\n    extend(config, preConfig);\n  } // Push a loose unnamed module to the modules collection\n\n\n  config.modules.push(config.currentModule);\n\n  var dump = function () {\n    function quote(str) {\n      return '\"' + str.toString().replace(/\\\\/g, '\\\\\\\\').replace(/\"/g, '\\\\\"') + '\"';\n    }\n\n    function literal(o) {\n      return o + '';\n    }\n\n    function join(pre, arr, post) {\n      var s = dump.separator();\n      var inner = dump.indent(1);\n\n      if (arr.join) {\n        arr = arr.join(',' + s + inner);\n      }\n\n      if (!arr) {\n        return pre + post;\n      }\n\n      var base = dump.indent();\n      return [pre, inner + arr, base + post].join(s);\n    }\n\n    function array(arr, stack) {\n      if (dump.maxDepth && dump.depth > dump.maxDepth) {\n        return '[object Array]';\n      }\n\n      this.up();\n      var i = arr.length;\n      var ret = new Array(i);\n\n      while (i--) {\n        ret[i] = this.parse(arr[i], undefined, stack);\n      }\n\n      this.down();\n      return join('[', ret, ']');\n    }\n\n    function isArray(obj) {\n      return (// Native Arrays\n        toString.call(obj) === '[object Array]' || // NodeList objects\n        typeof obj.length === 'number' && obj.item !== undefined && (obj.length ? obj.item(0) === obj[0] : obj.item(0) === null && obj[0] === undefined)\n      );\n    }\n\n    var reName = /^function (\\w+)/;\n    var dump = {\n      // The objType is used mostly internally, you can fix a (custom) type in advance\n      parse: function parse(obj, objType, stack) {\n        stack = stack || [];\n        var objIndex = stack.indexOf(obj);\n\n        if (objIndex !== -1) {\n          return \"recursion(\".concat(objIndex - stack.length, \")\");\n        }\n\n        objType = objType || this.typeOf(obj);\n        var parser = this.parsers[objType];\n\n        var parserType = _typeof(parser);\n\n        if (parserType === 'function') {\n          stack.push(obj);\n          var res = parser.call(this, obj, stack);\n          stack.pop();\n          return res;\n        }\n\n        if (parserType === 'string') {\n          return parser;\n        }\n\n        return '[ERROR: Missing QUnit.dump formatter for type ' + objType + ']';\n      },\n      typeOf: function typeOf(obj) {\n        var type;\n\n        if (obj === null) {\n          type = 'null';\n        } else if (typeof obj === 'undefined') {\n          type = 'undefined';\n        } else if (is('regexp', obj)) {\n          type = 'regexp';\n        } else if (is('date', obj)) {\n          type = 'date';\n        } else if (is('function', obj)) {\n          type = 'function';\n        } else if (obj.setInterval !== undefined && obj.document !== undefined && obj.nodeType === undefined) {\n          type = 'window';\n        } else if (obj.nodeType === 9) {\n          type = 'document';\n        } else if (obj.nodeType) {\n          type = 'node';\n        } else if (isArray(obj)) {\n          type = 'array';\n        } else if (obj.constructor === Error.prototype.constructor) {\n          type = 'error';\n        } else {\n          type = _typeof(obj);\n        }\n\n        return type;\n      },\n      separator: function separator() {\n        if (this.multiline) {\n          return this.HTML ? '<br />' : '\\n';\n        } else {\n          return this.HTML ? '&#160;' : ' ';\n        }\n      },\n      // Extra can be a number, shortcut for increasing-calling-decreasing\n      indent: function indent(extra) {\n        if (!this.multiline) {\n          return '';\n        }\n\n        var chr = this.indentChar;\n\n        if (this.HTML) {\n          chr = chr.replace(/\\t/g, '   ').replace(/ /g, '&#160;');\n        }\n\n        return new Array(this.depth + (extra || 0)).join(chr);\n      },\n      up: function up(a) {\n        this.depth += a || 1;\n      },\n      down: function down(a) {\n        this.depth -= a || 1;\n      },\n      setParser: function setParser(name, parser) {\n        this.parsers[name] = parser;\n      },\n      // The next 3 are exposed so you can use them\n      quote: quote,\n      literal: literal,\n      join: join,\n      depth: 1,\n      maxDepth: config.maxDepth,\n      // This is the list of parsers, to modify them, use dump.setParser\n      parsers: {\n        window: '[Window]',\n        document: '[Document]',\n        error: function error(_error) {\n          return 'Error(\"' + _error.message + '\")';\n        },\n        // This has been unused since QUnit 1.0.0.\n        // @todo Deprecate and remove.\n        unknown: '[Unknown]',\n        null: 'null',\n        undefined: 'undefined',\n        function: function _function(fn) {\n          var ret = 'function'; // Functions never have name in IE\n\n          var name = 'name' in fn ? fn.name : (reName.exec(fn) || [])[1];\n\n          if (name) {\n            ret += ' ' + name;\n          }\n\n          ret += '(';\n          ret = [ret, dump.parse(fn, 'functionArgs'), '){'].join('');\n          return join(ret, dump.parse(fn, 'functionCode'), '}');\n        },\n        array: array,\n        nodelist: array,\n        arguments: array,\n        object: function object(map, stack) {\n          var ret = [];\n\n          if (dump.maxDepth && dump.depth > dump.maxDepth) {\n            return '[object Object]';\n          }\n\n          dump.up();\n          var keys = [];\n\n          for (var key in map) {\n            keys.push(key);\n          } // Some properties are not always enumerable on Error objects.\n\n\n          var nonEnumerableProperties = ['message', 'name'];\n\n          for (var i in nonEnumerableProperties) {\n            var _key = nonEnumerableProperties[i];\n\n            if (_key in map && !inArray(_key, keys)) {\n              keys.push(_key);\n            }\n          }\n\n          keys.sort();\n\n          for (var _i = 0; _i < keys.length; _i++) {\n            var _key2 = keys[_i];\n            var val = map[_key2];\n            ret.push(dump.parse(_key2, 'key') + ': ' + dump.parse(val, undefined, stack));\n          }\n\n          dump.down();\n          return join('{', ret, '}');\n        },\n        node: function node(_node) {\n          var open = dump.HTML ? '&lt;' : '<';\n          var close = dump.HTML ? '&gt;' : '>';\n\n          var tag = _node.nodeName.toLowerCase();\n\n          var ret = open + tag;\n          var attrs = _node.attributes;\n\n          if (attrs) {\n            for (var i = 0; i < attrs.length; i++) {\n              var val = attrs[i].nodeValue; // IE6 includes all attributes in .attributes, even ones not explicitly\n              // set. Those have values like undefined, null, 0, false, \"\" or\n              // \"inherit\".\n\n              if (val && val !== 'inherit') {\n                ret += ' ' + attrs[i].nodeName + '=' + dump.parse(val, 'attribute');\n              }\n            }\n          }\n\n          ret += close; // Show content of TextNode or CDATASection\n\n          if (_node.nodeType === 3 || _node.nodeType === 4) {\n            ret += _node.nodeValue;\n          }\n\n          return ret + open + '/' + tag + close;\n        },\n        // Function calls it internally, it's the arguments part of the function\n        functionArgs: function functionArgs(fn) {\n          var l = fn.length;\n\n          if (!l) {\n            return '';\n          }\n\n          var args = new Array(l);\n\n          while (l--) {\n            // 97 is 'a'\n            args[l] = String.fromCharCode(97 + l);\n          }\n\n          return ' ' + args.join(', ') + ' ';\n        },\n        // Object calls it internally, the key part of an item in a map\n        key: quote,\n        // Function calls it internally, it's the content of the function\n        functionCode: '[code]',\n        // Node calls it internally, it's a html attribute value\n        attribute: quote,\n        string: quote,\n        date: quote,\n        regexp: literal,\n        number: literal,\n        boolean: literal,\n        symbol: function symbol(sym) {\n          return sym.toString();\n        }\n      },\n      // If true, entities are escaped ( <, >, \\t, space and \\n )\n      HTML: false,\n      // Indentation unit\n      indentChar: '  ',\n      // If true, items in a collection, are separated by a \\n, else just a space.\n      multiline: true\n    };\n    return dump;\n  }();\n\n  var SuiteReport = /*#__PURE__*/function () {\n    function SuiteReport(name, parentSuite) {\n      _classCallCheck(this, SuiteReport);\n\n      this.name = name;\n      this.fullName = parentSuite ? parentSuite.fullName.concat(name) : []; // When an \"error\" event is emitted from onUncaughtException(), the\n      // \"runEnd\" event should report the status as failed. The \"runEnd\" event data\n      // is tracked through this property (via the \"runSuite\" instance).\n\n      this.globalFailureCount = 0;\n      this.tests = [];\n      this.childSuites = [];\n\n      if (parentSuite) {\n        parentSuite.pushChildSuite(this);\n      }\n    }\n\n    _createClass(SuiteReport, [{\n      key: \"start\",\n      value: function start(recordTime) {\n        if (recordTime) {\n          this._startTime = performance.now();\n          var suiteLevel = this.fullName.length;\n          performance.mark(\"qunit_suite_\".concat(suiteLevel, \"_start\"));\n        }\n\n        return {\n          name: this.name,\n          fullName: this.fullName.slice(),\n          tests: this.tests.map(function (test) {\n            return test.start();\n          }),\n          childSuites: this.childSuites.map(function (suite) {\n            return suite.start();\n          }),\n          testCounts: {\n            total: this.getTestCounts().total\n          }\n        };\n      }\n    }, {\n      key: \"end\",\n      value: function end(recordTime) {\n        if (recordTime) {\n          this._endTime = performance.now();\n          var suiteLevel = this.fullName.length;\n          var suiteName = this.fullName.join(' – ');\n          performance.mark(\"qunit_suite_\".concat(suiteLevel, \"_end\"));\n          performance.measure(suiteLevel === 0 ? 'QUnit Test Run' : \"QUnit Test Suite: \".concat(suiteName), \"qunit_suite_\".concat(suiteLevel, \"_start\"), \"qunit_suite_\".concat(suiteLevel, \"_end\"));\n        }\n\n        return {\n          name: this.name,\n          fullName: this.fullName.slice(),\n          tests: this.tests.map(function (test) {\n            return test.end();\n          }),\n          childSuites: this.childSuites.map(function (suite) {\n            return suite.end();\n          }),\n          testCounts: this.getTestCounts(),\n          runtime: this.getRuntime(),\n          status: this.getStatus()\n        };\n      }\n    }, {\n      key: \"pushChildSuite\",\n      value: function pushChildSuite(suite) {\n        this.childSuites.push(suite);\n      }\n    }, {\n      key: \"pushTest\",\n      value: function pushTest(test) {\n        this.tests.push(test);\n      }\n    }, {\n      key: \"getRuntime\",\n      value: function getRuntime() {\n        return Math.round(this._endTime - this._startTime);\n      }\n    }, {\n      key: \"getTestCounts\",\n      value: function getTestCounts() {\n        var counts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {\n          passed: 0,\n          failed: 0,\n          skipped: 0,\n          todo: 0,\n          total: 0\n        };\n        counts.failed += this.globalFailureCount;\n        counts.total += this.globalFailureCount;\n        counts = this.tests.reduce(function (counts, test) {\n          if (test.valid) {\n            counts[test.getStatus()]++;\n            counts.total++;\n          }\n\n          return counts;\n        }, counts);\n        return this.childSuites.reduce(function (counts, suite) {\n          return suite.getTestCounts(counts);\n        }, counts);\n      }\n    }, {\n      key: \"getStatus\",\n      value: function getStatus() {\n        var _this$getTestCounts = this.getTestCounts(),\n            total = _this$getTestCounts.total,\n            failed = _this$getTestCounts.failed,\n            skipped = _this$getTestCounts.skipped,\n            todo = _this$getTestCounts.todo;\n\n        if (failed) {\n          return 'failed';\n        } else {\n          if (skipped === total) {\n            return 'skipped';\n          } else if (todo === total) {\n            return 'todo';\n          } else {\n            return 'passed';\n          }\n        }\n      }\n    }]);\n\n    return SuiteReport;\n  }();\n\n  var moduleStack = [];\n  var runSuite = new SuiteReport();\n\n  function isParentModuleInQueue() {\n    var modulesInQueue = config.modules.filter(function (module) {\n      return !module.ignored;\n    }).map(function (module) {\n      return module.moduleId;\n    });\n    return moduleStack.some(function (module) {\n      return modulesInQueue.includes(module.moduleId);\n    });\n  }\n\n  function createModule(name, testEnvironment, modifiers) {\n    var parentModule = moduleStack.length ? moduleStack.slice(-1)[0] : null;\n    var moduleName = parentModule !== null ? [parentModule.name, name].join(' > ') : name;\n    var parentSuite = parentModule ? parentModule.suiteReport : runSuite;\n    var skip = parentModule !== null && parentModule.skip || modifiers.skip;\n    var todo = parentModule !== null && parentModule.todo || modifiers.todo;\n    var env = {};\n\n    if (parentModule) {\n      extend(env, parentModule.testEnvironment);\n    }\n\n    extend(env, testEnvironment);\n    var module = {\n      name: moduleName,\n      parentModule: parentModule,\n      hooks: {\n        before: [],\n        beforeEach: [],\n        afterEach: [],\n        after: []\n      },\n      testEnvironment: env,\n      tests: [],\n      moduleId: generateHash(moduleName),\n      testsRun: 0,\n      testsIgnored: 0,\n      childModules: [],\n      suiteReport: new SuiteReport(name, parentSuite),\n      // Initialised by test.js when the module start executing,\n      // i.e. before the first test in this module (or a child).\n      stats: null,\n      // Pass along `skip` and `todo` properties from parent module, in case\n      // there is one, to childs. And use own otherwise.\n      // This property will be used to mark own tests and tests of child suites\n      // as either `skipped` or `todo`.\n      skip: skip,\n      todo: skip ? false : todo,\n      ignored: modifiers.ignored || false\n    };\n\n    if (parentModule) {\n      parentModule.childModules.push(module);\n    }\n\n    config.modules.push(module);\n    return module;\n  }\n\n  function setHookFromEnvironment(hooks, environment, name) {\n    var potentialHook = environment[name];\n\n    if (typeof potentialHook === 'function') {\n      hooks[name].push(potentialHook);\n    }\n\n    delete environment[name];\n  }\n\n  function makeSetHook(module, hookName) {\n    return function setHook(callback) {\n      if (config.currentModule !== module) {\n        Logger.warn('The `' + hookName + '` hook was called inside the wrong module (`' + config.currentModule.name + '`). ' + 'Instead, use hooks provided by the callback to the containing module (`' + module.name + '`). ' + 'This will become an error in QUnit 3.0.');\n      }\n\n      module.hooks[hookName].push(callback);\n    };\n  }\n\n  function processModule(name, options, executeNow) {\n    var modifiers = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};\n\n    if (typeof options === 'function') {\n      executeNow = options;\n      options = undefined;\n    }\n\n    var module = createModule(name, options, modifiers); // Transfer any initial hooks from the options object to the 'hooks' object\n\n    var testEnvironment = module.testEnvironment;\n    var hooks = module.hooks;\n    setHookFromEnvironment(hooks, testEnvironment, 'before');\n    setHookFromEnvironment(hooks, testEnvironment, 'beforeEach');\n    setHookFromEnvironment(hooks, testEnvironment, 'afterEach');\n    setHookFromEnvironment(hooks, testEnvironment, 'after');\n    var moduleFns = {\n      before: makeSetHook(module, 'before'),\n      beforeEach: makeSetHook(module, 'beforeEach'),\n      afterEach: makeSetHook(module, 'afterEach'),\n      after: makeSetHook(module, 'after')\n    };\n    var prevModule = config.currentModule;\n    config.currentModule = module;\n\n    if (typeof executeNow === 'function') {\n      moduleStack.push(module);\n\n      try {\n        var cbReturnValue = executeNow.call(module.testEnvironment, moduleFns);\n\n        if (cbReturnValue && typeof cbReturnValue.then === 'function') {\n          Logger.warn('Returning a promise from a module callback is not supported. ' + 'Instead, use hooks for async behavior. ' + 'This will become an error in QUnit 3.0.');\n        }\n      } finally {\n        // If the module closure threw an uncaught error during the load phase,\n        // we let this bubble up to global error handlers. But, not until after\n        // we teardown internal state to ensure correct module nesting.\n        // Ref https://github.com/qunitjs/qunit/issues/1478.\n        moduleStack.pop();\n        config.currentModule = module.parentModule || prevModule;\n      }\n    }\n  }\n\n  var focused$1 = false; // indicates that the \"only\" filter was used\n\n  function module$1(name, options, executeNow) {\n    var ignored = focused$1 && !isParentModuleInQueue();\n    processModule(name, options, executeNow, {\n      ignored: ignored\n    });\n  }\n\n  module$1.only = function () {\n    if (!focused$1) {\n      // Upon the first module.only() call,\n      // delete any and all previously registered modules and tests.\n      config.modules.length = 0;\n      config.queue.length = 0; // Ignore any tests declared after this block within the same\n      // module parent. https://github.com/qunitjs/qunit/issues/1645\n\n      config.currentModule.ignored = true;\n    }\n\n    focused$1 = true;\n    processModule.apply(void 0, arguments);\n  };\n\n  module$1.skip = function (name, options, executeNow) {\n    if (focused$1) {\n      return;\n    }\n\n    processModule(name, options, executeNow, {\n      skip: true\n    });\n  };\n\n  module$1.todo = function (name, options, executeNow) {\n    if (focused$1) {\n      return;\n    }\n\n    processModule(name, options, executeNow, {\n      todo: true\n    });\n  }; // Doesn't support IE9, it will return undefined on these browsers\n  // See also https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/Error/Stack\n\n\n  var fileName = (sourceFromStacktrace(0) || '').replace(/(:\\d+)+\\)?/, '') // Remove anything prior to the last slash (Unix/Windows)\n  // from the last frame\n  .replace(/.+[/\\\\]/, '');\n\n  function extractStacktrace(e, offset) {\n    offset = offset === undefined ? 4 : offset;\n\n    if (e && e.stack) {\n      var stack = e.stack.split('\\n');\n\n      if (/^error$/i.test(stack[0])) {\n        stack.shift();\n      }\n\n      if (fileName) {\n        var include = [];\n\n        for (var i = offset; i < stack.length; i++) {\n          if (stack[i].indexOf(fileName) !== -1) {\n            break;\n          }\n\n          include.push(stack[i]);\n        }\n\n        if (include.length) {\n          return include.join('\\n');\n        }\n      }\n\n      return stack[offset];\n    }\n  }\n\n  function sourceFromStacktrace(offset) {\n    var error = new Error(); // Support: Safari <=7 only, IE <=10 - 11 only\n    // Not all browsers generate the `stack` property for `new Error()`, see also #636\n\n    if (!error.stack) {\n      try {\n        throw error;\n      } catch (err) {\n        error = err;\n      }\n    }\n\n    return extractStacktrace(error, offset);\n  }\n\n  var Assert = /*#__PURE__*/function () {\n    function Assert(testContext) {\n      _classCallCheck(this, Assert);\n\n      this.test = testContext;\n    }\n\n    _createClass(Assert, [{\n      key: \"timeout\",\n      value: function timeout(duration) {\n        if (typeof duration !== 'number') {\n          throw new Error('You must pass a number as the duration to assert.timeout');\n        }\n\n        this.test.timeout = duration; // If a timeout has been set, clear it and reset with the new duration\n\n        if (config.timeout) {\n          clearTimeout(config.timeout);\n          config.timeout = null;\n\n          if (config.timeoutHandler && this.test.timeout > 0) {\n            this.test.internalResetTimeout(this.test.timeout);\n          }\n        }\n      } // Documents a \"step\", which is a string value, in a test as a passing assertion\n\n    }, {\n      key: \"step\",\n      value: function step(message) {\n        var assertionMessage = message;\n        var result = !!message;\n        this.test.steps.push(message);\n\n        if (typeof message === 'undefined' || message === '') {\n          assertionMessage = 'You must provide a message to assert.step';\n        } else if (typeof message !== 'string') {\n          assertionMessage = 'You must provide a string value to assert.step';\n          result = false;\n        }\n\n        this.pushResult({\n          result: result,\n          message: assertionMessage\n        });\n      } // Verifies the steps in a test match a given array of string values\n\n    }, {\n      key: \"verifySteps\",\n      value: function verifySteps(steps, message) {\n        // Since the steps array is just string values, we can clone with slice\n        var actualStepsClone = this.test.steps.slice();\n        this.deepEqual(actualStepsClone, steps, message);\n        this.test.steps.length = 0;\n      }\n    }, {\n      key: \"expect\",\n      value: function expect(asserts) {\n        if (arguments.length === 1) {\n          this.test.expected = asserts;\n        } else {\n          return this.test.expected;\n        }\n      } // Create a new async pause and return a new function that can release the pause.\n\n    }, {\n      key: \"async\",\n      value: function async(count) {\n        var requiredCalls = count === undefined ? 1 : count;\n        return this.test.internalStop(requiredCalls);\n      } // Exports test.push() to the user API\n      // Alias of pushResult.\n\n    }, {\n      key: \"push\",\n      value: function push(result, actual, expected, message, negative) {\n        Logger.warn('assert.push is deprecated and will be removed in QUnit 3.0.' + ' Please use assert.pushResult instead (https://api.qunitjs.com/assert/pushResult).');\n        var currentAssert = this instanceof Assert ? this : config.current.assert;\n        return currentAssert.pushResult({\n          result: result,\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: negative\n        });\n      }\n    }, {\n      key: \"pushResult\",\n      value: function pushResult(resultInfo) {\n        // Destructure of resultInfo = { result, actual, expected, message, negative }\n        var assert = this;\n        var currentTest = assert instanceof Assert && assert.test || config.current; // Backwards compatibility fix.\n        // Allows the direct use of global exported assertions and QUnit.assert.*\n        // Although, it's use is not recommended as it can leak assertions\n        // to other tests from async tests, because we only get a reference to the current test,\n        // not exactly the test where assertion were intended to be called.\n\n        if (!currentTest) {\n          throw new Error('assertion outside test context, in ' + sourceFromStacktrace(2));\n        }\n\n        if (!(assert instanceof Assert)) {\n          assert = currentTest.assert;\n        }\n\n        return assert.test.pushResult(resultInfo);\n      }\n    }, {\n      key: \"ok\",\n      value: function ok(result, message) {\n        if (!message) {\n          message = result ? 'okay' : \"failed, expected argument to be truthy, was: \".concat(dump.parse(result));\n        }\n\n        this.pushResult({\n          result: !!result,\n          actual: result,\n          expected: true,\n          message: message\n        });\n      }\n    }, {\n      key: \"notOk\",\n      value: function notOk(result, message) {\n        if (!message) {\n          message = !result ? 'okay' : \"failed, expected argument to be falsy, was: \".concat(dump.parse(result));\n        }\n\n        this.pushResult({\n          result: !result,\n          actual: result,\n          expected: false,\n          message: message\n        });\n      }\n    }, {\n      key: \"true\",\n      value: function _true(result, message) {\n        this.pushResult({\n          result: result === true,\n          actual: result,\n          expected: true,\n          message: message\n        });\n      }\n    }, {\n      key: \"false\",\n      value: function _false(result, message) {\n        this.pushResult({\n          result: result === false,\n          actual: result,\n          expected: false,\n          message: message\n        });\n      }\n    }, {\n      key: \"equal\",\n      value: function equal(actual, expected, message) {\n        // eslint-disable-next-line eqeqeq\n        var result = expected == actual;\n        this.pushResult({\n          result: result,\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notEqual\",\n      value: function notEqual(actual, expected, message) {\n        // eslint-disable-next-line eqeqeq\n        var result = expected != actual;\n        this.pushResult({\n          result: result,\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: \"propEqual\",\n      value: function propEqual(actual, expected, message) {\n        actual = objectValues(actual);\n        expected = objectValues(expected);\n        this.pushResult({\n          result: equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notPropEqual\",\n      value: function notPropEqual(actual, expected, message) {\n        actual = objectValues(actual);\n        expected = objectValues(expected);\n        this.pushResult({\n          result: !equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: \"propContains\",\n      value: function propContains(actual, expected, message) {\n        actual = objectValuesSubset(actual, expected); // The expected parameter is usually a plain object, but clone it for\n        // consistency with propEqual(), and to make it easy to explain that\n        // inheritence is not considered (on either side), and to support\n        // recursively checking subsets of nested objects.\n\n        expected = objectValues(expected, false);\n        this.pushResult({\n          result: equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notPropContains\",\n      value: function notPropContains(actual, expected, message) {\n        actual = objectValuesSubset(actual, expected);\n        expected = objectValues(expected);\n        this.pushResult({\n          result: !equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: \"deepEqual\",\n      value: function deepEqual(actual, expected, message) {\n        this.pushResult({\n          result: equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notDeepEqual\",\n      value: function notDeepEqual(actual, expected, message) {\n        this.pushResult({\n          result: !equiv(actual, expected),\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: \"strictEqual\",\n      value: function strictEqual(actual, expected, message) {\n        this.pushResult({\n          result: expected === actual,\n          actual: actual,\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"notStrictEqual\",\n      value: function notStrictEqual(actual, expected, message) {\n        this.pushResult({\n          result: expected !== actual,\n          actual: actual,\n          expected: expected,\n          message: message,\n          negative: true\n        });\n      }\n    }, {\n      key: 'throws',\n      value: function throws(block, expected, message) {\n        var _validateExpectedExce = validateExpectedExceptionArgs(expected, message, 'throws');\n\n        var _validateExpectedExce2 = _slicedToArray(_validateExpectedExce, 2);\n\n        expected = _validateExpectedExce2[0];\n        message = _validateExpectedExce2[1];\n        var currentTest = this instanceof Assert && this.test || config.current;\n\n        if (typeof block !== 'function') {\n          var _message = 'The value provided to `assert.throws` in ' + '\"' + currentTest.testName + '\" was not a function.';\n\n          currentTest.assert.pushResult({\n            result: false,\n            actual: block,\n            message: _message\n          });\n          return;\n        }\n\n        var actual;\n        var result = false;\n        currentTest.ignoreGlobalErrors = true;\n\n        try {\n          block.call(currentTest.testEnvironment);\n        } catch (e) {\n          actual = e;\n        }\n\n        currentTest.ignoreGlobalErrors = false;\n\n        if (actual) {\n          var _validateException = validateException(actual, expected, message);\n\n          var _validateException2 = _slicedToArray(_validateException, 3);\n\n          result = _validateException2[0];\n          expected = _validateException2[1];\n          message = _validateException2[2];\n        }\n\n        currentTest.assert.pushResult({\n          result: result,\n          // undefined if it didn't throw\n          actual: actual && errorString(actual),\n          expected: expected,\n          message: message\n        });\n      }\n    }, {\n      key: \"rejects\",\n      value: function rejects(promise, expected, message) {\n        var _validateExpectedExce3 = validateExpectedExceptionArgs(expected, message, 'rejects');\n\n        var _validateExpectedExce4 = _slicedToArray(_validateExpectedExce3, 2);\n\n        expected = _validateExpectedExce4[0];\n        message = _validateExpectedExce4[1];\n        var currentTest = this instanceof Assert && this.test || config.current;\n        var then = promise && promise.then;\n\n        if (typeof then !== 'function') {\n          var _message2 = 'The value provided to `assert.rejects` in ' + '\"' + currentTest.testName + '\" was not a promise.';\n\n          currentTest.assert.pushResult({\n            result: false,\n            message: _message2,\n            actual: promise\n          });\n          return;\n        }\n\n        var done = this.async();\n        return then.call(promise, function handleFulfillment() {\n          var message = 'The promise returned by the `assert.rejects` callback in ' + '\"' + currentTest.testName + '\" did not reject.';\n          currentTest.assert.pushResult({\n            result: false,\n            message: message,\n            actual: promise\n          });\n          done();\n        }, function handleRejection(actual) {\n          var result;\n\n          var _validateException3 = validateException(actual, expected, message);\n\n          var _validateException4 = _slicedToArray(_validateException3, 3);\n\n          result = _validateException4[0];\n          expected = _validateException4[1];\n          message = _validateException4[2];\n          currentTest.assert.pushResult({\n            result: result,\n            // leave rejection value of undefined as-is\n            actual: actual && errorString(actual),\n            expected: expected,\n            message: message\n          });\n          done();\n        });\n      }\n    }]);\n\n    return Assert;\n  }();\n\n  function validateExpectedExceptionArgs(expected, message, assertionMethod) {\n    var expectedType = objectType(expected); // 'expected' is optional unless doing string comparison\n\n    if (expectedType === 'string') {\n      if (message === undefined) {\n        message = expected;\n        expected = undefined;\n        return [expected, message];\n      } else {\n        throw new Error('assert.' + assertionMethod + ' does not accept a string value for the expected argument.\\n' + 'Use a non-string object value (e.g. RegExp or validator function) ' + 'instead if necessary.');\n      }\n    }\n\n    var valid = !expected || // TODO: be more explicit here\n    expectedType === 'regexp' || expectedType === 'function' || expectedType === 'object';\n\n    if (!valid) {\n      var _message3 = 'Invalid expected value type (' + expectedType + ') ' + 'provided to assert.' + assertionMethod + '.';\n\n      throw new Error(_message3);\n    }\n\n    return [expected, message];\n  }\n\n  function validateException(actual, expected, message) {\n    var result = false;\n    var expectedType = objectType(expected); // These branches should be exhaustive, based on validation done in validateExpectedException\n    // We don't want to validate\n\n    if (!expected) {\n      result = true; // Expected is a regexp\n    } else if (expectedType === 'regexp') {\n      result = expected.test(errorString(actual)); // Log the string form of the regexp\n\n      expected = String(expected); // Expected is a constructor, maybe an Error constructor.\n      // Note the extra check on its prototype - this is an implicit\n      // requirement of \"instanceof\", else it will throw a TypeError.\n    } else if (expectedType === 'function' && expected.prototype !== undefined && actual instanceof expected) {\n      result = true; // Expected is an Error object\n    } else if (expectedType === 'object') {\n      result = actual instanceof expected.constructor && actual.name === expected.name && actual.message === expected.message; // Log the string form of the Error object\n\n      expected = errorString(expected); // Expected is a validation function which returns true if validation passed\n    } else if (expectedType === 'function') {\n      // protect against accidental semantics which could hard error in the test\n      try {\n        result = expected.call({}, actual) === true;\n        expected = null;\n      } catch (e) {\n        // assign the \"expected\" to a nice error string to communicate the local failure to the user\n        expected = errorString(e);\n      }\n    }\n\n    return [result, expected, message];\n  } // Provide an alternative to assert.throws(), for environments that consider throws a reserved word\n  // Known to us are: Closure Compiler, Narwhal\n  // eslint-disable-next-line dot-notation\n\n\n  Assert.prototype.raises = Assert.prototype['throws'];\n  var LISTENERS = Object.create(null);\n  var SUPPORTED_EVENTS = ['error', 'runStart', 'suiteStart', 'testStart', 'assertion', 'testEnd', 'suiteEnd', 'runEnd'];\n  /**\n   * Emits an event with the specified data to all currently registered listeners.\n   * Callbacks will fire in the order in which they are registered (FIFO). This\n   * function is not exposed publicly; it is used by QUnit internals to emit\n   * logging events.\n   *\n   * @private\n   * @method emit\n   * @param {string} eventName\n   * @param {Object} data\n   * @return {void}\n   */\n\n  function emit(eventName, data) {\n    if (typeof eventName !== 'string') {\n      throw new TypeError('eventName must be a string when emitting an event');\n    } // Clone the callbacks in case one of them registers a new callback\n\n\n    var originalCallbacks = LISTENERS[eventName];\n    var callbacks = originalCallbacks ? _toConsumableArray(originalCallbacks) : [];\n\n    for (var i = 0; i < callbacks.length; i++) {\n      callbacks[i](data);\n    }\n  }\n  /**\n   * Registers a callback as a listener to the specified event.\n   *\n   * @public\n   * @method on\n   * @param {string} eventName\n   * @param {Function} callback\n   * @return {void}\n   */\n\n\n  function on(eventName, callback) {\n    if (typeof eventName !== 'string') {\n      throw new TypeError('eventName must be a string when registering a listener');\n    } else if (!inArray(eventName, SUPPORTED_EVENTS)) {\n      var events = SUPPORTED_EVENTS.join(', ');\n      throw new Error(\"\\\"\".concat(eventName, \"\\\" is not a valid event; must be one of: \").concat(events, \".\"));\n    } else if (typeof callback !== 'function') {\n      throw new TypeError('callback must be a function when registering a listener');\n    }\n\n    if (!LISTENERS[eventName]) {\n      LISTENERS[eventName] = [];\n    } // Don't register the same callback more than once\n\n\n    if (!inArray(callback, LISTENERS[eventName])) {\n      LISTENERS[eventName].push(callback);\n    }\n  }\n\n  var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};\n\n  function commonjsRequire(path) {\n    throw new Error('Could not dynamically require \"' + path + '\". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');\n  }\n\n  var promisePolyfill = {\n    exports: {}\n  };\n\n  (function () {\n    /** @suppress {undefinedVars} */\n    var globalNS = function () {\n      // the only reliable means to get the global object is\n      // `Function('return this')()`\n      // However, this causes CSP violations in Chrome apps.\n      if (typeof globalThis !== 'undefined') {\n        return globalThis;\n      }\n\n      if (typeof self !== 'undefined') {\n        return self;\n      }\n\n      if (typeof window !== 'undefined') {\n        return window;\n      }\n\n      if (typeof commonjsGlobal !== 'undefined') {\n        return commonjsGlobal;\n      }\n\n      throw new Error('unable to locate global object');\n    }(); // Expose the polyfill if Promise is undefined or set to a\n    // non-function value. The latter can be due to a named HTMLElement\n    // being exposed by browsers for legacy reasons.\n    // https://github.com/taylorhakes/promise-polyfill/issues/114\n\n\n    if (typeof globalNS['Promise'] === 'function') {\n      promisePolyfill.exports = globalNS['Promise'];\n      return;\n    }\n    /**\n     * @this {Promise}\n     */\n\n\n    function finallyConstructor(callback) {\n      var constructor = this.constructor;\n      return this.then(function (value) {\n        // @ts-ignore\n        return constructor.resolve(callback()).then(function () {\n          return value;\n        });\n      }, function (reason) {\n        // @ts-ignore\n        return constructor.resolve(callback()).then(function () {\n          // @ts-ignore\n          return constructor.reject(reason);\n        });\n      });\n    }\n\n    function allSettled(arr) {\n      var P = this;\n      return new P(function (resolve, reject) {\n        if (!(arr && typeof arr.length !== 'undefined')) {\n          return reject(new TypeError(_typeof(arr) + ' ' + arr + ' is not iterable(cannot read property Symbol(Symbol.iterator))'));\n        }\n\n        var args = Array.prototype.slice.call(arr);\n        if (args.length === 0) return resolve([]);\n        var remaining = args.length;\n\n        function res(i, val) {\n          if (val && (_typeof(val) === 'object' || typeof val === 'function')) {\n            var then = val.then;\n\n            if (typeof then === 'function') {\n              then.call(val, function (val) {\n                res(i, val);\n              }, function (e) {\n                args[i] = {\n                  status: 'rejected',\n                  reason: e\n                };\n\n                if (--remaining === 0) {\n                  resolve(args);\n                }\n              });\n              return;\n            }\n          }\n\n          args[i] = {\n            status: 'fulfilled',\n            value: val\n          };\n\n          if (--remaining === 0) {\n            resolve(args);\n          }\n        }\n\n        for (var i = 0; i < args.length; i++) {\n          res(i, args[i]);\n        }\n      });\n    } // Store setTimeout reference so promise-polyfill will be unaffected by\n    // other code modifying setTimeout (like sinon.useFakeTimers())\n\n\n    var setTimeoutFunc = setTimeout;\n\n    function isArray(x) {\n      return Boolean(x && typeof x.length !== 'undefined');\n    }\n\n    function noop() {} // Polyfill for Function.prototype.bind\n\n\n    function bind(fn, thisArg) {\n      return function () {\n        fn.apply(thisArg, arguments);\n      };\n    }\n    /**\n     * @constructor\n     * @param {Function} fn\n     */\n\n\n    function Promise(fn) {\n      if (!(this instanceof Promise)) throw new TypeError('Promises must be constructed via new');\n      if (typeof fn !== 'function') throw new TypeError('not a function');\n      /** @type {!number} */\n\n      this._state = 0;\n      /** @type {!boolean} */\n\n      this._handled = false;\n      /** @type {Promise|undefined} */\n\n      this._value = undefined;\n      /** @type {!Array<!Function>} */\n\n      this._deferreds = [];\n      doResolve(fn, this);\n    }\n\n    function handle(self, deferred) {\n      while (self._state === 3) {\n        self = self._value;\n      }\n\n      if (self._state === 0) {\n        self._deferreds.push(deferred);\n\n        return;\n      }\n\n      self._handled = true;\n\n      Promise._immediateFn(function () {\n        var cb = self._state === 1 ? deferred.onFulfilled : deferred.onRejected;\n\n        if (cb === null) {\n          (self._state === 1 ? resolve : reject)(deferred.promise, self._value);\n          return;\n        }\n\n        var ret;\n\n        try {\n          ret = cb(self._value);\n        } catch (e) {\n          reject(deferred.promise, e);\n          return;\n        }\n\n        resolve(deferred.promise, ret);\n      });\n    }\n\n    function resolve(self, newValue) {\n      try {\n        // Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure\n        if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.');\n\n        if (newValue && (_typeof(newValue) === 'object' || typeof newValue === 'function')) {\n          var then = newValue.then;\n\n          if (newValue instanceof Promise) {\n            self._state = 3;\n            self._value = newValue;\n            finale(self);\n            return;\n          } else if (typeof then === 'function') {\n            doResolve(bind(then, newValue), self);\n            return;\n          }\n        }\n\n        self._state = 1;\n        self._value = newValue;\n        finale(self);\n      } catch (e) {\n        reject(self, e);\n      }\n    }\n\n    function reject(self, newValue) {\n      self._state = 2;\n      self._value = newValue;\n      finale(self);\n    }\n\n    function finale(self) {\n      if (self._state === 2 && self._deferreds.length === 0) {\n        Promise._immediateFn(function () {\n          if (!self._handled) {\n            Promise._unhandledRejectionFn(self._value);\n          }\n        });\n      }\n\n      for (var i = 0, len = self._deferreds.length; i < len; i++) {\n        handle(self, self._deferreds[i]);\n      }\n\n      self._deferreds = null;\n    }\n    /**\n     * @constructor\n     */\n\n\n    function Handler(onFulfilled, onRejected, promise) {\n      this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;\n      this.onRejected = typeof onRejected === 'function' ? onRejected : null;\n      this.promise = promise;\n    }\n    /**\n     * Take a potentially misbehaving resolver function and make sure\n     * onFulfilled and onRejected are only called once.\n     *\n     * Makes no guarantees about asynchrony.\n     */\n\n\n    function doResolve(fn, self) {\n      var done = false;\n\n      try {\n        fn(function (value) {\n          if (done) return;\n          done = true;\n          resolve(self, value);\n        }, function (reason) {\n          if (done) return;\n          done = true;\n          reject(self, reason);\n        });\n      } catch (ex) {\n        if (done) return;\n        done = true;\n        reject(self, ex);\n      }\n    }\n\n    Promise.prototype['catch'] = function (onRejected) {\n      return this.then(null, onRejected);\n    };\n\n    Promise.prototype.then = function (onFulfilled, onRejected) {\n      // @ts-ignore\n      var prom = new this.constructor(noop);\n      handle(this, new Handler(onFulfilled, onRejected, prom));\n      return prom;\n    };\n\n    Promise.prototype['finally'] = finallyConstructor;\n\n    Promise.all = function (arr) {\n      return new Promise(function (resolve, reject) {\n        if (!isArray(arr)) {\n          return reject(new TypeError('Promise.all accepts an array'));\n        }\n\n        var args = Array.prototype.slice.call(arr);\n        if (args.length === 0) return resolve([]);\n        var remaining = args.length;\n\n        function res(i, val) {\n          try {\n            if (val && (_typeof(val) === 'object' || typeof val === 'function')) {\n              var then = val.then;\n\n              if (typeof then === 'function') {\n                then.call(val, function (val) {\n                  res(i, val);\n                }, reject);\n                return;\n              }\n            }\n\n            args[i] = val;\n\n            if (--remaining === 0) {\n              resolve(args);\n            }\n          } catch (ex) {\n            reject(ex);\n          }\n        }\n\n        for (var i = 0; i < args.length; i++) {\n          res(i, args[i]);\n        }\n      });\n    };\n\n    Promise.allSettled = allSettled;\n\n    Promise.resolve = function (value) {\n      if (value && _typeof(value) === 'object' && value.constructor === Promise) {\n        return value;\n      }\n\n      return new Promise(function (resolve) {\n        resolve(value);\n      });\n    };\n\n    Promise.reject = function (value) {\n      return new Promise(function (resolve, reject) {\n        reject(value);\n      });\n    };\n\n    Promise.race = function (arr) {\n      return new Promise(function (resolve, reject) {\n        if (!isArray(arr)) {\n          return reject(new TypeError('Promise.race accepts an array'));\n        }\n\n        for (var i = 0, len = arr.length; i < len; i++) {\n          Promise.resolve(arr[i]).then(resolve, reject);\n        }\n      });\n    }; // Use polyfill for setImmediate for performance gains\n\n\n    Promise._immediateFn = // @ts-ignore\n    typeof setImmediate === 'function' && function (fn) {\n      // @ts-ignore\n      setImmediate(fn);\n    } || function (fn) {\n      setTimeoutFunc(fn, 0);\n    };\n\n    Promise._unhandledRejectionFn = function _unhandledRejectionFn(err) {\n      if (typeof console !== 'undefined' && console) {\n        console.warn('Possible Unhandled Promise Rejection:', err); // eslint-disable-line no-console\n      }\n    };\n\n    promisePolyfill.exports = Promise;\n  })();\n\n  var _Promise = promisePolyfill.exports;\n\n  function registerLoggingCallbacks(obj) {\n    var callbackNames = ['begin', 'done', 'log', 'testStart', 'testDone', 'moduleStart', 'moduleDone'];\n\n    function registerLoggingCallback(key) {\n      return function loggingCallback(callback) {\n        if (typeof callback !== 'function') {\n          throw new Error('Callback parameter must be a function');\n        }\n\n        config.callbacks[key].push(callback);\n      };\n    }\n\n    for (var i = 0; i < callbackNames.length; i++) {\n      var key = callbackNames[i]; // Initialize key collection of logging callback\n\n      if (typeof config.callbacks[key] === 'undefined') {\n        config.callbacks[key] = [];\n      }\n\n      obj[key] = registerLoggingCallback(key);\n    }\n  }\n\n  function runLoggingCallbacks(key, args) {\n    var callbacks = config.callbacks[key]; // Handling 'log' callbacks separately. Unlike the other callbacks,\n    // the log callback is not controlled by the processing queue,\n    // but rather used by asserts. Hence to promisfy the 'log' callback\n    // would mean promisfying each step of a test\n\n    if (key === 'log') {\n      callbacks.map(function (callback) {\n        return callback(args);\n      });\n      return;\n    } // ensure that each callback is executed serially\n\n\n    var promiseChain = _Promise.resolve();\n\n    callbacks.forEach(function (callback) {\n      promiseChain = promiseChain.then(function () {\n        return _Promise.resolve(callback(args));\n      });\n    });\n    return promiseChain;\n  }\n\n  var priorityCount = 0;\n  var unitSampler; // This is a queue of functions that are tasks within a single test.\n  // After tests are dequeued from config.queue they are expanded into\n  // a set of tasks in this queue.\n\n  var taskQueue = [];\n  /**\n   * Advances the taskQueue to the next task. If the taskQueue is empty,\n   * process the testQueue\n   */\n\n  function advance() {\n    advanceTaskQueue();\n\n    if (!taskQueue.length && !config.blocking && !config.current) {\n      advanceTestQueue();\n    }\n  }\n  /**\n   * Advances the taskQueue with an increased depth\n   */\n\n\n  function advanceTaskQueue() {\n    var start = performance.now();\n    config.depth = (config.depth || 0) + 1;\n    processTaskQueue(start);\n    config.depth--;\n  }\n  /**\n   * Process the first task on the taskQueue as a promise.\n   * Each task is a function added by Test#queue() in /src/test.js\n   */\n\n\n  function processTaskQueue(start) {\n    if (taskQueue.length && !config.blocking) {\n      var elapsedTime = performance.now() - start; // The updateRate ensures that a user interface (HTML Reporter) can be updated\n      // at least once every second. This can also prevent browsers from prompting\n      // a warning about long running scripts.\n\n      if (!setTimeout$1 || config.updateRate <= 0 || elapsedTime < config.updateRate) {\n        var task = taskQueue.shift();\n\n        _Promise.resolve(task()).then(function () {\n          if (!taskQueue.length) {\n            advance();\n          } else {\n            processTaskQueue(start);\n          }\n        });\n      } else {\n        setTimeout$1(advance);\n      }\n    }\n  }\n  /**\n   * Advance the testQueue to the next test to process. Call done() if testQueue completes.\n   */\n\n\n  function advanceTestQueue() {\n    if (!config.blocking && !config.queue.length && config.depth === 0) {\n      done();\n      return;\n    }\n\n    var testTasks = config.queue.shift();\n    addToTaskQueue(testTasks());\n\n    if (priorityCount > 0) {\n      priorityCount--;\n    }\n\n    advance();\n  }\n  /**\n   * Enqueue the tasks for a test into the task queue.\n   * @param {Array} tasksArray\n   */\n\n\n  function addToTaskQueue(tasksArray) {\n    taskQueue.push.apply(taskQueue, _toConsumableArray(tasksArray));\n  }\n  /**\n   * Return the number of tasks remaining in the task queue to be processed.\n   * @return {number}\n   */\n\n\n  function taskQueueLength() {\n    return taskQueue.length;\n  }\n  /**\n   * Adds a test to the TestQueue for execution.\n   * @param {Function} testTasksFunc\n   * @param {boolean} prioritize\n   * @param {string} seed\n   */\n\n\n  function addToTestQueue(testTasksFunc, prioritize, seed) {\n    if (prioritize) {\n      config.queue.splice(priorityCount++, 0, testTasksFunc);\n    } else if (seed) {\n      if (!unitSampler) {\n        unitSampler = unitSamplerGenerator(seed);\n      } // Insert into a random position after all prioritized items\n\n\n      var index = Math.floor(unitSampler() * (config.queue.length - priorityCount + 1));\n      config.queue.splice(priorityCount + index, 0, testTasksFunc);\n    } else {\n      config.queue.push(testTasksFunc);\n    }\n  }\n  /**\n   * Creates a seeded \"sample\" generator which is used for randomizing tests.\n   */\n\n\n  function unitSamplerGenerator(seed) {\n    // 32-bit xorshift, requires only a nonzero seed\n    // https://excamera.com/sphinx/article-xorshift.html\n    var sample = parseInt(generateHash(seed), 16) || -1;\n    return function () {\n      sample ^= sample << 13;\n      sample ^= sample >>> 17;\n      sample ^= sample << 5; // ECMAScript has no unsigned number type\n\n      if (sample < 0) {\n        sample += 0x100000000;\n      }\n\n      return sample / 0x100000000;\n    };\n  }\n  /**\n   * This function is called when the ProcessingQueue is done processing all\n   * items. It handles emitting the final run events.\n   */\n\n\n  function done() {\n    // We have reached the end of the processing queue and are about to emit the\n    // \"runEnd\" event after which reporters typically stop listening and exit\n    // the process. First, check if we need to emit one final test.\n    if (config.stats.testCount === 0 && config.failOnZeroTests === true) {\n      var error;\n\n      if (config.filter && config.filter.length) {\n        error = new Error(\"No tests matched the filter \\\"\".concat(config.filter, \"\\\".\"));\n      } else if (config.module && config.module.length) {\n        error = new Error(\"No tests matched the module \\\"\".concat(config.module, \"\\\".\"));\n      } else if (config.moduleId && config.moduleId.length) {\n        error = new Error(\"No tests matched the moduleId \\\"\".concat(config.moduleId, \"\\\".\"));\n      } else if (config.testId && config.testId.length) {\n        error = new Error(\"No tests matched the testId \\\"\".concat(config.testId, \"\\\".\"));\n      } else {\n        error = new Error('No tests were run.');\n      }\n\n      test('global failure', extend(function (assert) {\n        assert.pushResult({\n          result: false,\n          message: error.message,\n          source: error.stack\n        });\n      }, {\n        validTest: true\n      })); // We do need to call `advance()` in order to resume the processing queue.\n      // Once this new test is finished processing, we'll reach `done` again, and\n      // that time the above condition will evaluate to false.\n\n      advance();\n      return;\n    }\n\n    var storage = config.storage;\n    var runtime = Math.round(performance.now() - config.started);\n    var passed = config.stats.all - config.stats.bad;\n    ProcessingQueue.finished = true;\n    emit('runEnd', runSuite.end(true));\n    runLoggingCallbacks('done', {\n      // @deprecated since 2.19.0 Use done() without `details` parameter,\n      // or use `QUnit.on('runEnd')` instead. Parameter to be replaced in\n      // QUnit 3.0 with test counts.\n      passed: passed,\n      failed: config.stats.bad,\n      total: config.stats.all,\n      runtime: runtime\n    }).then(function () {\n      // Clear own storage items if all tests passed\n      if (storage && config.stats.bad === 0) {\n        for (var i = storage.length - 1; i >= 0; i--) {\n          var key = storage.key(i);\n\n          if (key.indexOf('qunit-test-') === 0) {\n            storage.removeItem(key);\n          }\n        }\n      }\n    });\n  }\n\n  var ProcessingQueue = {\n    finished: false,\n    add: addToTestQueue,\n    advance: advance,\n    taskCount: taskQueueLength\n  };\n\n  var TestReport = /*#__PURE__*/function () {\n    function TestReport(name, suite, options) {\n      _classCallCheck(this, TestReport);\n\n      this.name = name;\n      this.suiteName = suite.name;\n      this.fullName = suite.fullName.concat(name);\n      this.runtime = 0;\n      this.assertions = [];\n      this.skipped = !!options.skip;\n      this.todo = !!options.todo;\n      this.valid = options.valid;\n      this._startTime = 0;\n      this._endTime = 0;\n      suite.pushTest(this);\n    }\n\n    _createClass(TestReport, [{\n      key: \"start\",\n      value: function start(recordTime) {\n        if (recordTime) {\n          this._startTime = performance.now();\n          performance.mark('qunit_test_start');\n        }\n\n        return {\n          name: this.name,\n          suiteName: this.suiteName,\n          fullName: this.fullName.slice()\n        };\n      }\n    }, {\n      key: \"end\",\n      value: function end(recordTime) {\n        if (recordTime) {\n          this._endTime = performance.now();\n\n          if (performance) {\n            performance.mark('qunit_test_end');\n            var testName = this.fullName.join(' – ');\n            performance.measure(\"QUnit Test: \".concat(testName), 'qunit_test_start', 'qunit_test_end');\n          }\n        }\n\n        return extend(this.start(), {\n          runtime: this.getRuntime(),\n          status: this.getStatus(),\n          errors: this.getFailedAssertions(),\n          assertions: this.getAssertions()\n        });\n      }\n    }, {\n      key: \"pushAssertion\",\n      value: function pushAssertion(assertion) {\n        this.assertions.push(assertion);\n      }\n    }, {\n      key: \"getRuntime\",\n      value: function getRuntime() {\n        return Math.round(this._endTime - this._startTime);\n      }\n    }, {\n      key: \"getStatus\",\n      value: function getStatus() {\n        if (this.skipped) {\n          return 'skipped';\n        }\n\n        var testPassed = this.getFailedAssertions().length > 0 ? this.todo : !this.todo;\n\n        if (!testPassed) {\n          return 'failed';\n        } else if (this.todo) {\n          return 'todo';\n        } else {\n          return 'passed';\n        }\n      }\n    }, {\n      key: \"getFailedAssertions\",\n      value: function getFailedAssertions() {\n        return this.assertions.filter(function (assertion) {\n          return !assertion.passed;\n        });\n      }\n    }, {\n      key: \"getAssertions\",\n      value: function getAssertions() {\n        return this.assertions.slice();\n      } // Remove actual and expected values from assertions. This is to prevent\n      // leaking memory throughout a test suite.\n\n    }, {\n      key: \"slimAssertions\",\n      value: function slimAssertions() {\n        this.assertions = this.assertions.map(function (assertion) {\n          delete assertion.actual;\n          delete assertion.expected;\n          return assertion;\n        });\n      }\n    }]);\n\n    return TestReport;\n  }();\n\n  function Test(settings) {\n    this.expected = null;\n    this.assertions = [];\n    this.module = config.currentModule;\n    this.steps = [];\n    this.timeout = undefined;\n    this.data = undefined;\n    this.withData = false;\n    this.pauses = new StringMap();\n    this.nextPauseId = 1; // For the most common case, we have:\n    // - 0: new Test\n    // - 1: addTest\n    // - 2: QUnit.test\n    // - 3: user file\n    //\n    // This needs is customised by test.each()\n\n    this.stackOffset = 3;\n    extend(this, settings); // If a module is skipped, all its tests and the tests of the child suites\n    // should be treated as skipped even if they are defined as `only` or `todo`.\n    // As for `todo` module, all its tests will be treated as `todo` except for\n    // tests defined as `skip` which will be left intact.\n    //\n    // So, if a test is defined as `todo` and is inside a skipped module, we should\n    // then treat that test as if was defined as `skip`.\n\n    if (this.module.skip) {\n      this.skip = true;\n      this.todo = false; // Skipped tests should be left intact\n    } else if (this.module.todo && !this.skip) {\n      this.todo = true;\n    } // Queuing a late test after the run has ended is not allowed.\n    // This was once supported for internal use by QUnit.onError().\n    // Ref https://github.com/qunitjs/qunit/issues/1377\n\n\n    if (ProcessingQueue.finished) {\n      // Using this for anything other than onError(), such as testing in QUnit.done(),\n      // is unstable and will likely result in the added tests being ignored by CI.\n      // (Meaning the CI passes irregardless of the added tests).\n      //\n      // TODO: Make this an error in QUnit 3.0\n      // throw new Error( \"Unexpected new test after the run already ended\" );\n      Logger.warn('Unexpected test after runEnd. This is unstable and will fail in QUnit 3.0.');\n      return;\n    }\n\n    if (!this.skip && typeof this.callback !== 'function') {\n      var method = this.todo ? 'QUnit.todo' : 'QUnit.test';\n      throw new TypeError(\"You must provide a callback to \".concat(method, \"(\\\"\").concat(this.testName, \"\\\")\"));\n    } // No validation after this. Beyond this point, failures must be recorded as\n    // a completed test with errors, instead of early bail out.\n    // Otherwise, internals may be left in an inconsistent state.\n    // Ref https://github.com/qunitjs/qunit/issues/1514\n\n\n    ++Test.count;\n    this.errorForStack = new Error();\n\n    if (this.callback && this.callback.validTest) {\n      // Omit the test-level trace for the internal \"No tests\" test failure,\n      // There is already an assertion-level trace, and that's noisy enough\n      // as it is.\n      this.errorForStack.stack = undefined;\n    }\n\n    this.testReport = new TestReport(this.testName, this.module.suiteReport, {\n      todo: this.todo,\n      skip: this.skip,\n      valid: this.valid()\n    }); // Register unique strings\n\n    for (var i = 0, l = this.module.tests; i < l.length; i++) {\n      if (this.module.tests[i].name === this.testName) {\n        this.testName += ' ';\n      }\n    }\n\n    this.testId = generateHash(this.module.name, this.testName);\n    this.module.tests.push({\n      name: this.testName,\n      testId: this.testId,\n      skip: !!this.skip\n    });\n\n    if (this.skip) {\n      // Skipped tests will fully ignore any sent callback\n      this.callback = function () {};\n\n      this.async = false;\n      this.expected = 0;\n    } else {\n      this.assert = new Assert(this);\n    }\n  }\n\n  Test.count = 0;\n\n  function getNotStartedModules(startModule) {\n    var module = startModule;\n    var modules = [];\n\n    while (module && module.testsRun === 0) {\n      modules.push(module);\n      module = module.parentModule;\n    } // The above push modules from the child to the parent\n    // return a reversed order with the top being the top most parent module\n\n\n    return modules.reverse();\n  }\n\n  Test.prototype = {\n    // Use a getter to avoid computing a stack trace (which can be expensive),\n    // This is displayed by the HTML Reporter, but most other integrations do\n    // not access it.\n    get stack() {\n      return extractStacktrace(this.errorForStack, this.stackOffset);\n    },\n\n    before: function before() {\n      var _this = this;\n\n      var module = this.module;\n      var notStartedModules = getNotStartedModules(module); // ensure the callbacks are executed serially for each module\n\n      var moduleStartChain = _Promise.resolve();\n\n      notStartedModules.forEach(function (startModule) {\n        moduleStartChain = moduleStartChain.then(function () {\n          startModule.stats = {\n            all: 0,\n            bad: 0,\n            started: performance.now()\n          };\n          emit('suiteStart', startModule.suiteReport.start(true));\n          return runLoggingCallbacks('moduleStart', {\n            name: startModule.name,\n            tests: startModule.tests\n          });\n        });\n      });\n      return moduleStartChain.then(function () {\n        config.current = _this;\n        _this.testEnvironment = extend({}, module.testEnvironment);\n        _this.started = performance.now();\n        emit('testStart', _this.testReport.start(true));\n        return runLoggingCallbacks('testStart', {\n          name: _this.testName,\n          module: module.name,\n          testId: _this.testId,\n          previousFailure: _this.previousFailure\n        }).then(function () {\n          if (!config.pollution) {\n            saveGlobal();\n          }\n        });\n      });\n    },\n    run: function run() {\n      config.current = this;\n\n      if (config.notrycatch) {\n        runTest(this);\n        return;\n      }\n\n      try {\n        runTest(this);\n      } catch (e) {\n        this.pushFailure('Died on test #' + (this.assertions.length + 1) + ': ' + (e.message || e) + '\\n' + this.stack, extractStacktrace(e, 0)); // Else next test will carry the responsibility\n\n        saveGlobal(); // Restart the tests if they're blocking\n\n        if (config.blocking) {\n          internalRecover(this);\n        }\n      }\n\n      function runTest(test) {\n        var promise;\n\n        if (test.withData) {\n          promise = test.callback.call(test.testEnvironment, test.assert, test.data);\n        } else {\n          promise = test.callback.call(test.testEnvironment, test.assert);\n        }\n\n        test.resolvePromise(promise); // If the test has an async \"pause\" on it, but the timeout is 0, then we push a\n        // failure as the test should be synchronous.\n\n        if (test.timeout === 0 && test.pauses.size > 0) {\n          pushFailure('Test did not finish synchronously even though assert.timeout( 0 ) was used.', sourceFromStacktrace(2));\n        }\n      }\n    },\n    after: function after() {\n      checkPollution();\n    },\n    queueGlobalHook: function queueGlobalHook(hook, hookName) {\n      var _this2 = this;\n\n      var runHook = function runHook() {\n        config.current = _this2;\n        var promise;\n\n        if (config.notrycatch) {\n          promise = hook.call(_this2.testEnvironment, _this2.assert);\n        } else {\n          try {\n            promise = hook.call(_this2.testEnvironment, _this2.assert);\n          } catch (error) {\n            _this2.pushFailure('Global ' + hookName + ' failed on ' + _this2.testName + ': ' + errorString(error), extractStacktrace(error, 0));\n\n            return;\n          }\n        }\n\n        _this2.resolvePromise(promise, hookName);\n      };\n\n      return runHook;\n    },\n    queueHook: function queueHook(hook, hookName, hookOwner) {\n      var _this3 = this;\n\n      var callHook = function callHook() {\n        var promise = hook.call(_this3.testEnvironment, _this3.assert);\n\n        _this3.resolvePromise(promise, hookName);\n      };\n\n      var runHook = function runHook() {\n        if (hookName === 'before') {\n          if (hookOwner.testsRun !== 0) {\n            return;\n          }\n\n          _this3.preserveEnvironment = true;\n        } // The 'after' hook should only execute when there are not tests left and\n        // when the 'after' and 'finish' tasks are the only tasks left to process\n\n\n        if (hookName === 'after' && !lastTestWithinModuleExecuted(hookOwner) && (config.queue.length > 0 || ProcessingQueue.taskCount() > 2)) {\n          return;\n        }\n\n        config.current = _this3;\n\n        if (config.notrycatch) {\n          callHook();\n          return;\n        }\n\n        try {\n          // This try-block includes the indirect call to resolvePromise, which shouldn't\n          // have to be inside try-catch. But, since we support any user-provided thenable\n          // object, the thenable might throw in some unexpected way.\n          // This subtle behaviour is undocumented. To avoid new failures in minor releases\n          // we will not change this until QUnit 3.\n          // TODO: In QUnit 3, reduce this try-block to just hook.call(), matching\n          // the simplicity of queueGlobalHook.\n          callHook();\n        } catch (error) {\n          _this3.pushFailure(hookName + ' failed on ' + _this3.testName + ': ' + (error.message || error), extractStacktrace(error, 0));\n        }\n      };\n\n      return runHook;\n    },\n    // Currently only used for module level hooks, can be used to add global level ones\n    hooks: function hooks(handler) {\n      var hooks = [];\n\n      function processGlobalhooks(test) {\n        if ((handler === 'beforeEach' || handler === 'afterEach') && config.globalHooks[handler]) {\n          for (var i = 0; i < config.globalHooks[handler].length; i++) {\n            hooks.push(test.queueGlobalHook(config.globalHooks[handler][i], handler));\n          }\n        }\n      }\n\n      function processHooks(test, module) {\n        if (module.parentModule) {\n          processHooks(test, module.parentModule);\n        }\n\n        if (module.hooks[handler].length) {\n          for (var i = 0; i < module.hooks[handler].length; i++) {\n            hooks.push(test.queueHook(module.hooks[handler][i], handler, module));\n          }\n        }\n      } // Hooks are ignored on skipped tests\n\n\n      if (!this.skip) {\n        processGlobalhooks(this);\n        processHooks(this, this.module);\n      }\n\n      return hooks;\n    },\n    finish: function finish() {\n      config.current = this; // Release the test callback to ensure that anything referenced has been\n      // released to be garbage collected.\n\n      this.callback = undefined;\n\n      if (this.steps.length) {\n        var stepsList = this.steps.join(', ');\n        this.pushFailure('Expected assert.verifySteps() to be called before end of test ' + \"after using assert.step(). Unverified steps: \".concat(stepsList), this.stack);\n      }\n\n      if (config.requireExpects && this.expected === null) {\n        this.pushFailure('Expected number of assertions to be defined, but expect() was ' + 'not called.', this.stack);\n      } else if (this.expected !== null && this.expected !== this.assertions.length) {\n        this.pushFailure('Expected ' + this.expected + ' assertions, but ' + this.assertions.length + ' were run', this.stack);\n      } else if (this.expected === null && !this.assertions.length) {\n        this.pushFailure('Expected at least one assertion, but none were run - call ' + 'expect(0) to accept zero assertions.', this.stack);\n      }\n\n      var module = this.module;\n      var moduleName = module.name;\n      var testName = this.testName;\n      var skipped = !!this.skip;\n      var todo = !!this.todo;\n      var bad = 0;\n      var storage = config.storage;\n      this.runtime = Math.round(performance.now() - this.started);\n      config.stats.all += this.assertions.length;\n      config.stats.testCount += 1;\n      module.stats.all += this.assertions.length;\n\n      for (var i = 0; i < this.assertions.length; i++) {\n        // A failing assertion will counts toward the HTML Reporter's\n        // \"X assertions, Y failed\" line even if it was inside a todo.\n        // Inverting this would be similarly confusing since all but the last\n        // passing assertion inside a todo test should be considered as good.\n        // These stats don't decide the outcome of anything, so counting them\n        // as failing seems the most intuitive.\n        if (!this.assertions[i].result) {\n          bad++;\n          config.stats.bad++;\n          module.stats.bad++;\n        }\n      }\n\n      if (skipped) {\n        incrementTestsIgnored(module);\n      } else {\n        incrementTestsRun(module);\n      } // Store result when possible.\n      // Note that this also marks todo tests as bad, thus they get hoisted,\n      // and always run first on refresh.\n\n\n      if (storage) {\n        if (bad) {\n          storage.setItem('qunit-test-' + moduleName + '-' + testName, bad);\n        } else {\n          storage.removeItem('qunit-test-' + moduleName + '-' + testName);\n        }\n      } // After emitting the js-reporters event we cleanup the assertion data to\n      // avoid leaking it. It is not used by the legacy testDone callbacks.\n\n\n      emit('testEnd', this.testReport.end(true));\n      this.testReport.slimAssertions();\n      var test = this;\n      return runLoggingCallbacks('testDone', {\n        name: testName,\n        module: moduleName,\n        skipped: skipped,\n        todo: todo,\n        failed: bad,\n        passed: this.assertions.length - bad,\n        total: this.assertions.length,\n        runtime: skipped ? 0 : this.runtime,\n        // HTML Reporter use\n        assertions: this.assertions,\n        testId: this.testId,\n\n        // Source of Test\n        // generating stack trace is expensive, so using a getter will help defer this until we need it\n        get source() {\n          return test.stack;\n        }\n\n      }).then(function () {\n        if (allTestsExecuted(module)) {\n          var completedModules = [module]; // Check if the parent modules, iteratively, are done. If that the case,\n          // we emit the `suiteEnd` event and trigger `moduleDone` callback.\n\n          var parent = module.parentModule;\n\n          while (parent && allTestsExecuted(parent)) {\n            completedModules.push(parent);\n            parent = parent.parentModule;\n          }\n\n          var moduleDoneChain = _Promise.resolve();\n\n          completedModules.forEach(function (completedModule) {\n            moduleDoneChain = moduleDoneChain.then(function () {\n              return logSuiteEnd(completedModule);\n            });\n          });\n          return moduleDoneChain;\n        }\n      }).then(function () {\n        config.current = undefined;\n      });\n\n      function logSuiteEnd(module) {\n        // Reset `module.hooks` to ensure that anything referenced in these hooks\n        // has been released to be garbage collected. Descendant modules that were\n        // entirely skipped, e.g. due to filtering, will never have this method\n        // called for them, but might have hooks with references pinning data in\n        // memory (even if the hooks weren't actually executed), so we reset the\n        // hooks on all descendant modules here as well. This is safe because we\n        // will never call this as long as any descendant modules still have tests\n        // to run. This also means that in multi-tiered nesting scenarios we might\n        // reset the hooks multiple times on some modules, but that's harmless.\n        var modules = [module];\n\n        while (modules.length) {\n          var nextModule = modules.shift();\n          nextModule.hooks = {};\n          modules.push.apply(modules, _toConsumableArray(nextModule.childModules));\n        }\n\n        emit('suiteEnd', module.suiteReport.end(true));\n        return runLoggingCallbacks('moduleDone', {\n          name: module.name,\n          tests: module.tests,\n          failed: module.stats.bad,\n          passed: module.stats.all - module.stats.bad,\n          total: module.stats.all,\n          runtime: Math.round(performance.now() - module.stats.started)\n        });\n      }\n    },\n    preserveTestEnvironment: function preserveTestEnvironment() {\n      if (this.preserveEnvironment) {\n        this.module.testEnvironment = this.testEnvironment;\n        this.testEnvironment = extend({}, this.module.testEnvironment);\n      }\n    },\n    queue: function queue() {\n      var test = this;\n\n      if (!this.valid()) {\n        incrementTestsIgnored(this.module);\n        return;\n      }\n\n      function runTest() {\n        return [function () {\n          return test.before();\n        }].concat(_toConsumableArray(test.hooks('before')), [function () {\n          test.preserveTestEnvironment();\n        }], _toConsumableArray(test.hooks('beforeEach')), [function () {\n          test.run();\n        }], _toConsumableArray(test.hooks('afterEach').reverse()), _toConsumableArray(test.hooks('after').reverse()), [function () {\n          test.after();\n        }, function () {\n          return test.finish();\n        }]);\n      }\n\n      var previousFailCount = config.storage && +config.storage.getItem('qunit-test-' + this.module.name + '-' + this.testName); // Prioritize previously failed tests, detected from storage\n\n      var prioritize = config.reorder && !!previousFailCount;\n      this.previousFailure = !!previousFailCount;\n      ProcessingQueue.add(runTest, prioritize, config.seed);\n    },\n    pushResult: function pushResult(resultInfo) {\n      if (this !== config.current) {\n        var message = resultInfo && resultInfo.message || '';\n        var testName = this && this.testName || '';\n        var error = 'Assertion occurred after test finished.\\n' + '> Test: ' + testName + '\\n' + '> Message: ' + message + '\\n';\n        throw new Error(error);\n      } // Destructure of resultInfo = { result, actual, expected, message, negative }\n\n\n      var details = {\n        module: this.module.name,\n        name: this.testName,\n        result: resultInfo.result,\n        message: resultInfo.message,\n        actual: resultInfo.actual,\n        testId: this.testId,\n        negative: resultInfo.negative || false,\n        runtime: Math.round(performance.now() - this.started),\n        todo: !!this.todo\n      };\n\n      if (hasOwn$1.call(resultInfo, 'expected')) {\n        details.expected = resultInfo.expected;\n      }\n\n      if (!resultInfo.result) {\n        var source = resultInfo.source || sourceFromStacktrace();\n\n        if (source) {\n          details.source = source;\n        }\n      }\n\n      this.logAssertion(details);\n      this.assertions.push({\n        result: !!resultInfo.result,\n        message: resultInfo.message\n      });\n    },\n    pushFailure: function pushFailure(message, source, actual) {\n      if (!(this instanceof Test)) {\n        throw new Error('pushFailure() assertion outside test context, was ' + sourceFromStacktrace(2));\n      }\n\n      this.pushResult({\n        result: false,\n        message: message || 'error',\n        actual: actual || null,\n        source: source\n      });\n    },\n\n    /**\n     * Log assertion details using both the old QUnit.log interface and\n     * QUnit.on( \"assertion\" ) interface.\n     *\n     * @private\n     */\n    logAssertion: function logAssertion(details) {\n      runLoggingCallbacks('log', details);\n      var assertion = {\n        passed: details.result,\n        actual: details.actual,\n        expected: details.expected,\n        message: details.message,\n        stack: details.source,\n        todo: details.todo\n      };\n      this.testReport.pushAssertion(assertion);\n      emit('assertion', assertion);\n    },\n\n    /**\n     * Reset config.timeout with a new timeout duration.\n     *\n     * @param {number} timeoutDuration\n     */\n    internalResetTimeout: function internalResetTimeout(timeoutDuration) {\n      clearTimeout(config.timeout);\n      config.timeout = setTimeout$1(config.timeoutHandler(timeoutDuration), timeoutDuration);\n    },\n\n    /**\n     * Create a new async pause and return a new function that can release the pause.\n     *\n     * This mechanism is internally used by:\n     *\n     * - explicit async pauses, created by calling `assert.async()`,\n     * - implicit async pauses, created when `QUnit.test()` or module hook callbacks\n     *   use async-await or otherwise return a Promise.\n     *\n     * Happy scenario:\n     *\n     * - Pause is created by calling internalStop().\n     *\n     *   Pause is released normally by invoking release() during the same test.\n     *\n     *   The release() callback lets internal processing resume.\n     *\n     * Failure scenarios:\n     *\n     * - The test fails due to an uncaught exception.\n     *\n     *   In this case, Test.run() will call internalRecover() which empties the clears all\n     *   async pauses and sets the cancelled flag, which means we silently ignore any\n     *   late calls to the resume() callback, as we will have moved on to a different\n     *   test by then, and we don't want to cause an extra \"release during a different test\"\n     *   errors that the developer isn't really responsible for. This can happen when a test\n     *   correctly schedules a call to release(), but also causes an uncaught error. The\n     *   uncaught error means we will no longer wait for the release (as it might not arrive).\n     *\n     * - Pause is never released, or called an insufficient number of times.\n     *\n     *   Our timeout handler will kill the pause and resume test processing, basically\n     *   like internalRecover(), but for one pause instead of any/all.\n     *\n     *   Here, too, any late calls to resume() will be silently ignored to avoid\n     *   extra errors. We tolerate this since the original test will have already been\n     *   marked as failure.\n     *\n     *   TODO: QUnit 3 will enable timeouts by default <https://github.com/qunitjs/qunit/issues/1483>,\n     *   but right now a test will hang indefinitely if async pauses are not released,\n     *   unless QUnit.config.testTimeout or assert.timeout() is used.\n     *\n     * - Pause is spontaneously released during a different test,\n     *   or when no test is currently running.\n     *\n     *   This is close to impossible because this error only happens if the original test\n     *   succesfully finished first (since other failure scenarios kill pauses and ignore\n     *   late calls). It can happen if a test ended exactly as expected, but has some\n     *   external or shared state continuing to hold a reference to the release callback,\n     *   and either the same test scheduled another call to it in the future, or a later test\n     *   causes it to be called through some shared state.\n     *\n     * - Pause release() is called too often, during the same test.\n     *\n     *   This simply throws an error, after which uncaught error handling picks it up\n     *   and processing resumes.\n     *\n     * @param {number} [requiredCalls=1]\n     */\n    internalStop: function internalStop() {\n      var requiredCalls = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;\n      config.blocking = true;\n      var test = this;\n      var pauseId = this.nextPauseId++;\n      var pause = {\n        cancelled: false,\n        remaining: requiredCalls\n      };\n      test.pauses.set(pauseId, pause);\n\n      function release() {\n        if (pause.cancelled) {\n          return;\n        }\n\n        if (config.current === undefined) {\n          throw new Error('Unexpected release of async pause after tests finished.\\n' + \"> Test: \".concat(test.testName, \" [async #\").concat(pauseId, \"]\"));\n        }\n\n        if (config.current !== test) {\n          throw new Error('Unexpected release of async pause during a different test.\\n' + \"> Test: \".concat(test.testName, \" [async #\").concat(pauseId, \"]\"));\n        }\n\n        if (pause.remaining <= 0) {\n          throw new Error('Tried to release async pause that was already released.\\n' + \"> Test: \".concat(test.testName, \" [async #\").concat(pauseId, \"]\"));\n        } // The `requiredCalls` parameter exists to support `assert.async(count)`\n\n\n        pause.remaining--;\n\n        if (pause.remaining === 0) {\n          test.pauses.delete(pauseId);\n        }\n\n        internalStart(test);\n      } // Set a recovery timeout, if so configured.\n\n\n      if (setTimeout$1) {\n        var timeoutDuration;\n\n        if (typeof test.timeout === 'number') {\n          timeoutDuration = test.timeout;\n        } else if (typeof config.testTimeout === 'number') {\n          timeoutDuration = config.testTimeout;\n        }\n\n        if (typeof timeoutDuration === 'number' && timeoutDuration > 0) {\n          config.timeoutHandler = function (timeout) {\n            return function () {\n              config.timeout = null;\n              pause.cancelled = true;\n              test.pauses.delete(pauseId);\n              test.pushFailure(\"Test took longer than \".concat(timeout, \"ms; test timed out.\"), sourceFromStacktrace(2));\n              internalStart(test);\n            };\n          };\n\n          clearTimeout(config.timeout);\n          config.timeout = setTimeout$1(config.timeoutHandler(timeoutDuration), timeoutDuration);\n        }\n      }\n\n      return release;\n    },\n    resolvePromise: function resolvePromise(promise, phase) {\n      if (promise != null) {\n        var _test = this;\n\n        var then = promise.then;\n\n        if (typeof then === 'function') {\n          var resume = _test.internalStop();\n\n          var resolve = function resolve() {\n            resume();\n          };\n\n          if (config.notrycatch) {\n            then.call(promise, resolve);\n          } else {\n            var reject = function reject(error) {\n              var message = 'Promise rejected ' + (!phase ? 'during' : phase.replace(/Each$/, '')) + ' \"' + _test.testName + '\": ' + (error && error.message || error);\n\n              _test.pushFailure(message, extractStacktrace(error, 0)); // Else next test will carry the responsibility\n\n\n              saveGlobal(); // Unblock\n\n              internalRecover(_test);\n            };\n\n            then.call(promise, resolve, reject);\n          }\n        }\n      }\n    },\n    valid: function valid() {\n      // Internally-generated tests are always valid\n      if (this.callback && this.callback.validTest) {\n        return true;\n      }\n\n      function moduleChainIdMatch(testModule, selectedId) {\n        return (// undefined or empty array\n          !selectedId || !selectedId.length || inArray(testModule.moduleId, selectedId) || testModule.parentModule && moduleChainIdMatch(testModule.parentModule, selectedId)\n        );\n      }\n\n      if (!moduleChainIdMatch(this.module, config.moduleId)) {\n        return false;\n      }\n\n      if (config.testId && config.testId.length && !inArray(this.testId, config.testId)) {\n        return false;\n      }\n\n      function moduleChainNameMatch(testModule, selectedModule) {\n        if (!selectedModule) {\n          // undefined or empty string\n          return true;\n        }\n\n        var testModuleName = testModule.name ? testModule.name.toLowerCase() : null;\n\n        if (testModuleName === selectedModule) {\n          return true;\n        } else if (testModule.parentModule) {\n          return moduleChainNameMatch(testModule.parentModule, selectedModule);\n        } else {\n          return false;\n        }\n      }\n\n      var selectedModule = config.module && config.module.toLowerCase();\n\n      if (!moduleChainNameMatch(this.module, selectedModule)) {\n        return false;\n      }\n\n      var filter = config.filter;\n\n      if (!filter) {\n        return true;\n      }\n\n      var regexFilter = /^(!?)\\/([\\w\\W]*)\\/(i?$)/.exec(filter);\n      var fullName = this.module.name + ': ' + this.testName;\n      return regexFilter ? this.regexFilter(!!regexFilter[1], regexFilter[2], regexFilter[3], fullName) : this.stringFilter(filter, fullName);\n    },\n    regexFilter: function regexFilter(exclude, pattern, flags, fullName) {\n      var regex = new RegExp(pattern, flags);\n      var match = regex.test(fullName);\n      return match !== exclude;\n    },\n    stringFilter: function stringFilter(filter, fullName) {\n      filter = filter.toLowerCase();\n      fullName = fullName.toLowerCase();\n      var include = filter.charAt(0) !== '!';\n\n      if (!include) {\n        filter = filter.slice(1);\n      } // If the filter matches, we need to honour include\n\n\n      if (fullName.indexOf(filter) !== -1) {\n        return include;\n      } // Otherwise, do the opposite\n\n\n      return !include;\n    }\n  };\n\n  function pushFailure() {\n    if (!config.current) {\n      throw new Error('pushFailure() assertion outside test context, in ' + sourceFromStacktrace(2));\n    } // Gets current test obj\n\n\n    var currentTest = config.current;\n    return currentTest.pushFailure.apply(currentTest, arguments);\n  }\n\n  function saveGlobal() {\n    config.pollution = [];\n\n    if (config.noglobals) {\n      for (var key in g) {\n        if (hasOwn$1.call(g, key)) {\n          // In Opera sometimes DOM element ids show up here, ignore them\n          if (/^qunit-test-output/.test(key)) {\n            continue;\n          }\n\n          config.pollution.push(key);\n        }\n      }\n    }\n  }\n\n  function checkPollution() {\n    var old = config.pollution;\n    saveGlobal();\n    var newGlobals = diff(config.pollution, old);\n\n    if (newGlobals.length > 0) {\n      pushFailure('Introduced global variable(s): ' + newGlobals.join(', '));\n    }\n\n    var deletedGlobals = diff(old, config.pollution);\n\n    if (deletedGlobals.length > 0) {\n      pushFailure('Deleted global variable(s): ' + deletedGlobals.join(', '));\n    }\n  }\n\n  var focused = false; // indicates that the \"only\" filter was used\n\n  function addTest(settings) {\n    if (focused || config.currentModule.ignored) {\n      return;\n    }\n\n    var newTest = new Test(settings);\n    newTest.queue();\n  }\n\n  function addOnlyTest(settings) {\n    if (config.currentModule.ignored) {\n      return;\n    }\n\n    if (!focused) {\n      config.queue.length = 0;\n      focused = true;\n    }\n\n    var newTest = new Test(settings);\n    newTest.queue();\n  } // Will be exposed as QUnit.test\n\n\n  function test(testName, callback) {\n    addTest({\n      testName: testName,\n      callback: callback\n    });\n  }\n\n  function makeEachTestName(testName, argument) {\n    return \"\".concat(testName, \" [\").concat(argument, \"]\");\n  }\n\n  function runEach(data, eachFn) {\n    if (Array.isArray(data)) {\n      for (var i = 0; i < data.length; i++) {\n        eachFn(data[i], i);\n      }\n    } else if (_typeof(data) === 'object' && data !== null) {\n      for (var key in data) {\n        eachFn(data[key], key);\n      }\n    } else {\n      throw new Error(\"test.each() expects an array or object as input, but\\nfound \".concat(_typeof(data), \" instead.\"));\n    }\n  }\n\n  extend(test, {\n    todo: function todo(testName, callback) {\n      addTest({\n        testName: testName,\n        callback: callback,\n        todo: true\n      });\n    },\n    skip: function skip(testName) {\n      addTest({\n        testName: testName,\n        skip: true\n      });\n    },\n    only: function only(testName, callback) {\n      addOnlyTest({\n        testName: testName,\n        callback: callback\n      });\n    },\n    each: function each(testName, dataset, callback) {\n      runEach(dataset, function (data, testKey) {\n        addTest({\n          testName: makeEachTestName(testName, testKey),\n          callback: callback,\n          withData: true,\n          stackOffset: 5,\n          data: data\n        });\n      });\n    }\n  });\n\n  test.todo.each = function (testName, dataset, callback) {\n    runEach(dataset, function (data, testKey) {\n      addTest({\n        testName: makeEachTestName(testName, testKey),\n        callback: callback,\n        todo: true,\n        withData: true,\n        stackOffset: 5,\n        data: data\n      });\n    });\n  };\n\n  test.skip.each = function (testName, dataset) {\n    runEach(dataset, function (_, testKey) {\n      addTest({\n        testName: makeEachTestName(testName, testKey),\n        stackOffset: 5,\n        skip: true\n      });\n    });\n  };\n\n  test.only.each = function (testName, dataset, callback) {\n    runEach(dataset, function (data, testKey) {\n      addOnlyTest({\n        testName: makeEachTestName(testName, testKey),\n        callback: callback,\n        withData: true,\n        stackOffset: 5,\n        data: data\n      });\n    });\n  }; // Forcefully release all processing holds.\n\n\n  function internalRecover(test) {\n    test.pauses.forEach(function (pause) {\n      pause.cancelled = true;\n    });\n    test.pauses.clear();\n    internalStart(test);\n  } // Release a processing hold, scheduling a resumption attempt if no holds remain.\n\n\n  function internalStart(test) {\n    // Ignore if other async pauses still exist.\n    if (test.pauses.size > 0) {\n      return;\n    } // Add a slight delay to allow more assertions etc.\n\n\n    if (setTimeout$1) {\n      clearTimeout(config.timeout);\n      config.timeout = setTimeout$1(function () {\n        if (test.pauses.size > 0) {\n          return;\n        }\n\n        clearTimeout(config.timeout);\n        config.timeout = null;\n        config.blocking = false;\n        ProcessingQueue.advance();\n      });\n    } else {\n      config.blocking = false;\n      ProcessingQueue.advance();\n    }\n  }\n\n  function collectTests(module) {\n    var tests = [].concat(module.tests);\n\n    var modules = _toConsumableArray(module.childModules); // Do a breadth-first traversal of the child modules\n\n\n    while (modules.length) {\n      var nextModule = modules.shift();\n      tests.push.apply(tests, nextModule.tests);\n      modules.push.apply(modules, _toConsumableArray(nextModule.childModules));\n    }\n\n    return tests;\n  } // This returns true after all executable and skippable tests\n  // in a module have been proccessed, and informs 'suiteEnd'\n  // and moduleDone().\n\n\n  function allTestsExecuted(module) {\n    return module.testsRun + module.testsIgnored === collectTests(module).length;\n  } // This returns true during the last executable non-skipped test\n  // within a module, and informs the running of the 'after' hook\n  // for a given module. This runs only once for a given module,\n  // but must run during the last non-skipped test. When it runs,\n  // there may be non-zero skipped tests left.\n\n\n  function lastTestWithinModuleExecuted(module) {\n    return module.testsRun === collectTests(module).filter(function (test) {\n      return !test.skip;\n    }).length - 1;\n  }\n\n  function incrementTestsRun(module) {\n    module.testsRun++;\n\n    while (module = module.parentModule) {\n      module.testsRun++;\n    }\n  }\n\n  function incrementTestsIgnored(module) {\n    module.testsIgnored++;\n\n    while (module = module.parentModule) {\n      module.testsIgnored++;\n    }\n  }\n  /* global module, exports, define */\n\n\n  function exportQUnit(QUnit) {\n    var exportedModule = false;\n\n    if (window$1 && document) {\n      // QUnit may be defined when it is preconfigured but then only QUnit and QUnit.config may be defined.\n      if (window$1.QUnit && window$1.QUnit.version) {\n        throw new Error('QUnit has already been defined.');\n      }\n\n      window$1.QUnit = QUnit;\n      exportedModule = true;\n    } // For Node.js\n\n\n    if ( true && module && module.exports) {\n      module.exports = QUnit; // For consistency with CommonJS environments' exports\n\n      module.exports.QUnit = QUnit;\n      exportedModule = true;\n    } // For CommonJS with exports, but without module.exports, like Rhino\n\n\n    if ( true && exports) {\n      exports.QUnit = QUnit;\n      exportedModule = true;\n    } // For AMD\n\n\n    if (true) {\n      !(__WEBPACK_AMD_DEFINE_RESULT__ = (function () {\n        return QUnit;\n      }).call(exports, __webpack_require__, exports, module),\n\t\t\t\t__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));\n      QUnit.config.autostart = false;\n      exportedModule = true;\n    } // For other environments, including Web Workers (globalThis === self),\n    // SpiderMonkey (mozjs), and other embedded JavaScript engines\n\n\n    if (!exportedModule) {\n      g.QUnit = QUnit;\n    }\n  }\n\n  var ConsoleReporter = /*#__PURE__*/function () {\n    function ConsoleReporter(runner) {\n      var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};\n\n      _classCallCheck(this, ConsoleReporter); // Cache references to console methods to ensure we can report failures\n      // from tests tests that mock the console object itself.\n      // https://github.com/qunitjs/qunit/issues/1340\n      // Support IE 9: Function#bind is supported, but no console.log.bind().\n\n\n      this.log = options.log || Function.prototype.bind.call(console$1.log, console$1);\n      runner.on('error', this.onError.bind(this));\n      runner.on('runStart', this.onRunStart.bind(this));\n      runner.on('testStart', this.onTestStart.bind(this));\n      runner.on('testEnd', this.onTestEnd.bind(this));\n      runner.on('runEnd', this.onRunEnd.bind(this));\n    }\n\n    _createClass(ConsoleReporter, [{\n      key: \"onError\",\n      value: function onError(error) {\n        this.log('error', error);\n      }\n    }, {\n      key: \"onRunStart\",\n      value: function onRunStart(runStart) {\n        this.log('runStart', runStart);\n      }\n    }, {\n      key: \"onTestStart\",\n      value: function onTestStart(test) {\n        this.log('testStart', test);\n      }\n    }, {\n      key: \"onTestEnd\",\n      value: function onTestEnd(test) {\n        this.log('testEnd', test);\n      }\n    }, {\n      key: \"onRunEnd\",\n      value: function onRunEnd(runEnd) {\n        this.log('runEnd', runEnd);\n      }\n    }], [{\n      key: \"init\",\n      value: function init(runner, options) {\n        return new ConsoleReporter(runner, options);\n      }\n    }]);\n\n    return ConsoleReporter;\n  }();\n\n  var FORCE_COLOR,\n      NODE_DISABLE_COLORS,\n      NO_COLOR,\n      TERM,\n      isTTY = true;\n\n  if (typeof process !== 'undefined') {\n    var _process$env = process.env;\n    FORCE_COLOR = _process$env.FORCE_COLOR;\n    NODE_DISABLE_COLORS = _process$env.NODE_DISABLE_COLORS;\n    NO_COLOR = _process$env.NO_COLOR;\n    TERM = _process$env.TERM;\n    isTTY = process.stdout && process.stdout.isTTY;\n  }\n\n  var $ = {\n    enabled: !NODE_DISABLE_COLORS && NO_COLOR == null && TERM !== 'dumb' && (FORCE_COLOR != null && FORCE_COLOR !== '0' || isTTY),\n    // modifiers\n    reset: init(0, 0),\n    bold: init(1, 22),\n    dim: init(2, 22),\n    italic: init(3, 23),\n    underline: init(4, 24),\n    inverse: init(7, 27),\n    hidden: init(8, 28),\n    strikethrough: init(9, 29),\n    // colors\n    black: init(30, 39),\n    red: init(31, 39),\n    green: init(32, 39),\n    yellow: init(33, 39),\n    blue: init(34, 39),\n    magenta: init(35, 39),\n    cyan: init(36, 39),\n    white: init(37, 39),\n    gray: init(90, 39),\n    grey: init(90, 39),\n    // background colors\n    bgBlack: init(40, 49),\n    bgRed: init(41, 49),\n    bgGreen: init(42, 49),\n    bgYellow: init(43, 49),\n    bgBlue: init(44, 49),\n    bgMagenta: init(45, 49),\n    bgCyan: init(46, 49),\n    bgWhite: init(47, 49)\n  };\n\n  function run(arr, str) {\n    var i = 0,\n        tmp,\n        beg = '',\n        end = '';\n\n    for (; i < arr.length; i++) {\n      tmp = arr[i];\n      beg += tmp.open;\n      end += tmp.close;\n\n      if (!!~str.indexOf(tmp.close)) {\n        str = str.replace(tmp.rgx, tmp.close + tmp.open);\n      }\n    }\n\n    return beg + str + end;\n  }\n\n  function chain(has, keys) {\n    var ctx = {\n      has: has,\n      keys: keys\n    };\n    ctx.reset = $.reset.bind(ctx);\n    ctx.bold = $.bold.bind(ctx);\n    ctx.dim = $.dim.bind(ctx);\n    ctx.italic = $.italic.bind(ctx);\n    ctx.underline = $.underline.bind(ctx);\n    ctx.inverse = $.inverse.bind(ctx);\n    ctx.hidden = $.hidden.bind(ctx);\n    ctx.strikethrough = $.strikethrough.bind(ctx);\n    ctx.black = $.black.bind(ctx);\n    ctx.red = $.red.bind(ctx);\n    ctx.green = $.green.bind(ctx);\n    ctx.yellow = $.yellow.bind(ctx);\n    ctx.blue = $.blue.bind(ctx);\n    ctx.magenta = $.magenta.bind(ctx);\n    ctx.cyan = $.cyan.bind(ctx);\n    ctx.white = $.white.bind(ctx);\n    ctx.gray = $.gray.bind(ctx);\n    ctx.grey = $.grey.bind(ctx);\n    ctx.bgBlack = $.bgBlack.bind(ctx);\n    ctx.bgRed = $.bgRed.bind(ctx);\n    ctx.bgGreen = $.bgGreen.bind(ctx);\n    ctx.bgYellow = $.bgYellow.bind(ctx);\n    ctx.bgBlue = $.bgBlue.bind(ctx);\n    ctx.bgMagenta = $.bgMagenta.bind(ctx);\n    ctx.bgCyan = $.bgCyan.bind(ctx);\n    ctx.bgWhite = $.bgWhite.bind(ctx);\n    return ctx;\n  }\n\n  function init(open, close) {\n    var blk = {\n      open: \"\\x1B[\".concat(open, \"m\"),\n      close: \"\\x1B[\".concat(close, \"m\"),\n      rgx: new RegExp(\"\\\\x1b\\\\[\".concat(close, \"m\"), 'g')\n    };\n    return function (txt) {\n      if (this !== void 0 && this.has !== void 0) {\n        !!~this.has.indexOf(open) || (this.has.push(open), this.keys.push(blk));\n        return txt === void 0 ? this : $.enabled ? run(this.keys, txt + '') : txt + '';\n      }\n\n      return txt === void 0 ? chain([open], [blk]) : $.enabled ? run([blk], txt + '') : txt + '';\n    };\n  }\n\n  var hasOwn = Object.prototype.hasOwnProperty;\n  /**\n   * Format a given value into YAML.\n   *\n   * YAML is a superset of JSON that supports all the same data\n   * types and syntax, and more. As such, it is always possible\n   * to fallback to JSON.stringfify, but we generally avoid\n   * that to make output easier to read for humans.\n   *\n   * Supported data types:\n   *\n   * - null\n   * - boolean\n   * - number\n   * - string\n   * - array\n   * - object\n   *\n   * Anything else (including NaN, Infinity, and undefined)\n   * must be described in strings, for display purposes.\n   *\n   * Note that quotes are optional in YAML strings if the\n   * strings are \"simple\", and as such we generally prefer\n   * that for improved readability. We output strings in\n   * one of three ways:\n   *\n   * - bare unquoted text, for simple one-line strings.\n   * - JSON (quoted text), for complex one-line strings.\n   * - YAML Block, for complex multi-line strings.\n   *\n   * Objects with cyclical references will be stringifed as\n   * \"[Circular]\" as they cannot otherwise be represented.\n   */\n\n  function prettyYamlValue(value) {\n    var indent = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 4;\n\n    if (value === undefined) {\n      // Not supported in JSON/YAML, turn into string\n      // and let the below output it as bare string.\n      value = String(value);\n    } // Support IE 9-11: Use isFinite instead of ES6 Number.isFinite\n\n\n    if (typeof value === 'number' && !isFinite(value)) {\n      // Turn NaN and Infinity into simple strings.\n      // Paranoia: Don't return directly just in case there's\n      // a way to add special characters here.\n      value = String(value);\n    }\n\n    if (typeof value === 'number') {\n      // Simple numbers\n      return JSON.stringify(value);\n    }\n\n    if (typeof value === 'string') {\n      // If any of these match, then we can't output it\n      // as bare unquoted text, because that would either\n      // cause data loss or invalid YAML syntax.\n      //\n      // - Quotes, escapes, line breaks, or JSON-like stuff.\n      var rSpecialJson = /['\"\\\\/[{}\\]\\r\\n]/; // - Characters that are special at the start of a YAML value\n\n      var rSpecialYaml = /[-?:,[\\]{}#&*!|=>'\"%@`]/; // - Leading or trailing whitespace.\n\n      var rUntrimmed = /(^\\s|\\s$)/; // - Ambiguous as YAML number, e.g. '2', '-1.2', '.2', or '2_000'\n\n      var rNumerical = /^[\\d._-]+$/; // - Ambiguous as YAML bool.\n      //   Use case-insensitive match, although technically only\n      //   fully-lower, fully-upper, or uppercase-first would be ambiguous.\n      //   e.g. true/True/TRUE, but not tRUe.\n\n      var rBool = /^(true|false|y|n|yes|no|on|off)$/i; // Is this a complex string?\n\n      if (value === '' || rSpecialJson.test(value) || rSpecialYaml.test(value[0]) || rUntrimmed.test(value) || rNumerical.test(value) || rBool.test(value)) {\n        if (!/\\n/.test(value)) {\n          // Complex one-line string, use JSON (quoted string)\n          return JSON.stringify(value);\n        } // See also <https://yaml-multiline.info/>\n        // Support IE 9-11: Avoid ES6 String#repeat\n\n\n        var prefix = new Array(indent + 1).join(' ');\n        var trailingLinebreakMatch = value.match(/\\n+$/);\n        var trailingLinebreaks = trailingLinebreakMatch ? trailingLinebreakMatch[0].length : 0;\n\n        if (trailingLinebreaks === 1) {\n          // Use the most straight-forward \"Block\" string in YAML\n          // without any \"Chomping\" indicators.\n          var lines = value // Ignore the last new line, since we'll get that one for free\n          // with the straight-forward Block syntax.\n          .replace(/\\n$/, '').split('\\n').map(function (line) {\n            return prefix + line;\n          });\n          return '|\\n' + lines.join('\\n');\n        } else {\n          // This has either no trailing new lines, or more than 1.\n          // Use |+ so that YAML parsers will preserve it exactly.\n          var _lines = value.split('\\n').map(function (line) {\n            return prefix + line;\n          });\n\n          return '|+\\n' + _lines.join('\\n');\n        }\n      } else {\n        // Simple string, use bare unquoted text\n        return value;\n      }\n    } // Handle null, boolean, array, and object\n\n\n    return JSON.stringify(decycledShallowClone(value), null, 2);\n  }\n  /**\n   * Creates a shallow clone of an object where cycles have\n   * been replaced with \"[Circular]\".\n   */\n\n\n  function decycledShallowClone(object) {\n    var ancestors = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];\n\n    if (ancestors.indexOf(object) !== -1) {\n      return '[Circular]';\n    }\n\n    var type = Object.prototype.toString.call(object).replace(/^\\[.+\\s(.+?)]$/, '$1').toLowerCase();\n    var clone;\n\n    switch (type) {\n      case 'array':\n        ancestors.push(object);\n        clone = object.map(function (element) {\n          return decycledShallowClone(element, ancestors);\n        });\n        ancestors.pop();\n        break;\n\n      case 'object':\n        ancestors.push(object);\n        clone = {};\n        Object.keys(object).forEach(function (key) {\n          clone[key] = decycledShallowClone(object[key], ancestors);\n        });\n        ancestors.pop();\n        break;\n\n      default:\n        clone = object;\n    }\n\n    return clone;\n  }\n\n  var TapReporter = /*#__PURE__*/function () {\n    function TapReporter(runner) {\n      var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};\n\n      _classCallCheck(this, TapReporter); // Cache references to console methods to ensure we can report failures\n      // from tests tests that mock the console object itself.\n      // https://github.com/qunitjs/qunit/issues/1340\n      // Support IE 9: Function#bind is supported, but no console.log.bind().\n\n\n      this.log = options.log || Function.prototype.bind.call(console$1.log, console$1);\n      this.testCount = 0;\n      this.ended = false;\n      this.bailed = false;\n      runner.on('error', this.onError.bind(this));\n      runner.on('runStart', this.onRunStart.bind(this));\n      runner.on('testEnd', this.onTestEnd.bind(this));\n      runner.on('runEnd', this.onRunEnd.bind(this));\n    }\n\n    _createClass(TapReporter, [{\n      key: \"onRunStart\",\n      value: function onRunStart(_runSuite) {\n        this.log('TAP version 13');\n      }\n    }, {\n      key: \"onError\",\n      value: function onError(error) {\n        if (this.bailed) {\n          return;\n        }\n\n        this.bailed = true; // Imitate onTestEnd\n        // Skip this if we're past \"runEnd\" as it would look odd\n\n        if (!this.ended) {\n          this.testCount = this.testCount + 1;\n          this.log($.red(\"not ok \".concat(this.testCount, \" global failure\")));\n          this.logError(error);\n        }\n\n        this.log('Bail out! ' + errorString(error).split('\\n')[0]);\n\n        if (this.ended) {\n          this.logError(error);\n        }\n      }\n    }, {\n      key: \"onTestEnd\",\n      value: function onTestEnd(test) {\n        var _this = this;\n\n        this.testCount = this.testCount + 1;\n\n        if (test.status === 'passed') {\n          this.log(\"ok \".concat(this.testCount, \" \").concat(test.fullName.join(' > ')));\n        } else if (test.status === 'skipped') {\n          this.log($.yellow(\"ok \".concat(this.testCount, \" # SKIP \").concat(test.fullName.join(' > '))));\n        } else if (test.status === 'todo') {\n          this.log($.cyan(\"not ok \".concat(this.testCount, \" # TODO \").concat(test.fullName.join(' > '))));\n          test.errors.forEach(function (error) {\n            return _this.logAssertion(error, 'todo');\n          });\n        } else {\n          this.log($.red(\"not ok \".concat(this.testCount, \" \").concat(test.fullName.join(' > '))));\n          test.errors.forEach(function (error) {\n            return _this.logAssertion(error);\n          });\n        }\n      }\n    }, {\n      key: \"onRunEnd\",\n      value: function onRunEnd(runSuite) {\n        this.ended = true;\n        this.log(\"1..\".concat(runSuite.testCounts.total));\n        this.log(\"# pass \".concat(runSuite.testCounts.passed));\n        this.log($.yellow(\"# skip \".concat(runSuite.testCounts.skipped)));\n        this.log($.cyan(\"# todo \".concat(runSuite.testCounts.todo)));\n        this.log($.red(\"# fail \".concat(runSuite.testCounts.failed)));\n      }\n    }, {\n      key: \"logAssertion\",\n      value: function logAssertion(error, severity) {\n        var out = '  ---';\n        out += \"\\n  message: \".concat(prettyYamlValue(error.message || 'failed'));\n        out += \"\\n  severity: \".concat(prettyYamlValue(severity || 'failed'));\n\n        if (hasOwn.call(error, 'actual')) {\n          out += \"\\n  actual  : \".concat(prettyYamlValue(error.actual));\n        }\n\n        if (hasOwn.call(error, 'expected')) {\n          out += \"\\n  expected: \".concat(prettyYamlValue(error.expected));\n        }\n\n        if (error.stack) {\n          // Since stacks aren't user generated, take a bit of liberty by\n          // adding a trailing new line to allow a straight-forward YAML Blocks.\n          out += \"\\n  stack: \".concat(prettyYamlValue(error.stack + '\\n'));\n        }\n\n        out += '\\n  ...';\n        this.log(out);\n      }\n    }, {\n      key: \"logError\",\n      value: function logError(error) {\n        var out = '  ---';\n        out += \"\\n  message: \".concat(prettyYamlValue(errorString(error)));\n        out += \"\\n  severity: \".concat(prettyYamlValue('failed'));\n\n        if (error && error.stack) {\n          out += \"\\n  stack: \".concat(prettyYamlValue(error.stack + '\\n'));\n        }\n\n        out += '\\n  ...';\n        this.log(out);\n      }\n    }], [{\n      key: \"init\",\n      value: function init(runner, options) {\n        return new TapReporter(runner, options);\n      }\n    }]);\n\n    return TapReporter;\n  }();\n\n  var reporters = {\n    console: ConsoleReporter,\n    tap: TapReporter\n  };\n\n  function makeAddGlobalHook(hookName) {\n    return function addGlobalHook(callback) {\n      if (!config.globalHooks[hookName]) {\n        config.globalHooks[hookName] = [];\n      }\n\n      config.globalHooks[hookName].push(callback);\n    };\n  }\n\n  var hooks = {\n    beforeEach: makeAddGlobalHook('beforeEach'),\n    afterEach: makeAddGlobalHook('afterEach')\n  };\n  /**\n   * Handle a global error that should result in a failed test run.\n   *\n   * Summary:\n   *\n   * - If we're strictly inside a test (or one if its module hooks), the exception\n   *   becomes a failed assertion.\n   *\n   *   This has the important side-effect that uncaught exceptions (such as\n   *   calling an undefined function) during a \"todo\" test do NOT result in\n   *   a failed test run.\n   *\n   * - If we're anywhere outside a test (be it in early event callbacks, or\n   *   internally between tests, or somewhere after \"runEnd\" if the process is\n   *   still alive for some reason), then send an \"error\" event to the reporters.\n   *\n   * @since 2.17.0\n   * @param {Error|any} error\n   */\n\n  function onUncaughtException(error) {\n    if (config.current) {\n      config.current.assert.pushResult({\n        result: false,\n        message: \"global failure: \".concat(errorString(error)),\n        // We could let callers specify an offset to subtract a number of frames via\n        // sourceFromStacktrace, in case they are a wrapper further away from the error\n        // handler, and thus reduce some noise in the stack trace. However, we're not\n        // doing this right now because it would almost never be used in practice given\n        // the vast majority of error values will be Error objects, and thus have their\n        // own stack trace already.\n        source: error && error.stack || sourceFromStacktrace(2)\n      });\n    } else {\n      // The \"error\" event was added in QUnit 2.17.\n      // Increase \"bad assertion\" stats despite no longer pushing an assertion in this case.\n      // This ensures \"runEnd\" and \"QUnit.done()\" handlers behave as expected, since the \"bad\"\n      // count is typically how reporters decide on the boolean outcome of the test run.\n      runSuite.globalFailureCount++;\n      config.stats.bad++;\n      config.stats.all++;\n      emit('error', error);\n    }\n  }\n  /**\n   * Handle a window.onerror error.\n   *\n   * If there is a current test that sets the internal `ignoreGlobalErrors` field\n   * (such as during `assert.throws()`), then the error is ignored and native\n   * error reporting is suppressed as well. This is because in browsers, an error\n   * can sometimes end up in `window.onerror` instead of in the local try/catch.\n   * This ignoring of errors does not apply to our general onUncaughtException\n   * method, nor to our `unhandledRejection` handlers, as those are not meant\n   * to receive an \"expected\" error during `assert.throws()`.\n   *\n   * @see <https://developer.mozilla.org/en-US/docs/Web/API/GlobalEventHandlers/onerror>\n   * @deprecated since 2.17.0 Use QUnit.onUncaughtException instead.\n   * @param {Object} details\n   * @param {string} details.message\n   * @param {string} details.fileName\n   * @param {number} details.lineNumber\n   * @param {string|undefined} [details.stacktrace]\n   * @return {bool} True if native error reporting should be suppressed.\n   */\n\n\n  function onWindowError(details) {\n    Logger.warn('QUnit.onError is deprecated and will be removed in QUnit 3.0.' + ' Please use QUnit.onUncaughtException instead.');\n\n    if (config.current && config.current.ignoreGlobalErrors) {\n      return true;\n    }\n\n    var err = new Error(details.message);\n    err.stack = details.stacktrace || details.fileName + ':' + details.lineNumber;\n    onUncaughtException(err);\n    return false;\n  }\n\n  var QUnit = {}; // The \"currentModule\" object would ideally be defined using the createModule()\n  // function. Since it isn't, add the missing suiteReport property to it now that\n  // we have loaded all source code required to do so.\n  //\n  // TODO: Consider defining currentModule in core.js or module.js in its entirely\n  // rather than partly in config.js and partly here.\n\n  config.currentModule.suiteReport = runSuite;\n  var globalStartCalled = false;\n  var runStarted = false; // Figure out if we're running the tests from a server or not\n\n  QUnit.isLocal = window$1 && window$1.location && window$1.location.protocol === 'file:'; // Expose the current QUnit version\n\n  QUnit.version = '2.19.1';\n  extend(QUnit, {\n    config: config,\n    dump: dump,\n    equiv: equiv,\n    reporters: reporters,\n    hooks: hooks,\n    is: is,\n    objectType: objectType,\n    on: on,\n    onError: onWindowError,\n    onUncaughtException: onUncaughtException,\n    pushFailure: pushFailure,\n    assert: Assert.prototype,\n    module: module$1,\n    test: test,\n    // alias other test flavors for easy access\n    todo: test.todo,\n    skip: test.skip,\n    only: test.only,\n    start: function start(count) {\n      if (config.current) {\n        throw new Error('QUnit.start cannot be called inside a test context.');\n      }\n\n      var globalStartAlreadyCalled = globalStartCalled;\n      globalStartCalled = true;\n\n      if (runStarted) {\n        throw new Error('Called start() while test already started running');\n      }\n\n      if (globalStartAlreadyCalled || count > 1) {\n        throw new Error('Called start() outside of a test context too many times');\n      }\n\n      if (config.autostart) {\n        throw new Error('Called start() outside of a test context when ' + 'QUnit.config.autostart was true');\n      }\n\n      if (!config.pageLoaded) {\n        // The page isn't completely loaded yet, so we set autostart and then\n        // load if we're in Node or wait for the browser's load event.\n        config.autostart = true; // Starts from Node even if .load was not previously called. We still return\n        // early otherwise we'll wind up \"beginning\" twice.\n\n        if (!document) {\n          QUnit.load();\n        }\n\n        return;\n      }\n\n      scheduleBegin();\n    },\n    onUnhandledRejection: function onUnhandledRejection(reason) {\n      Logger.warn('QUnit.onUnhandledRejection is deprecated and will be removed in QUnit 3.0.' + ' Please use QUnit.onUncaughtException instead.');\n      onUncaughtException(reason);\n    },\n    extend: function extend$1() {\n      Logger.warn('QUnit.extend is deprecated and will be removed in QUnit 3.0.' + ' Please use Object.assign instead.'); // delegate to utility implementation, which does not warn and can be used elsewhere internally\n\n      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {\n        args[_key] = arguments[_key];\n      }\n\n      return extend.apply(this, args);\n    },\n    load: function load() {\n      config.pageLoaded = true; // Initialize the configuration options\n\n      extend(config, {\n        started: 0,\n        updateRate: 1000,\n        autostart: true,\n        filter: ''\n      }, true);\n\n      if (!runStarted) {\n        config.blocking = false;\n\n        if (config.autostart) {\n          scheduleBegin();\n        }\n      }\n    },\n    stack: function stack(offset) {\n      offset = (offset || 0) + 2;\n      return sourceFromStacktrace(offset);\n    }\n  });\n  registerLoggingCallbacks(QUnit);\n\n  function scheduleBegin() {\n    runStarted = true; // Add a slight delay to allow definition of more modules and tests.\n\n    if (setTimeout$1) {\n      setTimeout$1(function () {\n        begin();\n      });\n    } else {\n      begin();\n    }\n  }\n\n  function unblockAndAdvanceQueue() {\n    config.blocking = false;\n    ProcessingQueue.advance();\n  }\n\n  function begin() {\n    if (config.started) {\n      unblockAndAdvanceQueue();\n      return;\n    } // The test run hasn't officially begun yet\n    // Record the time of the test run's beginning\n\n\n    config.started = performance.now(); // Delete the loose unnamed module if unused.\n\n    if (config.modules[0].name === '' && config.modules[0].tests.length === 0) {\n      config.modules.shift();\n    }\n\n    var modulesLog = [];\n\n    for (var i = 0; i < config.modules.length; i++) {\n      // Don't expose the unnamed global test module to plugins.\n      if (config.modules[i].name !== '') {\n        modulesLog.push({\n          name: config.modules[i].name,\n          moduleId: config.modules[i].moduleId,\n          // Added in QUnit 1.16.0 for internal use by html-reporter,\n          // but no longer used since QUnit 2.7.0.\n          // @deprecated Kept unofficially to be removed in QUnit 3.0.\n          tests: config.modules[i].tests\n        });\n      }\n    } // The test run is officially beginning now\n\n\n    emit('runStart', runSuite.start(true));\n    runLoggingCallbacks('begin', {\n      totalTests: Test.count,\n      modules: modulesLog\n    }).then(unblockAndAdvanceQueue);\n  }\n\n  exportQUnit(QUnit);\n\n  (function () {\n    if (!window$1 || !document) {\n      return;\n    }\n\n    var config = QUnit.config;\n    var hasOwn = Object.prototype.hasOwnProperty; // Stores fixture HTML for resetting later\n\n    function storeFixture() {\n      // Avoid overwriting user-defined values\n      if (hasOwn.call(config, 'fixture')) {\n        return;\n      }\n\n      var fixture = document.getElementById('qunit-fixture');\n\n      if (fixture) {\n        config.fixture = fixture.cloneNode(true);\n      }\n    }\n\n    QUnit.begin(storeFixture); // Resets the fixture DOM element if available.\n\n    function resetFixture() {\n      if (config.fixture == null) {\n        return;\n      }\n\n      var fixture = document.getElementById('qunit-fixture');\n\n      var resetFixtureType = _typeof(config.fixture);\n\n      if (resetFixtureType === 'string') {\n        // support user defined values for `config.fixture`\n        var newFixture = document.createElement('div');\n        newFixture.setAttribute('id', 'qunit-fixture');\n        newFixture.innerHTML = config.fixture;\n        fixture.parentNode.replaceChild(newFixture, fixture);\n      } else {\n        var clonedFixture = config.fixture.cloneNode(true);\n        fixture.parentNode.replaceChild(clonedFixture, fixture);\n      }\n    }\n\n    QUnit.testStart(resetFixture);\n  })();\n\n  (function () {\n    // Only interact with URLs via window.location\n    var location = typeof window$1 !== 'undefined' && window$1.location;\n\n    if (!location) {\n      return;\n    }\n\n    var urlParams = getUrlParams();\n    QUnit.urlParams = urlParams;\n    QUnit.config.filter = urlParams.filter;\n    QUnit.config.module = urlParams.module;\n    QUnit.config.moduleId = [].concat(urlParams.moduleId || []);\n    QUnit.config.testId = [].concat(urlParams.testId || []); // Test order randomization\n\n    if (urlParams.seed === true) {\n      // Generate a random seed if the option is specified without a value\n      QUnit.config.seed = Math.random().toString(36).slice(2);\n    } else if (urlParams.seed) {\n      QUnit.config.seed = urlParams.seed;\n    } // Add URL-parameter-mapped config values with UI form rendering data\n\n\n    QUnit.config.urlConfig.push({\n      id: 'hidepassed',\n      label: 'Hide passed tests',\n      tooltip: 'Only show tests and assertions that fail. Stored as query-strings.'\n    }, {\n      id: 'noglobals',\n      label: 'Check for Globals',\n      tooltip: 'Enabling this will test if any test introduces new properties on the ' + 'global object (`window` in Browsers). Stored as query-strings.'\n    }, {\n      id: 'notrycatch',\n      label: 'No try-catch',\n      tooltip: 'Enabling this will run tests outside of a try-catch block. Makes debugging ' + 'exceptions in IE reasonable. Stored as query-strings.'\n    });\n    QUnit.begin(function () {\n      var urlConfig = QUnit.config.urlConfig;\n\n      for (var i = 0; i < urlConfig.length; i++) {\n        // Options can be either strings or objects with nonempty \"id\" properties\n        var option = QUnit.config.urlConfig[i];\n\n        if (typeof option !== 'string') {\n          option = option.id;\n        }\n\n        if (QUnit.config[option] === undefined) {\n          QUnit.config[option] = urlParams[option];\n        }\n      }\n    });\n\n    function getUrlParams() {\n      var urlParams = Object.create(null);\n      var params = location.search.slice(1).split('&');\n      var length = params.length;\n\n      for (var i = 0; i < length; i++) {\n        if (params[i]) {\n          var param = params[i].split('=');\n          var name = decodeQueryParam(param[0]); // Allow just a key to turn on a flag, e.g., test.html?noglobals\n\n          var value = param.length === 1 || decodeQueryParam(param.slice(1).join('='));\n\n          if (name in urlParams) {\n            urlParams[name] = [].concat(urlParams[name], value);\n          } else {\n            urlParams[name] = value;\n          }\n        }\n      }\n\n      return urlParams;\n    }\n\n    function decodeQueryParam(param) {\n      return decodeURIComponent(param.replace(/\\+/g, '%20'));\n    }\n  })();\n\n  var fuzzysort$1 = {\n    exports: {}\n  };\n\n  (function (module) {\n    (function (root, UMD) {\n      if (module.exports) module.exports = UMD();else root.fuzzysort = UMD();\n    })(commonjsGlobal, function UMD() {\n      function fuzzysortNew(instanceOptions) {\n        var fuzzysort = {\n          single: function single(search, target, options) {\n            if (search == 'farzher') return {\n              target: \"farzher was here (^-^*)/\",\n              score: 0,\n              indexes: [0, 1, 2, 3, 4, 5, 6]\n            };\n            if (!search) return null;\n            if (!isObj(search)) search = fuzzysort.getPreparedSearch(search);\n            if (!target) return null;\n            if (!isObj(target)) target = fuzzysort.getPrepared(target);\n            var allowTypo = options && options.allowTypo !== undefined ? options.allowTypo : instanceOptions && instanceOptions.allowTypo !== undefined ? instanceOptions.allowTypo : true;\n            var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo;\n            return algorithm(search, target, search[0]);\n          },\n          go: function go(search, targets, options) {\n            if (search == 'farzher') return [{\n              target: \"farzher was here (^-^*)/\",\n              score: 0,\n              indexes: [0, 1, 2, 3, 4, 5, 6],\n              obj: targets ? targets[0] : null\n            }];\n            if (!search) return noResults;\n            search = fuzzysort.prepareSearch(search);\n            var searchLowerCode = search[0];\n            var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991;\n            var limit = options && options.limit || instanceOptions && instanceOptions.limit || 9007199254740991;\n            var allowTypo = options && options.allowTypo !== undefined ? options.allowTypo : instanceOptions && instanceOptions.allowTypo !== undefined ? instanceOptions.allowTypo : true;\n            var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo;\n            var resultsLen = 0;\n            var limitedCount = 0;\n            var targetsLen = targets.length; // This code is copy/pasted 3 times for performance reasons [options.keys, options.key, no keys]\n            // options.keys\n\n            if (options && options.keys) {\n              var scoreFn = options.scoreFn || defaultScoreFn;\n              var keys = options.keys;\n              var keysLen = keys.length;\n\n              for (var i = targetsLen - 1; i >= 0; --i) {\n                var obj = targets[i];\n                var objResults = new Array(keysLen);\n\n                for (var keyI = keysLen - 1; keyI >= 0; --keyI) {\n                  var key = keys[keyI];\n                  var target = getValue(obj, key);\n\n                  if (!target) {\n                    objResults[keyI] = null;\n                    continue;\n                  }\n\n                  if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                  objResults[keyI] = algorithm(search, target, searchLowerCode);\n                }\n\n                objResults.obj = obj; // before scoreFn so scoreFn can use it\n\n                var score = scoreFn(objResults);\n                if (score === null) continue;\n                if (score < threshold) continue;\n                objResults.score = score;\n\n                if (resultsLen < limit) {\n                  q.add(objResults);\n                  ++resultsLen;\n                } else {\n                  ++limitedCount;\n                  if (score > q.peek().score) q.replaceTop(objResults);\n                }\n              } // options.key\n\n            } else if (options && options.key) {\n              var key = options.key;\n\n              for (var i = targetsLen - 1; i >= 0; --i) {\n                var obj = targets[i];\n                var target = getValue(obj, key);\n                if (!target) continue;\n                if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                var result = algorithm(search, target, searchLowerCode);\n                if (result === null) continue;\n                if (result.score < threshold) continue; // have to clone result so duplicate targets from different obj can each reference the correct obj\n\n                result = {\n                  target: result.target,\n                  _targetLowerCodes: null,\n                  _nextBeginningIndexes: null,\n                  score: result.score,\n                  indexes: result.indexes,\n                  obj: obj\n                }; // hidden\n\n                if (resultsLen < limit) {\n                  q.add(result);\n                  ++resultsLen;\n                } else {\n                  ++limitedCount;\n                  if (result.score > q.peek().score) q.replaceTop(result);\n                }\n              } // no keys\n\n            } else {\n              for (var i = targetsLen - 1; i >= 0; --i) {\n                var target = targets[i];\n                if (!target) continue;\n                if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                var result = algorithm(search, target, searchLowerCode);\n                if (result === null) continue;\n                if (result.score < threshold) continue;\n\n                if (resultsLen < limit) {\n                  q.add(result);\n                  ++resultsLen;\n                } else {\n                  ++limitedCount;\n                  if (result.score > q.peek().score) q.replaceTop(result);\n                }\n              }\n            }\n\n            if (resultsLen === 0) return noResults;\n            var results = new Array(resultsLen);\n\n            for (var i = resultsLen - 1; i >= 0; --i) {\n              results[i] = q.poll();\n            }\n\n            results.total = resultsLen + limitedCount;\n            return results;\n          },\n          goAsync: function goAsync(search, targets, options) {\n            var canceled = false;\n            var p = new Promise(function (resolve, reject) {\n              if (search == 'farzher') return resolve([{\n                target: \"farzher was here (^-^*)/\",\n                score: 0,\n                indexes: [0, 1, 2, 3, 4, 5, 6],\n                obj: targets ? targets[0] : null\n              }]);\n              if (!search) return resolve(noResults);\n              search = fuzzysort.prepareSearch(search);\n              var searchLowerCode = search[0];\n              var q = fastpriorityqueue();\n              var iCurrent = targets.length - 1;\n              var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991;\n              var limit = options && options.limit || instanceOptions && instanceOptions.limit || 9007199254740991;\n              var allowTypo = options && options.allowTypo !== undefined ? options.allowTypo : instanceOptions && instanceOptions.allowTypo !== undefined ? instanceOptions.allowTypo : true;\n              var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo;\n              var resultsLen = 0;\n              var limitedCount = 0;\n\n              function step() {\n                if (canceled) return reject('canceled');\n                var startMs = Date.now(); // This code is copy/pasted 3 times for performance reasons [options.keys, options.key, no keys]\n                // options.keys\n\n                if (options && options.keys) {\n                  var scoreFn = options.scoreFn || defaultScoreFn;\n                  var keys = options.keys;\n                  var keysLen = keys.length;\n\n                  for (; iCurrent >= 0; --iCurrent) {\n                    if (iCurrent % 1000\n                    /*itemsPerCheck*/\n                    === 0) {\n                      if (Date.now() - startMs >= 10\n                      /*asyncInterval*/\n                      ) {\n                          isNode ? setImmediate(step) : setTimeout(step);\n                          return;\n                        }\n                    }\n\n                    var obj = targets[iCurrent];\n                    var objResults = new Array(keysLen);\n\n                    for (var keyI = keysLen - 1; keyI >= 0; --keyI) {\n                      var key = keys[keyI];\n                      var target = getValue(obj, key);\n\n                      if (!target) {\n                        objResults[keyI] = null;\n                        continue;\n                      }\n\n                      if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                      objResults[keyI] = algorithm(search, target, searchLowerCode);\n                    }\n\n                    objResults.obj = obj; // before scoreFn so scoreFn can use it\n\n                    var score = scoreFn(objResults);\n                    if (score === null) continue;\n                    if (score < threshold) continue;\n                    objResults.score = score;\n\n                    if (resultsLen < limit) {\n                      q.add(objResults);\n                      ++resultsLen;\n                    } else {\n                      ++limitedCount;\n                      if (score > q.peek().score) q.replaceTop(objResults);\n                    }\n                  } // options.key\n\n                } else if (options && options.key) {\n                  var key = options.key;\n\n                  for (; iCurrent >= 0; --iCurrent) {\n                    if (iCurrent % 1000\n                    /*itemsPerCheck*/\n                    === 0) {\n                      if (Date.now() - startMs >= 10\n                      /*asyncInterval*/\n                      ) {\n                          isNode ? setImmediate(step) : setTimeout(step);\n                          return;\n                        }\n                    }\n\n                    var obj = targets[iCurrent];\n                    var target = getValue(obj, key);\n                    if (!target) continue;\n                    if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                    var result = algorithm(search, target, searchLowerCode);\n                    if (result === null) continue;\n                    if (result.score < threshold) continue; // have to clone result so duplicate targets from different obj can each reference the correct obj\n\n                    result = {\n                      target: result.target,\n                      _targetLowerCodes: null,\n                      _nextBeginningIndexes: null,\n                      score: result.score,\n                      indexes: result.indexes,\n                      obj: obj\n                    }; // hidden\n\n                    if (resultsLen < limit) {\n                      q.add(result);\n                      ++resultsLen;\n                    } else {\n                      ++limitedCount;\n                      if (result.score > q.peek().score) q.replaceTop(result);\n                    }\n                  } // no keys\n\n                } else {\n                  for (; iCurrent >= 0; --iCurrent) {\n                    if (iCurrent % 1000\n                    /*itemsPerCheck*/\n                    === 0) {\n                      if (Date.now() - startMs >= 10\n                      /*asyncInterval*/\n                      ) {\n                          isNode ? setImmediate(step) : setTimeout(step);\n                          return;\n                        }\n                    }\n\n                    var target = targets[iCurrent];\n                    if (!target) continue;\n                    if (!isObj(target)) target = fuzzysort.getPrepared(target);\n                    var result = algorithm(search, target, searchLowerCode);\n                    if (result === null) continue;\n                    if (result.score < threshold) continue;\n\n                    if (resultsLen < limit) {\n                      q.add(result);\n                      ++resultsLen;\n                    } else {\n                      ++limitedCount;\n                      if (result.score > q.peek().score) q.replaceTop(result);\n                    }\n                  }\n                }\n\n                if (resultsLen === 0) return resolve(noResults);\n                var results = new Array(resultsLen);\n\n                for (var i = resultsLen - 1; i >= 0; --i) {\n                  results[i] = q.poll();\n                }\n\n                results.total = resultsLen + limitedCount;\n                resolve(results);\n              }\n\n              isNode ? setImmediate(step) : step(); //setTimeout here is too slow\n            });\n\n            p.cancel = function () {\n              canceled = true;\n            };\n\n            return p;\n          },\n          highlight: function highlight(result, hOpen, hClose) {\n            if (typeof hOpen == 'function') return fuzzysort.highlightCallback(result, hOpen);\n            if (result === null) return null;\n            if (hOpen === undefined) hOpen = '<b>';\n            if (hClose === undefined) hClose = '</b>';\n            var highlighted = '';\n            var matchesIndex = 0;\n            var opened = false;\n            var target = result.target;\n            var targetLen = target.length;\n            var matchesBest = result.indexes;\n\n            for (var i = 0; i < targetLen; ++i) {\n              var char = target[i];\n\n              if (matchesBest[matchesIndex] === i) {\n                ++matchesIndex;\n\n                if (!opened) {\n                  opened = true;\n                  highlighted += hOpen;\n                }\n\n                if (matchesIndex === matchesBest.length) {\n                  highlighted += char + hClose + target.substr(i + 1);\n                  break;\n                }\n              } else {\n                if (opened) {\n                  opened = false;\n                  highlighted += hClose;\n                }\n              }\n\n              highlighted += char;\n            }\n\n            return highlighted;\n          },\n          highlightCallback: function highlightCallback(result, cb) {\n            if (result === null) return null;\n            var target = result.target;\n            var targetLen = target.length;\n            var indexes = result.indexes;\n            var highlighted = '';\n            var matchI = 0;\n            var indexesI = 0;\n            var opened = false;\n            var result = [];\n\n            for (var i = 0; i < targetLen; ++i) {\n              var char = target[i];\n\n              if (indexes[indexesI] === i) {\n                ++indexesI;\n\n                if (!opened) {\n                  opened = true;\n                  result.push(highlighted);\n                  highlighted = '';\n                }\n\n                if (indexesI === indexes.length) {\n                  highlighted += char;\n                  result.push(cb(highlighted, matchI++));\n                  highlighted = '';\n                  result.push(target.substr(i + 1));\n                  break;\n                }\n              } else {\n                if (opened) {\n                  opened = false;\n                  result.push(cb(highlighted, matchI++));\n                  highlighted = '';\n                }\n              }\n\n              highlighted += char;\n            }\n\n            return result;\n          },\n          prepare: function prepare(target) {\n            if (!target) return {\n              target: '',\n              _targetLowerCodes: [0\n              /*this 0 doesn't make sense. here because an empty array causes the algorithm to deoptimize and run 50% slower!*/\n              ],\n              _nextBeginningIndexes: null,\n              score: null,\n              indexes: null,\n              obj: null\n            }; // hidden\n\n            return {\n              target: target,\n              _targetLowerCodes: fuzzysort.prepareLowerCodes(target),\n              _nextBeginningIndexes: null,\n              score: null,\n              indexes: null,\n              obj: null\n            }; // hidden\n          },\n          prepareSlow: function prepareSlow(target) {\n            if (!target) return {\n              target: '',\n              _targetLowerCodes: [0\n              /*this 0 doesn't make sense. here because an empty array causes the algorithm to deoptimize and run 50% slower!*/\n              ],\n              _nextBeginningIndexes: null,\n              score: null,\n              indexes: null,\n              obj: null\n            }; // hidden\n\n            return {\n              target: target,\n              _targetLowerCodes: fuzzysort.prepareLowerCodes(target),\n              _nextBeginningIndexes: fuzzysort.prepareNextBeginningIndexes(target),\n              score: null,\n              indexes: null,\n              obj: null\n            }; // hidden\n          },\n          prepareSearch: function prepareSearch(search) {\n            if (!search) search = '';\n            return fuzzysort.prepareLowerCodes(search);\n          },\n          // Below this point is only internal code\n          // Below this point is only internal code\n          // Below this point is only internal code\n          // Below this point is only internal code\n          getPrepared: function getPrepared(target) {\n            if (target.length > 999) return fuzzysort.prepare(target); // don't cache huge targets\n\n            var targetPrepared = preparedCache.get(target);\n            if (targetPrepared !== undefined) return targetPrepared;\n            targetPrepared = fuzzysort.prepare(target);\n            preparedCache.set(target, targetPrepared);\n            return targetPrepared;\n          },\n          getPreparedSearch: function getPreparedSearch(search) {\n            if (search.length > 999) return fuzzysort.prepareSearch(search); // don't cache huge searches\n\n            var searchPrepared = preparedSearchCache.get(search);\n            if (searchPrepared !== undefined) return searchPrepared;\n            searchPrepared = fuzzysort.prepareSearch(search);\n            preparedSearchCache.set(search, searchPrepared);\n            return searchPrepared;\n          },\n          algorithm: function algorithm(searchLowerCodes, prepared, searchLowerCode) {\n            var targetLowerCodes = prepared._targetLowerCodes;\n            var searchLen = searchLowerCodes.length;\n            var targetLen = targetLowerCodes.length;\n            var searchI = 0; // where we at\n\n            var targetI = 0; // where you at\n\n            var typoSimpleI = 0;\n            var matchesSimpleLen = 0; // very basic fuzzy match; to remove non-matching targets ASAP!\n            // walk through target. find sequential matches.\n            // if all chars aren't found then exit\n\n            for (;;) {\n              var isMatch = searchLowerCode === targetLowerCodes[targetI];\n\n              if (isMatch) {\n                matchesSimple[matchesSimpleLen++] = targetI;\n                ++searchI;\n                if (searchI === searchLen) break;\n                searchLowerCode = searchLowerCodes[typoSimpleI === 0 ? searchI : typoSimpleI === searchI ? searchI + 1 : typoSimpleI === searchI - 1 ? searchI - 1 : searchI];\n              }\n\n              ++targetI;\n\n              if (targetI >= targetLen) {\n                // Failed to find searchI\n                // Check for typo or exit\n                // we go as far as possible before trying to transpose\n                // then we transpose backwards until we reach the beginning\n                for (;;) {\n                  if (searchI <= 1) return null; // not allowed to transpose first char\n\n                  if (typoSimpleI === 0) {\n                    // we haven't tried to transpose yet\n                    --searchI;\n                    var searchLowerCodeNew = searchLowerCodes[searchI];\n                    if (searchLowerCode === searchLowerCodeNew) continue; // doesn't make sense to transpose a repeat char\n\n                    typoSimpleI = searchI;\n                  } else {\n                    if (typoSimpleI === 1) return null; // reached the end of the line for transposing\n\n                    --typoSimpleI;\n                    searchI = typoSimpleI;\n                    searchLowerCode = searchLowerCodes[searchI + 1];\n                    var searchLowerCodeNew = searchLowerCodes[searchI];\n                    if (searchLowerCode === searchLowerCodeNew) continue; // doesn't make sense to transpose a repeat char\n                  }\n\n                  matchesSimpleLen = searchI;\n                  targetI = matchesSimple[matchesSimpleLen - 1] + 1;\n                  break;\n                }\n              }\n            }\n\n            var searchI = 0;\n            var typoStrictI = 0;\n            var successStrict = false;\n            var matchesStrictLen = 0;\n            var nextBeginningIndexes = prepared._nextBeginningIndexes;\n            if (nextBeginningIndexes === null) nextBeginningIndexes = prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);\n            var firstPossibleI = targetI = matchesSimple[0] === 0 ? 0 : nextBeginningIndexes[matchesSimple[0] - 1]; // Our target string successfully matched all characters in sequence!\n            // Let's try a more advanced and strict test to improve the score\n            // only count it as a match if it's consecutive or a beginning character!\n\n            if (targetI !== targetLen) for (;;) {\n              if (targetI >= targetLen) {\n                // We failed to find a good spot for this search char, go back to the previous search char and force it forward\n                if (searchI <= 0) {\n                  // We failed to push chars forward for a better match\n                  // transpose, starting from the beginning\n                  ++typoStrictI;\n                  if (typoStrictI > searchLen - 2) break;\n                  if (searchLowerCodes[typoStrictI] === searchLowerCodes[typoStrictI + 1]) continue; // doesn't make sense to transpose a repeat char\n\n                  targetI = firstPossibleI;\n                  continue;\n                }\n\n                --searchI;\n                var lastMatch = matchesStrict[--matchesStrictLen];\n                targetI = nextBeginningIndexes[lastMatch];\n              } else {\n                var isMatch = searchLowerCodes[typoStrictI === 0 ? searchI : typoStrictI === searchI ? searchI + 1 : typoStrictI === searchI - 1 ? searchI - 1 : searchI] === targetLowerCodes[targetI];\n\n                if (isMatch) {\n                  matchesStrict[matchesStrictLen++] = targetI;\n                  ++searchI;\n\n                  if (searchI === searchLen) {\n                    successStrict = true;\n                    break;\n                  }\n\n                  ++targetI;\n                } else {\n                  targetI = nextBeginningIndexes[targetI];\n                }\n              }\n            }\n            {\n              // tally up the score & keep track of matches for highlighting later\n              if (successStrict) {\n                var matchesBest = matchesStrict;\n                var matchesBestLen = matchesStrictLen;\n              } else {\n                var matchesBest = matchesSimple;\n                var matchesBestLen = matchesSimpleLen;\n              }\n\n              var score = 0;\n              var lastTargetI = -1;\n\n              for (var i = 0; i < searchLen; ++i) {\n                var targetI = matchesBest[i]; // score only goes down if they're not consecutive\n\n                if (lastTargetI !== targetI - 1) score -= targetI;\n                lastTargetI = targetI;\n              }\n\n              if (!successStrict) {\n                score *= 1000;\n                if (typoSimpleI !== 0) score += -20;\n                /*typoPenalty*/\n              } else {\n                if (typoStrictI !== 0) score += -20;\n                /*typoPenalty*/\n              }\n\n              score -= targetLen - searchLen;\n              prepared.score = score;\n              prepared.indexes = new Array(matchesBestLen);\n\n              for (var i = matchesBestLen - 1; i >= 0; --i) {\n                prepared.indexes[i] = matchesBest[i];\n              }\n\n              return prepared;\n            }\n          },\n          algorithmNoTypo: function algorithmNoTypo(searchLowerCodes, prepared, searchLowerCode) {\n            var targetLowerCodes = prepared._targetLowerCodes;\n            var searchLen = searchLowerCodes.length;\n            var targetLen = targetLowerCodes.length;\n            var searchI = 0; // where we at\n\n            var targetI = 0; // where you at\n\n            var matchesSimpleLen = 0; // very basic fuzzy match; to remove non-matching targets ASAP!\n            // walk through target. find sequential matches.\n            // if all chars aren't found then exit\n\n            for (;;) {\n              var isMatch = searchLowerCode === targetLowerCodes[targetI];\n\n              if (isMatch) {\n                matchesSimple[matchesSimpleLen++] = targetI;\n                ++searchI;\n                if (searchI === searchLen) break;\n                searchLowerCode = searchLowerCodes[searchI];\n              }\n\n              ++targetI;\n              if (targetI >= targetLen) return null; // Failed to find searchI\n            }\n\n            var searchI = 0;\n            var successStrict = false;\n            var matchesStrictLen = 0;\n            var nextBeginningIndexes = prepared._nextBeginningIndexes;\n            if (nextBeginningIndexes === null) nextBeginningIndexes = prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);\n            targetI = matchesSimple[0] === 0 ? 0 : nextBeginningIndexes[matchesSimple[0] - 1]; // Our target string successfully matched all characters in sequence!\n            // Let's try a more advanced and strict test to improve the score\n            // only count it as a match if it's consecutive or a beginning character!\n\n            if (targetI !== targetLen) for (;;) {\n              if (targetI >= targetLen) {\n                // We failed to find a good spot for this search char, go back to the previous search char and force it forward\n                if (searchI <= 0) break; // We failed to push chars forward for a better match\n\n                --searchI;\n                var lastMatch = matchesStrict[--matchesStrictLen];\n                targetI = nextBeginningIndexes[lastMatch];\n              } else {\n                var isMatch = searchLowerCodes[searchI] === targetLowerCodes[targetI];\n\n                if (isMatch) {\n                  matchesStrict[matchesStrictLen++] = targetI;\n                  ++searchI;\n\n                  if (searchI === searchLen) {\n                    successStrict = true;\n                    break;\n                  }\n\n                  ++targetI;\n                } else {\n                  targetI = nextBeginningIndexes[targetI];\n                }\n              }\n            }\n            {\n              // tally up the score & keep track of matches for highlighting later\n              if (successStrict) {\n                var matchesBest = matchesStrict;\n                var matchesBestLen = matchesStrictLen;\n              } else {\n                var matchesBest = matchesSimple;\n                var matchesBestLen = matchesSimpleLen;\n              }\n\n              var score = 0;\n              var lastTargetI = -1;\n\n              for (var i = 0; i < searchLen; ++i) {\n                var targetI = matchesBest[i]; // score only goes down if they're not consecutive\n\n                if (lastTargetI !== targetI - 1) score -= targetI;\n                lastTargetI = targetI;\n              }\n\n              if (!successStrict) score *= 1000;\n              score -= targetLen - searchLen;\n              prepared.score = score;\n              prepared.indexes = new Array(matchesBestLen);\n\n              for (var i = matchesBestLen - 1; i >= 0; --i) {\n                prepared.indexes[i] = matchesBest[i];\n              }\n\n              return prepared;\n            }\n          },\n          prepareLowerCodes: function prepareLowerCodes(str) {\n            var strLen = str.length;\n            var lowerCodes = []; // new Array(strLen)    sparse array is too slow\n\n            var lower = str.toLowerCase();\n\n            for (var i = 0; i < strLen; ++i) {\n              lowerCodes[i] = lower.charCodeAt(i);\n            }\n\n            return lowerCodes;\n          },\n          prepareBeginningIndexes: function prepareBeginningIndexes(target) {\n            var targetLen = target.length;\n            var beginningIndexes = [];\n            var beginningIndexesLen = 0;\n            var wasUpper = false;\n            var wasAlphanum = false;\n\n            for (var i = 0; i < targetLen; ++i) {\n              var targetCode = target.charCodeAt(i);\n              var isUpper = targetCode >= 65 && targetCode <= 90;\n              var isAlphanum = isUpper || targetCode >= 97 && targetCode <= 122 || targetCode >= 48 && targetCode <= 57;\n              var isBeginning = isUpper && !wasUpper || !wasAlphanum || !isAlphanum;\n              wasUpper = isUpper;\n              wasAlphanum = isAlphanum;\n              if (isBeginning) beginningIndexes[beginningIndexesLen++] = i;\n            }\n\n            return beginningIndexes;\n          },\n          prepareNextBeginningIndexes: function prepareNextBeginningIndexes(target) {\n            var targetLen = target.length;\n            var beginningIndexes = fuzzysort.prepareBeginningIndexes(target);\n            var nextBeginningIndexes = []; // new Array(targetLen)     sparse array is too slow\n\n            var lastIsBeginning = beginningIndexes[0];\n            var lastIsBeginningI = 0;\n\n            for (var i = 0; i < targetLen; ++i) {\n              if (lastIsBeginning > i) {\n                nextBeginningIndexes[i] = lastIsBeginning;\n              } else {\n                lastIsBeginning = beginningIndexes[++lastIsBeginningI];\n                nextBeginningIndexes[i] = lastIsBeginning === undefined ? targetLen : lastIsBeginning;\n              }\n            }\n\n            return nextBeginningIndexes;\n          },\n          cleanup: cleanup,\n          new: fuzzysortNew\n        };\n        return fuzzysort;\n      } // fuzzysortNew\n      // This stuff is outside fuzzysortNew, because it's shared with instances of fuzzysort.new()\n\n\n      var isNode = typeof commonjsRequire !== 'undefined' && typeof window === 'undefined';\n      var MyMap = typeof Map === 'function' ? Map : function () {\n        var s = Object.create(null);\n\n        this.get = function (k) {\n          return s[k];\n        };\n\n        this.set = function (k, val) {\n          s[k] = val;\n          return this;\n        };\n\n        this.clear = function () {\n          s = Object.create(null);\n        };\n      };\n      var preparedCache = new MyMap();\n      var preparedSearchCache = new MyMap();\n      var noResults = [];\n      noResults.total = 0;\n      var matchesSimple = [];\n      var matchesStrict = [];\n\n      function cleanup() {\n        preparedCache.clear();\n        preparedSearchCache.clear();\n        matchesSimple = [];\n        matchesStrict = [];\n      }\n\n      function defaultScoreFn(a) {\n        var max = -9007199254740991;\n\n        for (var i = a.length - 1; i >= 0; --i) {\n          var result = a[i];\n          if (result === null) continue;\n          var score = result.score;\n          if (score > max) max = score;\n        }\n\n        if (max === -9007199254740991) return null;\n        return max;\n      } // prop = 'key'              2.5ms optimized for this case, seems to be about as fast as direct obj[prop]\n      // prop = 'key1.key2'        10ms\n      // prop = ['key1', 'key2']   27ms\n\n\n      function getValue(obj, prop) {\n        var tmp = obj[prop];\n        if (tmp !== undefined) return tmp;\n        var segs = prop;\n        if (!Array.isArray(prop)) segs = prop.split('.');\n        var len = segs.length;\n        var i = -1;\n\n        while (obj && ++i < len) {\n          obj = obj[segs[i]];\n        }\n\n        return obj;\n      }\n\n      function isObj(x) {\n        return _typeof(x) === 'object';\n      } // faster as a function\n      // Hacked version of https://github.com/lemire/FastPriorityQueue.js\n\n\n      var fastpriorityqueue = function fastpriorityqueue() {\n        var r = [],\n            o = 0,\n            e = {};\n\n        function n() {\n          for (var e = 0, n = r[e], c = 1; c < o;) {\n            var f = c + 1;\n            e = c, f < o && r[f].score < r[c].score && (e = f), r[e - 1 >> 1] = r[e], c = 1 + (e << 1);\n          }\n\n          for (var a = e - 1 >> 1; e > 0 && n.score < r[a].score; a = (e = a) - 1 >> 1) {\n            r[e] = r[a];\n          }\n\n          r[e] = n;\n        }\n\n        return e.add = function (e) {\n          var n = o;\n          r[o++] = e;\n\n          for (var c = n - 1 >> 1; n > 0 && e.score < r[c].score; c = (n = c) - 1 >> 1) {\n            r[n] = r[c];\n          }\n\n          r[n] = e;\n        }, e.poll = function () {\n          if (0 !== o) {\n            var e = r[0];\n            return r[0] = r[--o], n(), e;\n          }\n        }, e.peek = function (e) {\n          if (0 !== o) return r[0];\n        }, e.replaceTop = function (o) {\n          r[0] = o, n();\n        }, e;\n      };\n\n      var q = fastpriorityqueue(); // reuse this, except for async, it needs to make its own\n\n      return fuzzysortNew();\n    }); // UMD\n    // TODO: (performance) wasm version!?\n    // TODO: (performance) threads?\n    // TODO: (performance) avoid cache misses\n    // TODO: (performance) preparedCache is a memory leak\n    // TODO: (like sublime) backslash === forwardslash\n    // TODO: (like sublime) spaces: \"a b\" should do 2 searches 1 for a and 1 for b\n    // TODO: (scoring) garbage in targets that allows most searches to strict match need a penality\n    // TODO: (performance) idk if allowTypo is optimized\n\n  })(fuzzysort$1);\n\n  var fuzzysort = fuzzysort$1.exports;\n  var stats = {\n    failedTests: [],\n    defined: 0,\n    completed: 0\n  }; // Escape text for attribute or text content.\n\n  function escapeText(str) {\n    if (!str) {\n      return '';\n    } // Both single quotes and double quotes (for attributes)\n\n\n    return ('' + str).replace(/['\"<>&]/g, function (s) {\n      switch (s) {\n        case \"'\":\n          return '&#039;';\n\n        case '\"':\n          return '&quot;';\n\n        case '<':\n          return '&lt;';\n\n        case '>':\n          return '&gt;';\n\n        case '&':\n          return '&amp;';\n      }\n    });\n  }\n\n  (function () {\n    // Don't load the HTML Reporter on non-browser environments\n    if (!window$1 || !document) {\n      return;\n    }\n\n    var config = QUnit.config;\n    var hiddenTests = [];\n    var collapseNext = false;\n    var hasOwn = Object.prototype.hasOwnProperty;\n    var unfilteredUrl = setUrl({\n      filter: undefined,\n      module: undefined,\n      moduleId: undefined,\n      testId: undefined\n    });\n    var dropdownData = null;\n\n    function trim(string) {\n      if (typeof string.trim === 'function') {\n        return string.trim();\n      } else {\n        return string.replace(/^\\s+|\\s+$/g, '');\n      }\n    }\n\n    function addEvent(elem, type, fn) {\n      elem.addEventListener(type, fn, false);\n    }\n\n    function removeEvent(elem, type, fn) {\n      elem.removeEventListener(type, fn, false);\n    }\n\n    function addEvents(elems, type, fn) {\n      var i = elems.length;\n\n      while (i--) {\n        addEvent(elems[i], type, fn);\n      }\n    }\n\n    function hasClass(elem, name) {\n      return (' ' + elem.className + ' ').indexOf(' ' + name + ' ') >= 0;\n    }\n\n    function addClass(elem, name) {\n      if (!hasClass(elem, name)) {\n        elem.className += (elem.className ? ' ' : '') + name;\n      }\n    }\n\n    function toggleClass(elem, name, force) {\n      if (force || typeof force === 'undefined' && !hasClass(elem, name)) {\n        addClass(elem, name);\n      } else {\n        removeClass(elem, name);\n      }\n    }\n\n    function removeClass(elem, name) {\n      var set = ' ' + elem.className + ' '; // Class name may appear multiple times\n\n      while (set.indexOf(' ' + name + ' ') >= 0) {\n        set = set.replace(' ' + name + ' ', ' ');\n      } // Trim for prettiness\n\n\n      elem.className = trim(set);\n    }\n\n    function id(name) {\n      return document.getElementById && document.getElementById(name);\n    }\n\n    function abortTests() {\n      var abortButton = id('qunit-abort-tests-button');\n\n      if (abortButton) {\n        abortButton.disabled = true;\n        abortButton.innerHTML = 'Aborting...';\n      }\n\n      QUnit.config.queue.length = 0;\n      return false;\n    }\n\n    function interceptNavigation(ev) {\n      // Trim potential accidental whitespace so that QUnit doesn't throw an error about no tests matching the filter.\n      var filterInputElem = id('qunit-filter-input');\n      filterInputElem.value = trim(filterInputElem.value);\n      applyUrlParams();\n\n      if (ev && ev.preventDefault) {\n        ev.preventDefault();\n      }\n\n      return false;\n    }\n\n    function getUrlConfigHtml() {\n      var selection = false;\n      var urlConfig = config.urlConfig;\n      var urlConfigHtml = '';\n\n      for (var i = 0; i < urlConfig.length; i++) {\n        // Options can be either strings or objects with nonempty \"id\" properties\n        var val = config.urlConfig[i];\n\n        if (typeof val === 'string') {\n          val = {\n            id: val,\n            label: val\n          };\n        }\n\n        var escaped = escapeText(val.id);\n        var escapedTooltip = escapeText(val.tooltip);\n\n        if (!val.value || typeof val.value === 'string') {\n          urlConfigHtml += \"<label for='qunit-urlconfig-\" + escaped + \"' title='\" + escapedTooltip + \"'><input id='qunit-urlconfig-\" + escaped + \"' name='\" + escaped + \"' type='checkbox'\" + (val.value ? \" value='\" + escapeText(val.value) + \"'\" : '') + (config[val.id] ? \" checked='checked'\" : '') + \" title='\" + escapedTooltip + \"' />\" + escapeText(val.label) + '</label>';\n        } else {\n          urlConfigHtml += \"<label for='qunit-urlconfig-\" + escaped + \"' title='\" + escapedTooltip + \"'>\" + val.label + \": </label><select id='qunit-urlconfig-\" + escaped + \"' name='\" + escaped + \"' title='\" + escapedTooltip + \"'><option></option>\";\n\n          if (Array.isArray(val.value)) {\n            for (var j = 0; j < val.value.length; j++) {\n              escaped = escapeText(val.value[j]);\n              urlConfigHtml += \"<option value='\" + escaped + \"'\" + (config[val.id] === val.value[j] ? (selection = true) && \" selected='selected'\" : '') + '>' + escaped + '</option>';\n            }\n          } else {\n            for (var _j in val.value) {\n              if (hasOwn.call(val.value, _j)) {\n                urlConfigHtml += \"<option value='\" + escapeText(_j) + \"'\" + (config[val.id] === _j ? (selection = true) && \" selected='selected'\" : '') + '>' + escapeText(val.value[_j]) + '</option>';\n              }\n            }\n          }\n\n          if (config[val.id] && !selection) {\n            escaped = escapeText(config[val.id]);\n            urlConfigHtml += \"<option value='\" + escaped + \"' selected='selected' disabled='disabled'>\" + escaped + '</option>';\n          }\n\n          urlConfigHtml += '</select>';\n        }\n      }\n\n      return urlConfigHtml;\n    } // Handle \"click\" events on toolbar checkboxes and \"change\" for select menus.\n    // Updates the URL with the new state of `config.urlConfig` values.\n\n\n    function toolbarChanged() {\n      var field = this;\n      var params = {}; // Detect if field is a select menu or a checkbox\n\n      var value;\n\n      if ('selectedIndex' in field) {\n        value = field.options[field.selectedIndex].value || undefined;\n      } else {\n        value = field.checked ? field.defaultValue || true : undefined;\n      }\n\n      params[field.name] = value;\n      var updatedUrl = setUrl(params); // Check if we can apply the change without a page refresh\n\n      if (field.name === 'hidepassed' && 'replaceState' in window$1.history) {\n        QUnit.urlParams[field.name] = value;\n        config[field.name] = value || false;\n        var tests = id('qunit-tests');\n\n        if (tests) {\n          var length = tests.children.length;\n          var children = tests.children;\n\n          if (field.checked) {\n            for (var i = 0; i < length; i++) {\n              var test = children[i];\n              var className = test ? test.className : '';\n              var classNameHasPass = className.indexOf('pass') > -1;\n              var classNameHasSkipped = className.indexOf('skipped') > -1;\n\n              if (classNameHasPass || classNameHasSkipped) {\n                hiddenTests.push(test);\n              }\n            }\n\n            var _iterator = _createForOfIteratorHelper(hiddenTests),\n                _step;\n\n            try {\n              for (_iterator.s(); !(_step = _iterator.n()).done;) {\n                var hiddenTest = _step.value;\n                tests.removeChild(hiddenTest);\n              }\n            } catch (err) {\n              _iterator.e(err);\n            } finally {\n              _iterator.f();\n            }\n          } else {\n            var _test;\n\n            while ((_test = hiddenTests.pop()) != null) {\n              tests.appendChild(_test);\n            }\n          }\n        }\n\n        window$1.history.replaceState(null, '', updatedUrl);\n      } else {\n        window$1.location = updatedUrl;\n      }\n    }\n\n    function setUrl(params) {\n      var querystring = '?';\n      var location = window$1.location;\n      params = extend(extend({}, QUnit.urlParams), params);\n\n      for (var key in params) {\n        // Skip inherited or undefined properties\n        if (hasOwn.call(params, key) && params[key] !== undefined) {\n          // Output a parameter for each value of this key\n          // (but usually just one)\n          var arrValue = [].concat(params[key]);\n\n          for (var i = 0; i < arrValue.length; i++) {\n            querystring += encodeURIComponent(key);\n\n            if (arrValue[i] !== true) {\n              querystring += '=' + encodeURIComponent(arrValue[i]);\n            }\n\n            querystring += '&';\n          }\n        }\n      }\n\n      return location.protocol + '//' + location.host + location.pathname + querystring.slice(0, -1);\n    }\n\n    function applyUrlParams() {\n      var filter = id('qunit-filter-input').value;\n      window$1.location = setUrl({\n        filter: filter === '' ? undefined : filter,\n        moduleId: _toConsumableArray(dropdownData.selectedMap.keys()),\n        // Remove module and testId filter\n        module: undefined,\n        testId: undefined\n      });\n    }\n\n    function toolbarUrlConfigContainer() {\n      var urlConfigContainer = document.createElement('span');\n      urlConfigContainer.innerHTML = getUrlConfigHtml();\n      addClass(urlConfigContainer, 'qunit-url-config');\n      addEvents(urlConfigContainer.getElementsByTagName('input'), 'change', toolbarChanged);\n      addEvents(urlConfigContainer.getElementsByTagName('select'), 'change', toolbarChanged);\n      return urlConfigContainer;\n    }\n\n    function abortTestsButton() {\n      var button = document.createElement('button');\n      button.id = 'qunit-abort-tests-button';\n      button.innerHTML = 'Abort';\n      addEvent(button, 'click', abortTests);\n      return button;\n    }\n\n    function toolbarLooseFilter() {\n      var filter = document.createElement('form');\n      var label = document.createElement('label');\n      var input = document.createElement('input');\n      var button = document.createElement('button');\n      addClass(filter, 'qunit-filter');\n      label.innerHTML = 'Filter: ';\n      input.type = 'text';\n      input.value = config.filter || '';\n      input.name = 'filter';\n      input.id = 'qunit-filter-input';\n      button.innerHTML = 'Go';\n      label.appendChild(input);\n      filter.appendChild(label);\n      filter.appendChild(document.createTextNode(' '));\n      filter.appendChild(button);\n      addEvent(filter, 'submit', interceptNavigation);\n      return filter;\n    }\n\n    function createModuleListItem(moduleId, name, checked) {\n      return '<li><label class=\"clickable' + (checked ? ' checked' : '') + '\"><input type=\"checkbox\" ' + 'value=\"' + escapeText(moduleId) + '\"' + (checked ? ' checked=\"checked\"' : '') + ' />' + escapeText(name) + '</label></li>';\n    }\n    /**\n     * @param {Array} Results from fuzzysort\n     * @return {string} HTML\n     */\n\n\n    function moduleListHtml(results) {\n      var html = ''; // Hoist the already selected items, and show them always\n      // even if not matched by the current search.\n\n      dropdownData.selectedMap.forEach(function (name, moduleId) {\n        html += createModuleListItem(moduleId, name, true);\n      });\n\n      for (var i = 0; i < results.length; i++) {\n        var mod = results[i].obj;\n\n        if (!dropdownData.selectedMap.has(mod.moduleId)) {\n          html += createModuleListItem(mod.moduleId, mod.name, false);\n        }\n      }\n\n      return html;\n    }\n\n    function toolbarModuleFilter(beginDetails) {\n      var initialSelected = null;\n      dropdownData = {\n        options: beginDetails.modules.slice(),\n        selectedMap: new StringMap(),\n        isDirty: function isDirty() {\n          return _toConsumableArray(dropdownData.selectedMap.keys()).sort().join(',') !== _toConsumableArray(initialSelected.keys()).sort().join(',');\n        }\n      };\n\n      if (config.moduleId.length) {\n        // The module dropdown is seeded with the runtime configuration of the last run.\n        //\n        // We don't reference `config.moduleId` directly after this and keep our own\n        // copy because:\n        // 1. This naturaly filters out unknown moduleIds.\n        // 2. Gives us a place to manage and remember unsubmitted checkbox changes.\n        // 3. Gives us an efficient way to map a selected moduleId to module name\n        //    during rendering.\n        for (var i = 0; i < beginDetails.modules.length; i++) {\n          var mod = beginDetails.modules[i];\n\n          if (config.moduleId.indexOf(mod.moduleId) !== -1) {\n            dropdownData.selectedMap.set(mod.moduleId, mod.name);\n          }\n        }\n      }\n\n      initialSelected = new StringMap(dropdownData.selectedMap);\n      var moduleSearch = document.createElement('input');\n      moduleSearch.id = 'qunit-modulefilter-search';\n      moduleSearch.autocomplete = 'off';\n      addEvent(moduleSearch, 'input', searchInput);\n      addEvent(moduleSearch, 'input', searchFocus);\n      addEvent(moduleSearch, 'focus', searchFocus);\n      addEvent(moduleSearch, 'click', searchFocus);\n      var label = document.createElement('label');\n      label.htmlFor = 'qunit-modulefilter-search';\n      label.textContent = 'Module:';\n      var searchContainer = document.createElement('span');\n      searchContainer.id = 'qunit-modulefilter-search-container';\n      searchContainer.appendChild(moduleSearch);\n      var applyButton = document.createElement('button');\n      applyButton.textContent = 'Apply';\n      applyButton.title = 'Re-run the selected test modules';\n      addEvent(applyButton, 'click', applyUrlParams);\n      var resetButton = document.createElement('button');\n      resetButton.textContent = 'Reset';\n      resetButton.type = 'reset';\n      resetButton.title = 'Restore the previous module selection';\n      var clearButton = document.createElement('button');\n      clearButton.textContent = 'Select none';\n      clearButton.type = 'button';\n      clearButton.title = 'Clear the current module selection';\n      addEvent(clearButton, 'click', function () {\n        dropdownData.selectedMap.clear();\n        selectionChange();\n        searchInput();\n      });\n      var actions = document.createElement('span');\n      actions.id = 'qunit-modulefilter-actions';\n      actions.appendChild(applyButton);\n      actions.appendChild(resetButton);\n\n      if (initialSelected.size) {\n        // Only show clear button if functionally different from reset\n        actions.appendChild(clearButton);\n      }\n\n      var dropDownList = document.createElement('ul');\n      dropDownList.id = 'qunit-modulefilter-dropdown-list';\n      var dropDown = document.createElement('div');\n      dropDown.id = 'qunit-modulefilter-dropdown';\n      dropDown.style.display = 'none';\n      dropDown.appendChild(actions);\n      dropDown.appendChild(dropDownList);\n      addEvent(dropDown, 'change', selectionChange);\n      searchContainer.appendChild(dropDown); // Set initial moduleSearch.placeholder and clearButton/resetButton.\n\n      selectionChange();\n      var moduleFilter = document.createElement('form');\n      moduleFilter.id = 'qunit-modulefilter';\n      moduleFilter.appendChild(label);\n      moduleFilter.appendChild(document.createTextNode(' '));\n      moduleFilter.appendChild(searchContainer);\n      addEvent(moduleFilter, 'submit', interceptNavigation);\n      addEvent(moduleFilter, 'reset', function () {\n        dropdownData.selectedMap = new StringMap(initialSelected); // Set moduleSearch.placeholder and reflect non-dirty state\n\n        selectionChange();\n        searchInput();\n      }); // Enables show/hide for the dropdown\n\n      function searchFocus() {\n        if (dropDown.style.display !== 'none') {\n          return;\n        } // Optimization: Defer rendering options until focussed.\n        // https://github.com/qunitjs/qunit/issues/1664\n\n\n        searchInput();\n        dropDown.style.display = 'block'; // Hide on Escape keydown or on click outside the container\n\n        addEvent(document, 'click', hideHandler);\n        addEvent(document, 'keydown', hideHandler);\n\n        function hideHandler(e) {\n          var inContainer = moduleFilter.contains(e.target);\n\n          if (e.keyCode === 27 || !inContainer) {\n            if (e.keyCode === 27 && inContainer) {\n              moduleSearch.focus();\n            }\n\n            dropDown.style.display = 'none';\n            removeEvent(document, 'click', hideHandler);\n            removeEvent(document, 'keydown', hideHandler);\n            moduleSearch.value = '';\n            searchInput();\n          }\n        }\n      }\n      /**\n       * @param {string} searchText\n       * @return {string} HTML\n       */\n\n\n      function filterModules(searchText) {\n        var results;\n\n        if (searchText === '') {\n          // Improve on-boarding experience by having an immediate display of\n          // module names, indicating how the interface works. This also makes\n          // for a quicker interaction in the common case of small projects.\n          // Don't mandate typing just to get the menu.\n          results = dropdownData.options.slice(0, 20).map(function (obj) {\n            // Fake empty results. https://github.com/farzher/fuzzysort/issues/41\n            return {\n              obj: obj\n            };\n          });\n        } else {\n          results = fuzzysort.go(searchText, dropdownData.options, {\n            limit: 20,\n            key: 'name',\n            allowTypo: true\n          });\n        }\n\n        return moduleListHtml(results);\n      } // Processes module search box input\n\n\n      var searchInputTimeout;\n\n      function searchInput() {\n        // Use a debounce with a ~0ms timeout. This is effectively instantaneous,\n        // but is better than undebounced because it avoids an ever-growing\n        // backlog of unprocessed now-outdated input events if fuzzysearch or\n        // drodown DOM is slow (e.g. very large test suite).\n        window$1.clearTimeout(searchInputTimeout);\n        searchInputTimeout = window$1.setTimeout(function () {\n          dropDownList.innerHTML = filterModules(moduleSearch.value);\n        });\n      } // Processes checkbox change, or a generic render (initial render, or after reset event)\n      // Avoid any dropdown rendering here as this is used by toolbarModuleFilter()\n      // during the initial render, which should not delay test execution.\n\n\n      function selectionChange(evt) {\n        var checkbox = evt && evt.target || null;\n\n        if (checkbox) {\n          // Update internal state\n          if (checkbox.checked) {\n            dropdownData.selectedMap.set(checkbox.value, checkbox.parentNode.textContent);\n          } else {\n            dropdownData.selectedMap.delete(checkbox.value);\n          } // Update UI state\n\n\n          toggleClass(checkbox.parentNode, 'checked', checkbox.checked);\n        }\n\n        var textForm = dropdownData.selectedMap.size ? dropdownData.selectedMap.size + ' ' + (dropdownData.selectedMap.size === 1 ? 'module' : 'modules') : 'All modules';\n        moduleSearch.placeholder = textForm;\n        moduleSearch.title = 'Type to search through and reduce the list.';\n        resetButton.disabled = !dropdownData.isDirty();\n        clearButton.style.display = dropdownData.selectedMap.size ? '' : 'none';\n      }\n\n      return moduleFilter;\n    }\n\n    function appendToolbar(beginDetails) {\n      var toolbar = id('qunit-testrunner-toolbar');\n\n      if (toolbar) {\n        toolbar.appendChild(toolbarUrlConfigContainer());\n        var toolbarFilters = document.createElement('span');\n        toolbarFilters.id = 'qunit-toolbar-filters';\n        toolbarFilters.appendChild(toolbarLooseFilter());\n        toolbarFilters.appendChild(toolbarModuleFilter(beginDetails));\n        var clearfix = document.createElement('div');\n        clearfix.className = 'clearfix';\n        toolbar.appendChild(toolbarFilters);\n        toolbar.appendChild(clearfix);\n      }\n    }\n\n    function appendHeader() {\n      var header = id('qunit-header');\n\n      if (header) {\n        header.innerHTML = \"<a href='\" + escapeText(unfilteredUrl) + \"'>\" + header.innerHTML + '</a> ';\n      }\n    }\n\n    function appendBanner() {\n      var banner = id('qunit-banner');\n\n      if (banner) {\n        banner.className = '';\n      }\n    }\n\n    function appendTestResults() {\n      var tests = id('qunit-tests');\n      var result = id('qunit-testresult');\n      var controls;\n\n      if (result) {\n        result.parentNode.removeChild(result);\n      }\n\n      if (tests) {\n        tests.innerHTML = '';\n        result = document.createElement('p');\n        result.id = 'qunit-testresult';\n        result.className = 'result';\n        tests.parentNode.insertBefore(result, tests);\n        result.innerHTML = '<div id=\"qunit-testresult-display\">Running...<br />&#160;</div>' + '<div id=\"qunit-testresult-controls\"></div>' + '<div class=\"clearfix\"></div>';\n        controls = id('qunit-testresult-controls');\n      }\n\n      if (controls) {\n        controls.appendChild(abortTestsButton());\n      }\n    }\n\n    function appendFilteredTest() {\n      var testId = QUnit.config.testId;\n\n      if (!testId || testId.length <= 0) {\n        return '';\n      }\n\n      return \"<div id='qunit-filteredTest'>Rerunning selected tests: \" + escapeText(testId.join(', ')) + \" <a id='qunit-clearFilter' href='\" + escapeText(unfilteredUrl) + \"'>Run all tests</a></div>\";\n    }\n\n    function appendUserAgent() {\n      var userAgent = id('qunit-userAgent');\n\n      if (userAgent) {\n        userAgent.innerHTML = '';\n        userAgent.appendChild(document.createTextNode('QUnit ' + QUnit.version + '; ' + navigator.userAgent));\n      }\n    }\n\n    function appendInterface(beginDetails) {\n      var qunit = id('qunit'); // For compat with QUnit 1.2, and to support fully custom theme HTML,\n      // we will use any existing elements if no id=\"qunit\" element exists.\n      //\n      // Note that we don't fail or fallback to creating it ourselves,\n      // because not having id=\"qunit\" (and not having the below elements)\n      // simply means QUnit acts headless, allowing users to use their own\n      // reporters, or for a test runner to listen for events directly without\n      // having the HTML reporter actively render anything.\n\n      if (qunit) {\n        qunit.setAttribute('role', 'main'); // Since QUnit 1.3, these are created automatically if the page\n        // contains id=\"qunit\".\n\n        qunit.innerHTML = \"<h1 id='qunit-header'>\" + escapeText(document.title) + '</h1>' + \"<h2 id='qunit-banner'></h2>\" + \"<div id='qunit-testrunner-toolbar' role='navigation'></div>\" + appendFilteredTest() + \"<h2 id='qunit-userAgent'></h2>\" + \"<ol id='qunit-tests'></ol>\";\n      }\n\n      appendHeader();\n      appendBanner();\n      appendTestResults();\n      appendUserAgent();\n      appendToolbar(beginDetails);\n    }\n\n    function appendTest(name, testId, moduleName) {\n      var tests = id('qunit-tests');\n\n      if (!tests) {\n        return;\n      }\n\n      var title = document.createElement('strong');\n      title.innerHTML = getNameHtml(name, moduleName);\n      var testBlock = document.createElement('li');\n      testBlock.appendChild(title); // No ID or rerun link for \"global failure\" blocks\n\n      if (testId !== undefined) {\n        var rerunTrigger = document.createElement('a');\n        rerunTrigger.innerHTML = 'Rerun';\n        rerunTrigger.href = setUrl({\n          testId: testId\n        });\n        testBlock.id = 'qunit-test-output-' + testId;\n        testBlock.appendChild(rerunTrigger);\n      }\n\n      var assertList = document.createElement('ol');\n      assertList.className = 'qunit-assert-list';\n      testBlock.appendChild(assertList);\n      tests.appendChild(testBlock);\n      return testBlock;\n    } // HTML Reporter initialization and load\n\n\n    QUnit.on('runStart', function (runStart) {\n      stats.defined = runStart.testCounts.total;\n    });\n    QUnit.begin(function (beginDetails) {\n      // Initialize QUnit elements\n      // This is done from begin() instead of runStart, because\n      // urlparams.js uses begin(), which we need to wait for.\n      // urlparams.js in turn uses begin() to allow plugins to\n      // add entries to QUnit.config.urlConfig, which may be done\n      // asynchronously.\n      // <https://github.com/qunitjs/qunit/issues/1657>\n      appendInterface(beginDetails);\n    });\n\n    function getRerunFailedHtml(failedTests) {\n      if (failedTests.length === 0) {\n        return '';\n      }\n\n      var href = setUrl({\n        testId: failedTests\n      });\n      return [\"<br /><a href='\" + escapeText(href) + \"'>\", failedTests.length === 1 ? 'Rerun 1 failed test' : 'Rerun ' + failedTests.length + ' failed tests', '</a>'].join('');\n    }\n\n    QUnit.on('runEnd', function (runEnd) {\n      var banner = id('qunit-banner');\n      var tests = id('qunit-tests');\n      var abortButton = id('qunit-abort-tests-button');\n      var assertPassed = config.stats.all - config.stats.bad;\n      var html = [runEnd.testCounts.total, ' tests completed in ', runEnd.runtime, ' milliseconds, with ', runEnd.testCounts.failed, ' failed, ', runEnd.testCounts.skipped, ' skipped, and ', runEnd.testCounts.todo, ' todo.<br />', \"<span class='passed'>\", assertPassed, \"</span> assertions of <span class='total'>\", config.stats.all, \"</span> passed, <span class='failed'>\", config.stats.bad, '</span> failed.', getRerunFailedHtml(stats.failedTests)].join('');\n      var test;\n      var assertLi;\n      var assertList; // Update remaining tests to aborted\n\n      if (abortButton && abortButton.disabled) {\n        html = 'Tests aborted after ' + runEnd.runtime + ' milliseconds.';\n\n        for (var i = 0; i < tests.children.length; i++) {\n          test = tests.children[i];\n\n          if (test.className === '' || test.className === 'running') {\n            test.className = 'aborted';\n            assertList = test.getElementsByTagName('ol')[0];\n            assertLi = document.createElement('li');\n            assertLi.className = 'fail';\n            assertLi.innerHTML = 'Test aborted.';\n            assertList.appendChild(assertLi);\n          }\n        }\n      }\n\n      if (banner && (!abortButton || abortButton.disabled === false)) {\n        banner.className = runEnd.status === 'failed' ? 'qunit-fail' : 'qunit-pass';\n      }\n\n      if (abortButton) {\n        abortButton.parentNode.removeChild(abortButton);\n      }\n\n      if (tests) {\n        id('qunit-testresult-display').innerHTML = html;\n      }\n\n      if (config.altertitle && document.title) {\n        // Show ✖ for good, ✔ for bad suite result in title\n        // use escape sequences in case file gets loaded with non-utf-8\n        // charset\n        document.title = [runEnd.status === 'failed' ? \"\\u2716\" : \"\\u2714\", document.title.replace(/^[\\u2714\\u2716] /i, '')].join(' ');\n      } // Scroll back to top to show results\n\n\n      if (config.scrolltop && window$1.scrollTo) {\n        window$1.scrollTo(0, 0);\n      }\n    });\n\n    function getNameHtml(name, module) {\n      var nameHtml = '';\n\n      if (module) {\n        nameHtml = \"<span class='module-name'>\" + escapeText(module) + '</span>: ';\n      }\n\n      nameHtml += \"<span class='test-name'>\" + escapeText(name) + '</span>';\n      return nameHtml;\n    }\n\n    function getProgressHtml(stats) {\n      return [stats.completed, ' / ', stats.defined, ' tests completed.<br />'].join('');\n    }\n\n    QUnit.testStart(function (details) {\n      var running, bad;\n      appendTest(details.name, details.testId, details.module);\n      running = id('qunit-testresult-display');\n\n      if (running) {\n        addClass(running, 'running');\n        bad = QUnit.config.reorder && details.previousFailure;\n        running.innerHTML = [getProgressHtml(stats), bad ? 'Rerunning previously failed test: <br />' : 'Running: ', getNameHtml(details.name, details.module), getRerunFailedHtml(stats.failedTests)].join('');\n      }\n    });\n\n    function stripHtml(string) {\n      // Strip tags, html entity and whitespaces\n      return string.replace(/<\\/?[^>]+(>|$)/g, '').replace(/&quot;/g, '').replace(/\\s+/g, '');\n    }\n\n    QUnit.log(function (details) {\n      var testItem = id('qunit-test-output-' + details.testId);\n\n      if (!testItem) {\n        return;\n      }\n\n      var message = escapeText(details.message) || (details.result ? 'okay' : 'failed');\n      message = \"<span class='test-message'>\" + message + '</span>';\n      message += \"<span class='runtime'>@ \" + details.runtime + ' ms</span>';\n      var expected;\n      var actual;\n      var diff;\n      var showDiff = false; // The pushFailure doesn't provide details.expected\n      // when it calls, it's implicit to also not show expected and diff stuff\n      // Also, we need to check details.expected existence, as it can exist and be undefined\n\n      if (!details.result && hasOwn.call(details, 'expected')) {\n        if (details.negative) {\n          expected = 'NOT ' + QUnit.dump.parse(details.expected);\n        } else {\n          expected = QUnit.dump.parse(details.expected);\n        }\n\n        actual = QUnit.dump.parse(details.actual);\n        message += \"<table><tr class='test-expected'><th>Expected: </th><td><pre>\" + escapeText(expected) + '</pre></td></tr>';\n\n        if (actual !== expected) {\n          message += \"<tr class='test-actual'><th>Result: </th><td><pre>\" + escapeText(actual) + '</pre></td></tr>';\n\n          if (typeof details.actual === 'number' && typeof details.expected === 'number') {\n            if (!isNaN(details.actual) && !isNaN(details.expected)) {\n              showDiff = true;\n              diff = details.actual - details.expected;\n              diff = (diff > 0 ? '+' : '') + diff;\n            }\n          } else if (typeof details.actual !== 'boolean' && typeof details.expected !== 'boolean') {\n            diff = QUnit.diff(expected, actual); // don't show diff if there is zero overlap\n\n            showDiff = stripHtml(diff).length !== stripHtml(expected).length + stripHtml(actual).length;\n          }\n\n          if (showDiff) {\n            message += \"<tr class='test-diff'><th>Diff: </th><td><pre>\" + diff + '</pre></td></tr>';\n          }\n        } else if (expected.indexOf('[object Array]') !== -1 || expected.indexOf('[object Object]') !== -1) {\n          message += \"<tr class='test-message'><th>Message: </th><td>\" + 'Diff suppressed as the depth of object is more than current max depth (' + QUnit.config.maxDepth + ').<p>Hint: Use <code>QUnit.dump.maxDepth</code> to ' + \" run with a higher max depth or <a href='\" + escapeText(setUrl({\n            maxDepth: -1\n          })) + \"'>\" + 'Rerun</a> without max depth.</p></td></tr>';\n        } else {\n          message += \"<tr class='test-message'><th>Message: </th><td>\" + 'Diff suppressed as the expected and actual results have an equivalent' + ' serialization</td></tr>';\n        }\n\n        if (details.source) {\n          message += \"<tr class='test-source'><th>Source: </th><td><pre>\" + escapeText(details.source) + '</pre></td></tr>';\n        }\n\n        message += '</table>'; // This occurs when pushFailure is set and we have an extracted stack trace\n      } else if (!details.result && details.source) {\n        message += '<table>' + \"<tr class='test-source'><th>Source: </th><td><pre>\" + escapeText(details.source) + '</pre></td></tr>' + '</table>';\n      }\n\n      var assertList = testItem.getElementsByTagName('ol')[0];\n      var assertLi = document.createElement('li');\n      assertLi.className = details.result ? 'pass' : 'fail';\n      assertLi.innerHTML = message;\n      assertList.appendChild(assertLi);\n    });\n    QUnit.testDone(function (details) {\n      var tests = id('qunit-tests');\n      var testItem = id('qunit-test-output-' + details.testId);\n\n      if (!tests || !testItem) {\n        return;\n      }\n\n      removeClass(testItem, 'running');\n      var status;\n\n      if (details.failed > 0) {\n        status = 'failed';\n      } else if (details.todo) {\n        status = 'todo';\n      } else {\n        status = details.skipped ? 'skipped' : 'passed';\n      }\n\n      var assertList = testItem.getElementsByTagName('ol')[0];\n      var good = details.passed;\n      var bad = details.failed; // This test passed if it has no unexpected failed assertions\n\n      var testPassed = details.failed > 0 ? details.todo : !details.todo;\n\n      if (testPassed) {\n        // Collapse the passing tests\n        addClass(assertList, 'qunit-collapsed');\n      } else {\n        stats.failedTests.push(details.testId);\n\n        if (config.collapse) {\n          if (!collapseNext) {\n            // Skip collapsing the first failing test\n            collapseNext = true;\n          } else {\n            // Collapse remaining tests\n            addClass(assertList, 'qunit-collapsed');\n          }\n        }\n      } // The testItem.firstChild is the test name\n\n\n      var testTitle = testItem.firstChild;\n      var testCounts = bad ? \"<b class='failed'>\" + bad + '</b>, ' + \"<b class='passed'>\" + good + '</b>, ' : '';\n      testTitle.innerHTML += \" <b class='counts'>(\" + testCounts + details.assertions.length + ')</b>';\n      stats.completed++;\n\n      if (details.skipped) {\n        testItem.className = 'skipped';\n        var skipped = document.createElement('em');\n        skipped.className = 'qunit-skipped-label';\n        skipped.innerHTML = 'skipped';\n        testItem.insertBefore(skipped, testTitle);\n      } else {\n        addEvent(testTitle, 'click', function () {\n          toggleClass(assertList, 'qunit-collapsed');\n        });\n        testItem.className = testPassed ? 'pass' : 'fail';\n\n        if (details.todo) {\n          var todoLabel = document.createElement('em');\n          todoLabel.className = 'qunit-todo-label';\n          todoLabel.innerHTML = 'todo';\n          testItem.className += ' todo';\n          testItem.insertBefore(todoLabel, testTitle);\n        }\n\n        var time = document.createElement('span');\n        time.className = 'runtime';\n        time.innerHTML = details.runtime + ' ms';\n        testItem.insertBefore(time, assertList);\n      } // Show the source of the test when showing assertions\n\n\n      if (details.source) {\n        var sourceName = document.createElement('p');\n        sourceName.innerHTML = '<strong>Source: </strong>' + escapeText(details.source);\n        addClass(sourceName, 'qunit-source');\n\n        if (testPassed) {\n          addClass(sourceName, 'qunit-collapsed');\n        }\n\n        addEvent(testTitle, 'click', function () {\n          toggleClass(sourceName, 'qunit-collapsed');\n        });\n        testItem.appendChild(sourceName);\n      }\n\n      if (config.hidepassed && (status === 'passed' || details.skipped)) {\n        // use removeChild instead of remove because of support\n        hiddenTests.push(testItem);\n        tests.removeChild(testItem);\n      }\n    });\n    QUnit.on('error', function (error) {\n      var testItem = appendTest('global failure');\n\n      if (!testItem) {\n        // HTML Reporter is probably disabled or not yet initialized.\n        return;\n      } // Render similar to a failed assertion (see above QUnit.log callback)\n\n\n      var message = escapeText(errorString(error));\n      message = \"<span class='test-message'>\" + message + '</span>';\n\n      if (error && error.stack) {\n        message += '<table>' + \"<tr class='test-source'><th>Source: </th><td><pre>\" + escapeText(error.stack) + '</pre></td></tr>' + '</table>';\n      }\n\n      var assertList = testItem.getElementsByTagName('ol')[0];\n      var assertLi = document.createElement('li');\n      assertLi.className = 'fail';\n      assertLi.innerHTML = message;\n      assertList.appendChild(assertLi); // Make it visible\n\n      testItem.className = 'fail';\n    }); // Avoid readyState issue with phantomjs\n    // Ref: #818\n\n    var usingPhantom = function (p) {\n      return p && p.version && p.version.major > 0;\n    }(window$1.phantom);\n\n    if (usingPhantom) {\n      console$1.warn('Support for PhantomJS is deprecated and will be removed in QUnit 3.0.');\n    }\n\n    if (!usingPhantom && document.readyState === 'complete') {\n      QUnit.load();\n    } else {\n      addEvent(window$1, 'load', QUnit.load);\n    } // Wrap window.onerror. We will call the original window.onerror to see if\n    // the existing handler fully handles the error; if not, we will call the\n    // QUnit.onError function.\n\n\n    var originalWindowOnError = window$1.onerror; // Cover uncaught exceptions\n    // Returning true will suppress the default browser handler,\n    // returning false will let it run.\n\n    window$1.onerror = function (message, fileName, lineNumber, columnNumber, errorObj) {\n      var ret = false;\n\n      if (originalWindowOnError) {\n        for (var _len = arguments.length, args = new Array(_len > 5 ? _len - 5 : 0), _key = 5; _key < _len; _key++) {\n          args[_key - 5] = arguments[_key];\n        }\n\n        ret = originalWindowOnError.call.apply(originalWindowOnError, [this, message, fileName, lineNumber, columnNumber, errorObj].concat(args));\n      } // Treat return value as window.onerror itself does,\n      // Only do our handling if not suppressed.\n\n\n      if (ret !== true) {\n        // If there is a current test that sets the internal `ignoreGlobalErrors` field\n        // (such as during `assert.throws()`), then the error is ignored and native\n        // error reporting is suppressed as well. This is because in browsers, an error\n        // can sometimes end up in `window.onerror` instead of in the local try/catch.\n        // This ignoring of errors does not apply to our general onUncaughtException\n        // method, nor to our `unhandledRejection` handlers, as those are not meant\n        // to receive an \"expected\" error during `assert.throws()`.\n        if (config.current && config.current.ignoreGlobalErrors) {\n          return true;\n        } // According to\n        // https://blog.sentry.io/2016/01/04/client-javascript-reporting-window-onerror,\n        // most modern browsers support an errorObj argument; use that to\n        // get a full stack trace if it's available.\n\n\n        var error = errorObj || new Error(message);\n\n        if (!error.stack && fileName && lineNumber) {\n          error.stack = \"\".concat(fileName, \":\").concat(lineNumber);\n        }\n\n        QUnit.onUncaughtException(error);\n      }\n\n      return ret;\n    };\n\n    window$1.addEventListener('unhandledrejection', function (event) {\n      QUnit.onUncaughtException(event.reason);\n    });\n  })();\n  /*\n   * This file is a modified version of google-diff-match-patch's JavaScript implementation\n   * (https://code.google.com/p/google-diff-match-patch/source/browse/trunk/javascript/diff_match_patch_uncompressed.js),\n   * modifications are licensed as more fully set forth in LICENSE.txt.\n   *\n   * The original source of google-diff-match-patch is attributable and licensed as follows:\n   *\n   * Copyright 2006 Google Inc.\n   * https://code.google.com/p/google-diff-match-patch/\n   *\n   * Licensed under the Apache License, Version 2.0 (the \"License\");\n   * you may not use this file except in compliance with the License.\n   * You may obtain a copy of the License at\n   *\n   * https://www.apache.org/licenses/LICENSE-2.0\n   *\n   * Unless required by applicable law or agreed to in writing, software\n   * distributed under the License is distributed on an \"AS IS\" BASIS,\n   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   * See the License for the specific language governing permissions and\n   * limitations under the License.\n   *\n   * More Info:\n   *  https://code.google.com/p/google-diff-match-patch/\n   *\n   * Usage: QUnit.diff(expected, actual)\n   *\n   */\n\n\n  QUnit.diff = function () {\n    function DiffMatchPatch() {} //  DIFF FUNCTIONS\n\n    /**\n     * The data structure representing a diff is an array of tuples:\n     * [[DIFF_DELETE, 'Hello'], [DIFF_INSERT, 'Goodbye'], [DIFF_EQUAL, ' world.']]\n     * which means: delete 'Hello', add 'Goodbye' and keep ' world.'\n     */\n\n\n    var DIFF_DELETE = -1;\n    var DIFF_INSERT = 1;\n    var DIFF_EQUAL = 0;\n    var hasOwn = Object.prototype.hasOwnProperty;\n    /**\n     * Find the differences between two texts.  Simplifies the problem by stripping\n     * any common prefix or suffix off the texts before diffing.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {boolean=} optChecklines Optional speedup flag. If present and false,\n     *     then don't run a line-level diff first to identify the changed areas.\n     *     Defaults to true, which does a faster, slightly less optimal diff.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     */\n\n    DiffMatchPatch.prototype.DiffMain = function (text1, text2, optChecklines) {\n      var deadline, checklines, commonlength, commonprefix, commonsuffix, diffs; // The diff must be complete in up to 1 second.\n\n      deadline = new Date().getTime() + 1000; // Check for null inputs.\n\n      if (text1 === null || text2 === null) {\n        throw new Error('Null input. (DiffMain)');\n      } // Check for equality (speedup).\n\n\n      if (text1 === text2) {\n        if (text1) {\n          return [[DIFF_EQUAL, text1]];\n        }\n\n        return [];\n      }\n\n      if (typeof optChecklines === 'undefined') {\n        optChecklines = true;\n      }\n\n      checklines = optChecklines; // Trim off common prefix (speedup).\n\n      commonlength = this.diffCommonPrefix(text1, text2);\n      commonprefix = text1.substring(0, commonlength);\n      text1 = text1.substring(commonlength);\n      text2 = text2.substring(commonlength); // Trim off common suffix (speedup).\n\n      commonlength = this.diffCommonSuffix(text1, text2);\n      commonsuffix = text1.substring(text1.length - commonlength);\n      text1 = text1.substring(0, text1.length - commonlength);\n      text2 = text2.substring(0, text2.length - commonlength); // Compute the diff on the middle block.\n\n      diffs = this.diffCompute(text1, text2, checklines, deadline); // Restore the prefix and suffix.\n\n      if (commonprefix) {\n        diffs.unshift([DIFF_EQUAL, commonprefix]);\n      }\n\n      if (commonsuffix) {\n        diffs.push([DIFF_EQUAL, commonsuffix]);\n      }\n\n      this.diffCleanupMerge(diffs);\n      return diffs;\n    };\n    /**\n     * Reduce the number of edits by eliminating operationally trivial equalities.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     */\n\n\n    DiffMatchPatch.prototype.diffCleanupEfficiency = function (diffs) {\n      var changes, equalities, equalitiesLength, lastequality, pointer, preIns, preDel, postIns, postDel;\n      changes = false;\n      equalities = []; // Stack of indices where equalities are found.\n\n      equalitiesLength = 0; // Keeping our own length var is faster in JS.\n\n      /** @type {?string} */\n\n      lastequality = null; // Always equal to diffs[equalities[equalitiesLength - 1]][1]\n\n      pointer = 0; // Index of current position.\n      // Is there an insertion operation before the last equality.\n\n      preIns = false; // Is there a deletion operation before the last equality.\n\n      preDel = false; // Is there an insertion operation after the last equality.\n\n      postIns = false; // Is there a deletion operation after the last equality.\n\n      postDel = false;\n\n      while (pointer < diffs.length) {\n        // Equality found.\n        if (diffs[pointer][0] === DIFF_EQUAL) {\n          if (diffs[pointer][1].length < 4 && (postIns || postDel)) {\n            // Candidate found.\n            equalities[equalitiesLength++] = pointer;\n            preIns = postIns;\n            preDel = postDel;\n            lastequality = diffs[pointer][1];\n          } else {\n            // Not a candidate, and can never become one.\n            equalitiesLength = 0;\n            lastequality = null;\n          }\n\n          postIns = postDel = false; // An insertion or deletion.\n        } else {\n          if (diffs[pointer][0] === DIFF_DELETE) {\n            postDel = true;\n          } else {\n            postIns = true;\n          }\n          /*\n           * Five types to be split:\n           * <ins>A</ins><del>B</del>XY<ins>C</ins><del>D</del>\n           * <ins>A</ins>X<ins>C</ins><del>D</del>\n           * <ins>A</ins><del>B</del>X<ins>C</ins>\n           * <ins>A</del>X<ins>C</ins><del>D</del>\n           * <ins>A</ins><del>B</del>X<del>C</del>\n           */\n\n\n          if (lastequality && (preIns && preDel && postIns && postDel || lastequality.length < 2 && preIns + preDel + postIns + postDel === 3)) {\n            // Duplicate record.\n            diffs.splice(equalities[equalitiesLength - 1], 0, [DIFF_DELETE, lastequality]); // Change second copy to insert.\n\n            diffs[equalities[equalitiesLength - 1] + 1][0] = DIFF_INSERT;\n            equalitiesLength--; // Throw away the equality we just deleted;\n\n            lastequality = null;\n\n            if (preIns && preDel) {\n              // No changes made which could affect previous entry, keep going.\n              postIns = postDel = true;\n              equalitiesLength = 0;\n            } else {\n              equalitiesLength--; // Throw away the previous equality.\n\n              pointer = equalitiesLength > 0 ? equalities[equalitiesLength - 1] : -1;\n              postIns = postDel = false;\n            }\n\n            changes = true;\n          }\n        }\n\n        pointer++;\n      }\n\n      if (changes) {\n        this.diffCleanupMerge(diffs);\n      }\n    };\n    /**\n     * Convert a diff array into a pretty HTML report.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     * @param {integer} string to be beautified.\n     * @return {string} HTML representation.\n     */\n\n\n    DiffMatchPatch.prototype.diffPrettyHtml = function (diffs) {\n      var html = [];\n\n      for (var x = 0; x < diffs.length; x++) {\n        var op = diffs[x][0]; // Operation (insert, delete, equal)\n\n        var data = diffs[x][1]; // Text of change.\n\n        switch (op) {\n          case DIFF_INSERT:\n            html[x] = '<ins>' + escapeText(data) + '</ins>';\n            break;\n\n          case DIFF_DELETE:\n            html[x] = '<del>' + escapeText(data) + '</del>';\n            break;\n\n          case DIFF_EQUAL:\n            html[x] = '<span>' + escapeText(data) + '</span>';\n            break;\n        }\n      }\n\n      return html.join('');\n    };\n    /**\n     * Determine the common prefix of two strings.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {number} The number of characters common to the start of each\n     *     string.\n     */\n\n\n    DiffMatchPatch.prototype.diffCommonPrefix = function (text1, text2) {\n      var pointermid, pointermax, pointermin, pointerstart; // Quick check for common null cases.\n\n      if (!text1 || !text2 || text1.charAt(0) !== text2.charAt(0)) {\n        return 0;\n      } // Binary search.\n      // Performance analysis: https://neil.fraser.name/news/2007/10/09/\n\n\n      pointermin = 0;\n      pointermax = Math.min(text1.length, text2.length);\n      pointermid = pointermax;\n      pointerstart = 0;\n\n      while (pointermin < pointermid) {\n        if (text1.substring(pointerstart, pointermid) === text2.substring(pointerstart, pointermid)) {\n          pointermin = pointermid;\n          pointerstart = pointermin;\n        } else {\n          pointermax = pointermid;\n        }\n\n        pointermid = Math.floor((pointermax - pointermin) / 2 + pointermin);\n      }\n\n      return pointermid;\n    };\n    /**\n     * Determine the common suffix of two strings.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {number} The number of characters common to the end of each string.\n     */\n\n\n    DiffMatchPatch.prototype.diffCommonSuffix = function (text1, text2) {\n      var pointermid, pointermax, pointermin, pointerend; // Quick check for common null cases.\n\n      if (!text1 || !text2 || text1.charAt(text1.length - 1) !== text2.charAt(text2.length - 1)) {\n        return 0;\n      } // Binary search.\n      // Performance analysis: https://neil.fraser.name/news/2007/10/09/\n\n\n      pointermin = 0;\n      pointermax = Math.min(text1.length, text2.length);\n      pointermid = pointermax;\n      pointerend = 0;\n\n      while (pointermin < pointermid) {\n        if (text1.substring(text1.length - pointermid, text1.length - pointerend) === text2.substring(text2.length - pointermid, text2.length - pointerend)) {\n          pointermin = pointermid;\n          pointerend = pointermin;\n        } else {\n          pointermax = pointermid;\n        }\n\n        pointermid = Math.floor((pointermax - pointermin) / 2 + pointermin);\n      }\n\n      return pointermid;\n    };\n    /**\n     * Find the differences between two texts.  Assumes that the texts do not\n     * have any common prefix or suffix.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {boolean} checklines Speedup flag.  If false, then don't run a\n     *     line-level diff first to identify the changed areas.\n     *     If true, then run a faster, slightly less optimal diff.\n     * @param {number} deadline Time when the diff should be complete by.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffCompute = function (text1, text2, checklines, deadline) {\n      var diffs, longtext, shorttext, i, hm, text1A, text2A, text1B, text2B, midCommon, diffsA, diffsB;\n\n      if (!text1) {\n        // Just add some text (speedup).\n        return [[DIFF_INSERT, text2]];\n      }\n\n      if (!text2) {\n        // Just delete some text (speedup).\n        return [[DIFF_DELETE, text1]];\n      }\n\n      longtext = text1.length > text2.length ? text1 : text2;\n      shorttext = text1.length > text2.length ? text2 : text1;\n      i = longtext.indexOf(shorttext);\n\n      if (i !== -1) {\n        // Shorter text is inside the longer text (speedup).\n        diffs = [[DIFF_INSERT, longtext.substring(0, i)], [DIFF_EQUAL, shorttext], [DIFF_INSERT, longtext.substring(i + shorttext.length)]]; // Swap insertions for deletions if diff is reversed.\n\n        if (text1.length > text2.length) {\n          diffs[0][0] = diffs[2][0] = DIFF_DELETE;\n        }\n\n        return diffs;\n      }\n\n      if (shorttext.length === 1) {\n        // Single character string.\n        // After the previous speedup, the character can't be an equality.\n        return [[DIFF_DELETE, text1], [DIFF_INSERT, text2]];\n      } // Check to see if the problem can be split in two.\n\n\n      hm = this.diffHalfMatch(text1, text2);\n\n      if (hm) {\n        // A half-match was found, sort out the return data.\n        text1A = hm[0];\n        text1B = hm[1];\n        text2A = hm[2];\n        text2B = hm[3];\n        midCommon = hm[4]; // Send both pairs off for separate processing.\n\n        diffsA = this.DiffMain(text1A, text2A, checklines, deadline);\n        diffsB = this.DiffMain(text1B, text2B, checklines, deadline); // Merge the results.\n\n        return diffsA.concat([[DIFF_EQUAL, midCommon]], diffsB);\n      }\n\n      if (checklines && text1.length > 100 && text2.length > 100) {\n        return this.diffLineMode(text1, text2, deadline);\n      }\n\n      return this.diffBisect(text1, text2, deadline);\n    };\n    /**\n     * Do the two texts share a substring which is at least half the length of the\n     * longer text?\n     * This speedup can produce non-minimal diffs.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {Array.<string>} Five element Array, containing the prefix of\n     *     text1, the suffix of text1, the prefix of text2, the suffix of\n     *     text2 and the common middle.  Or null if there was no match.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffHalfMatch = function (text1, text2) {\n      var longtext, shorttext, dmp, text1A, text2B, text2A, text1B, midCommon, hm1, hm2, hm;\n      longtext = text1.length > text2.length ? text1 : text2;\n      shorttext = text1.length > text2.length ? text2 : text1;\n\n      if (longtext.length < 4 || shorttext.length * 2 < longtext.length) {\n        return null; // Pointless.\n      }\n\n      dmp = this; // 'this' becomes 'window' in a closure.\n\n      /**\n       * Does a substring of shorttext exist within longtext such that the substring\n       * is at least half the length of longtext?\n       * Closure, but does not reference any external variables.\n       * @param {string} longtext Longer string.\n       * @param {string} shorttext Shorter string.\n       * @param {number} i Start index of quarter length substring within longtext.\n       * @return {Array.<string>} Five element Array, containing the prefix of\n       *     longtext, the suffix of longtext, the prefix of shorttext, the suffix\n       *     of shorttext and the common middle.  Or null if there was no match.\n       * @private\n       */\n\n      function diffHalfMatchI(longtext, shorttext, i) {\n        var seed, j, bestCommon, prefixLength, suffixLength, bestLongtextA, bestLongtextB, bestShorttextA, bestShorttextB; // Start with a 1/4 length substring at position i as a seed.\n\n        seed = longtext.substring(i, i + Math.floor(longtext.length / 4));\n        j = -1;\n        bestCommon = '';\n\n        while ((j = shorttext.indexOf(seed, j + 1)) !== -1) {\n          prefixLength = dmp.diffCommonPrefix(longtext.substring(i), shorttext.substring(j));\n          suffixLength = dmp.diffCommonSuffix(longtext.substring(0, i), shorttext.substring(0, j));\n\n          if (bestCommon.length < suffixLength + prefixLength) {\n            bestCommon = shorttext.substring(j - suffixLength, j) + shorttext.substring(j, j + prefixLength);\n            bestLongtextA = longtext.substring(0, i - suffixLength);\n            bestLongtextB = longtext.substring(i + prefixLength);\n            bestShorttextA = shorttext.substring(0, j - suffixLength);\n            bestShorttextB = shorttext.substring(j + prefixLength);\n          }\n        }\n\n        if (bestCommon.length * 2 >= longtext.length) {\n          return [bestLongtextA, bestLongtextB, bestShorttextA, bestShorttextB, bestCommon];\n        } else {\n          return null;\n        }\n      } // First check if the second quarter is the seed for a half-match.\n\n\n      hm1 = diffHalfMatchI(longtext, shorttext, Math.ceil(longtext.length / 4)); // Check again based on the third quarter.\n\n      hm2 = diffHalfMatchI(longtext, shorttext, Math.ceil(longtext.length / 2));\n\n      if (!hm1 && !hm2) {\n        return null;\n      } else if (!hm2) {\n        hm = hm1;\n      } else if (!hm1) {\n        hm = hm2;\n      } else {\n        // Both matched.  Select the longest.\n        hm = hm1[4].length > hm2[4].length ? hm1 : hm2;\n      } // A half-match was found, sort out the return data.\n\n\n      if (text1.length > text2.length) {\n        text1A = hm[0];\n        text1B = hm[1];\n        text2A = hm[2];\n        text2B = hm[3];\n      } else {\n        text2A = hm[0];\n        text2B = hm[1];\n        text1A = hm[2];\n        text1B = hm[3];\n      }\n\n      midCommon = hm[4];\n      return [text1A, text1B, text2A, text2B, midCommon];\n    };\n    /**\n     * Do a quick line-level diff on both strings, then rediff the parts for\n     * greater accuracy.\n     * This speedup can produce non-minimal diffs.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {number} deadline Time when the diff should be complete by.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffLineMode = function (text1, text2, deadline) {\n      var a, diffs, linearray, pointer, countInsert, countDelete, textInsert, textDelete, j; // Scan the text on a line-by-line basis first.\n\n      a = this.diffLinesToChars(text1, text2);\n      text1 = a.chars1;\n      text2 = a.chars2;\n      linearray = a.lineArray;\n      diffs = this.DiffMain(text1, text2, false, deadline); // Convert the diff back to original text.\n\n      this.diffCharsToLines(diffs, linearray); // Eliminate freak matches (e.g. blank lines)\n\n      this.diffCleanupSemantic(diffs); // Rediff any replacement blocks, this time character-by-character.\n      // Add a dummy entry at the end.\n\n      diffs.push([DIFF_EQUAL, '']);\n      pointer = 0;\n      countDelete = 0;\n      countInsert = 0;\n      textDelete = '';\n      textInsert = '';\n\n      while (pointer < diffs.length) {\n        switch (diffs[pointer][0]) {\n          case DIFF_INSERT:\n            countInsert++;\n            textInsert += diffs[pointer][1];\n            break;\n\n          case DIFF_DELETE:\n            countDelete++;\n            textDelete += diffs[pointer][1];\n            break;\n\n          case DIFF_EQUAL:\n            // Upon reaching an equality, check for prior redundancies.\n            if (countDelete >= 1 && countInsert >= 1) {\n              // Delete the offending records and add the merged ones.\n              diffs.splice(pointer - countDelete - countInsert, countDelete + countInsert);\n              pointer = pointer - countDelete - countInsert;\n              a = this.DiffMain(textDelete, textInsert, false, deadline);\n\n              for (j = a.length - 1; j >= 0; j--) {\n                diffs.splice(pointer, 0, a[j]);\n              }\n\n              pointer = pointer + a.length;\n            }\n\n            countInsert = 0;\n            countDelete = 0;\n            textDelete = '';\n            textInsert = '';\n            break;\n        }\n\n        pointer++;\n      }\n\n      diffs.pop(); // Remove the dummy entry at the end.\n\n      return diffs;\n    };\n    /**\n     * Find the 'middle snake' of a diff, split the problem in two\n     * and return the recursively constructed diff.\n     * See Myers 1986 paper: An O(ND) Difference Algorithm and Its Variations.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {number} deadline Time at which to bail if not yet complete.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffBisect = function (text1, text2, deadline) {\n      var text1Length, text2Length, maxD, vOffset, vLength, v1, v2, x, delta, front, k1start, k1end, k2start, k2end, k2Offset, k1Offset, x1, x2, y1, y2, d, k1, k2; // Cache the text lengths to prevent multiple calls.\n\n      text1Length = text1.length;\n      text2Length = text2.length;\n      maxD = Math.ceil((text1Length + text2Length) / 2);\n      vOffset = maxD;\n      vLength = 2 * maxD;\n      v1 = new Array(vLength);\n      v2 = new Array(vLength); // Setting all elements to -1 is faster in Chrome & Firefox than mixing\n      // integers and undefined.\n\n      for (x = 0; x < vLength; x++) {\n        v1[x] = -1;\n        v2[x] = -1;\n      }\n\n      v1[vOffset + 1] = 0;\n      v2[vOffset + 1] = 0;\n      delta = text1Length - text2Length; // If the total number of characters is odd, then the front path will collide\n      // with the reverse path.\n\n      front = delta % 2 !== 0; // Offsets for start and end of k loop.\n      // Prevents mapping of space beyond the grid.\n\n      k1start = 0;\n      k1end = 0;\n      k2start = 0;\n      k2end = 0;\n\n      for (d = 0; d < maxD; d++) {\n        // Bail out if deadline is reached.\n        if (new Date().getTime() > deadline) {\n          break;\n        } // Walk the front path one step.\n\n\n        for (k1 = -d + k1start; k1 <= d - k1end; k1 += 2) {\n          k1Offset = vOffset + k1;\n\n          if (k1 === -d || k1 !== d && v1[k1Offset - 1] < v1[k1Offset + 1]) {\n            x1 = v1[k1Offset + 1];\n          } else {\n            x1 = v1[k1Offset - 1] + 1;\n          }\n\n          y1 = x1 - k1;\n\n          while (x1 < text1Length && y1 < text2Length && text1.charAt(x1) === text2.charAt(y1)) {\n            x1++;\n            y1++;\n          }\n\n          v1[k1Offset] = x1;\n\n          if (x1 > text1Length) {\n            // Ran off the right of the graph.\n            k1end += 2;\n          } else if (y1 > text2Length) {\n            // Ran off the bottom of the graph.\n            k1start += 2;\n          } else if (front) {\n            k2Offset = vOffset + delta - k1;\n\n            if (k2Offset >= 0 && k2Offset < vLength && v2[k2Offset] !== -1) {\n              // Mirror x2 onto top-left coordinate system.\n              x2 = text1Length - v2[k2Offset];\n\n              if (x1 >= x2) {\n                // Overlap detected.\n                return this.diffBisectSplit(text1, text2, x1, y1, deadline);\n              }\n            }\n          }\n        } // Walk the reverse path one step.\n\n\n        for (k2 = -d + k2start; k2 <= d - k2end; k2 += 2) {\n          k2Offset = vOffset + k2;\n\n          if (k2 === -d || k2 !== d && v2[k2Offset - 1] < v2[k2Offset + 1]) {\n            x2 = v2[k2Offset + 1];\n          } else {\n            x2 = v2[k2Offset - 1] + 1;\n          }\n\n          y2 = x2 - k2;\n\n          while (x2 < text1Length && y2 < text2Length && text1.charAt(text1Length - x2 - 1) === text2.charAt(text2Length - y2 - 1)) {\n            x2++;\n            y2++;\n          }\n\n          v2[k2Offset] = x2;\n\n          if (x2 > text1Length) {\n            // Ran off the left of the graph.\n            k2end += 2;\n          } else if (y2 > text2Length) {\n            // Ran off the top of the graph.\n            k2start += 2;\n          } else if (!front) {\n            k1Offset = vOffset + delta - k2;\n\n            if (k1Offset >= 0 && k1Offset < vLength && v1[k1Offset] !== -1) {\n              x1 = v1[k1Offset];\n              y1 = vOffset + x1 - k1Offset; // Mirror x2 onto top-left coordinate system.\n\n              x2 = text1Length - x2;\n\n              if (x1 >= x2) {\n                // Overlap detected.\n                return this.diffBisectSplit(text1, text2, x1, y1, deadline);\n              }\n            }\n          }\n        }\n      } // Diff took too long and hit the deadline or\n      // number of diffs equals number of characters, no commonality at all.\n\n\n      return [[DIFF_DELETE, text1], [DIFF_INSERT, text2]];\n    };\n    /**\n     * Given the location of the 'middle snake', split the diff in two parts\n     * and recurse.\n     * @param {string} text1 Old string to be diffed.\n     * @param {string} text2 New string to be diffed.\n     * @param {number} x Index of split point in text1.\n     * @param {number} y Index of split point in text2.\n     * @param {number} deadline Time at which to bail if not yet complete.\n     * @return {!Array.<!DiffMatchPatch.Diff>} Array of diff tuples.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffBisectSplit = function (text1, text2, x, y, deadline) {\n      var text1a, text1b, text2a, text2b, diffs, diffsb;\n      text1a = text1.substring(0, x);\n      text2a = text2.substring(0, y);\n      text1b = text1.substring(x);\n      text2b = text2.substring(y); // Compute both diffs serially.\n\n      diffs = this.DiffMain(text1a, text2a, false, deadline);\n      diffsb = this.DiffMain(text1b, text2b, false, deadline);\n      return diffs.concat(diffsb);\n    };\n    /**\n     * Reduce the number of edits by eliminating semantically trivial equalities.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     */\n\n\n    DiffMatchPatch.prototype.diffCleanupSemantic = function (diffs) {\n      var changes, equalities, equalitiesLength, lastequality, pointer, lengthInsertions2, lengthDeletions2, lengthInsertions1, lengthDeletions1, deletion, insertion, overlapLength1, overlapLength2;\n      changes = false;\n      equalities = []; // Stack of indices where equalities are found.\n\n      equalitiesLength = 0; // Keeping our own length var is faster in JS.\n\n      /** @type {?string} */\n\n      lastequality = null; // Always equal to diffs[equalities[equalitiesLength - 1]][1]\n\n      pointer = 0; // Index of current position.\n      // Number of characters that changed prior to the equality.\n\n      lengthInsertions1 = 0;\n      lengthDeletions1 = 0; // Number of characters that changed after the equality.\n\n      lengthInsertions2 = 0;\n      lengthDeletions2 = 0;\n\n      while (pointer < diffs.length) {\n        if (diffs[pointer][0] === DIFF_EQUAL) {\n          // Equality found.\n          equalities[equalitiesLength++] = pointer;\n          lengthInsertions1 = lengthInsertions2;\n          lengthDeletions1 = lengthDeletions2;\n          lengthInsertions2 = 0;\n          lengthDeletions2 = 0;\n          lastequality = diffs[pointer][1];\n        } else {\n          // An insertion or deletion.\n          if (diffs[pointer][0] === DIFF_INSERT) {\n            lengthInsertions2 += diffs[pointer][1].length;\n          } else {\n            lengthDeletions2 += diffs[pointer][1].length;\n          } // Eliminate an equality that is smaller or equal to the edits on both\n          // sides of it.\n\n\n          if (lastequality && lastequality.length <= Math.max(lengthInsertions1, lengthDeletions1) && lastequality.length <= Math.max(lengthInsertions2, lengthDeletions2)) {\n            // Duplicate record.\n            diffs.splice(equalities[equalitiesLength - 1], 0, [DIFF_DELETE, lastequality]); // Change second copy to insert.\n\n            diffs[equalities[equalitiesLength - 1] + 1][0] = DIFF_INSERT; // Throw away the equality we just deleted.\n\n            equalitiesLength--; // Throw away the previous equality (it needs to be reevaluated).\n\n            equalitiesLength--;\n            pointer = equalitiesLength > 0 ? equalities[equalitiesLength - 1] : -1; // Reset the counters.\n\n            lengthInsertions1 = 0;\n            lengthDeletions1 = 0;\n            lengthInsertions2 = 0;\n            lengthDeletions2 = 0;\n            lastequality = null;\n            changes = true;\n          }\n        }\n\n        pointer++;\n      } // Normalize the diff.\n\n\n      if (changes) {\n        this.diffCleanupMerge(diffs);\n      } // Find any overlaps between deletions and insertions.\n      // e.g: <del>abcxxx</del><ins>xxxdef</ins>\n      //   -> <del>abc</del>xxx<ins>def</ins>\n      // e.g: <del>xxxabc</del><ins>defxxx</ins>\n      //   -> <ins>def</ins>xxx<del>abc</del>\n      // Only extract an overlap if it is as big as the edit ahead or behind it.\n\n\n      pointer = 1;\n\n      while (pointer < diffs.length) {\n        if (diffs[pointer - 1][0] === DIFF_DELETE && diffs[pointer][0] === DIFF_INSERT) {\n          deletion = diffs[pointer - 1][1];\n          insertion = diffs[pointer][1];\n          overlapLength1 = this.diffCommonOverlap(deletion, insertion);\n          overlapLength2 = this.diffCommonOverlap(insertion, deletion);\n\n          if (overlapLength1 >= overlapLength2) {\n            if (overlapLength1 >= deletion.length / 2 || overlapLength1 >= insertion.length / 2) {\n              // Overlap found.  Insert an equality and trim the surrounding edits.\n              diffs.splice(pointer, 0, [DIFF_EQUAL, insertion.substring(0, overlapLength1)]);\n              diffs[pointer - 1][1] = deletion.substring(0, deletion.length - overlapLength1);\n              diffs[pointer + 1][1] = insertion.substring(overlapLength1);\n              pointer++;\n            }\n          } else {\n            if (overlapLength2 >= deletion.length / 2 || overlapLength2 >= insertion.length / 2) {\n              // Reverse overlap found.\n              // Insert an equality and swap and trim the surrounding edits.\n              diffs.splice(pointer, 0, [DIFF_EQUAL, deletion.substring(0, overlapLength2)]);\n              diffs[pointer - 1][0] = DIFF_INSERT;\n              diffs[pointer - 1][1] = insertion.substring(0, insertion.length - overlapLength2);\n              diffs[pointer + 1][0] = DIFF_DELETE;\n              diffs[pointer + 1][1] = deletion.substring(overlapLength2);\n              pointer++;\n            }\n          }\n\n          pointer++;\n        }\n\n        pointer++;\n      }\n    };\n    /**\n     * Determine if the suffix of one string is the prefix of another.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {number} The number of characters common to the end of the first\n     *     string and the start of the second string.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffCommonOverlap = function (text1, text2) {\n      var text1Length, text2Length, textLength, best, length, pattern, found; // Cache the text lengths to prevent multiple calls.\n\n      text1Length = text1.length;\n      text2Length = text2.length; // Eliminate the null case.\n\n      if (text1Length === 0 || text2Length === 0) {\n        return 0;\n      } // Truncate the longer string.\n\n\n      if (text1Length > text2Length) {\n        text1 = text1.substring(text1Length - text2Length);\n      } else if (text1Length < text2Length) {\n        text2 = text2.substring(0, text1Length);\n      }\n\n      textLength = Math.min(text1Length, text2Length); // Quick check for the worst case.\n\n      if (text1 === text2) {\n        return textLength;\n      } // Start by looking for a single character match\n      // and increase length until no match is found.\n      // Performance analysis: https://neil.fraser.name/news/2010/11/04/\n\n\n      best = 0;\n      length = 1;\n\n      while (true) {\n        pattern = text1.substring(textLength - length);\n        found = text2.indexOf(pattern);\n\n        if (found === -1) {\n          return best;\n        }\n\n        length += found;\n\n        if (found === 0 || text1.substring(textLength - length) === text2.substring(0, length)) {\n          best = length;\n          length++;\n        }\n      }\n    };\n    /**\n     * Split two texts into an array of strings.  Reduce the texts to a string of\n     * hashes where each Unicode character represents one line.\n     * @param {string} text1 First string.\n     * @param {string} text2 Second string.\n     * @return {{chars1: string, chars2: string, lineArray: !Array.<string>}}\n     *     An object containing the encoded text1, the encoded text2 and\n     *     the array of unique strings.\n     *     The zeroth element of the array of unique strings is intentionally blank.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffLinesToChars = function (text1, text2) {\n      var lineArray, lineHash, chars1, chars2;\n      lineArray = []; // E.g. lineArray[4] === 'Hello\\n'\n\n      lineHash = {}; // E.g. lineHash['Hello\\n'] === 4\n      // '\\x00' is a valid character, but various debuggers don't like it.\n      // So we'll insert a junk entry to avoid generating a null character.\n\n      lineArray[0] = '';\n      /**\n       * Split a text into an array of strings.  Reduce the texts to a string of\n       * hashes where each Unicode character represents one line.\n       * Modifies linearray and linehash through being a closure.\n       * @param {string} text String to encode.\n       * @return {string} Encoded string.\n       * @private\n       */\n\n      function diffLinesToCharsMunge(text) {\n        var chars = ''; // Walk the text, pulling out a substring for each line.\n        // text.split('\\n') would would temporarily double our memory footprint.\n        // Modifying text would create many large strings to garbage collect.\n\n        var lineStart = 0;\n        var lineEnd = -1; // Keeping our own length variable is faster than looking it up.\n\n        var lineArrayLength = lineArray.length;\n\n        while (lineEnd < text.length - 1) {\n          lineEnd = text.indexOf('\\n', lineStart);\n\n          if (lineEnd === -1) {\n            lineEnd = text.length - 1;\n          }\n\n          var line = text.substring(lineStart, lineEnd + 1);\n          lineStart = lineEnd + 1;\n\n          if (hasOwn.call(lineHash, line)) {\n            chars += String.fromCharCode(lineHash[line]);\n          } else {\n            chars += String.fromCharCode(lineArrayLength);\n            lineHash[line] = lineArrayLength;\n            lineArray[lineArrayLength++] = line;\n          }\n        }\n\n        return chars;\n      }\n\n      chars1 = diffLinesToCharsMunge(text1);\n      chars2 = diffLinesToCharsMunge(text2);\n      return {\n        chars1: chars1,\n        chars2: chars2,\n        lineArray: lineArray\n      };\n    };\n    /**\n     * Rehydrate the text in a diff from a string of line hashes to real lines of\n     * text.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     * @param {!Array.<string>} lineArray Array of unique strings.\n     * @private\n     */\n\n\n    DiffMatchPatch.prototype.diffCharsToLines = function (diffs, lineArray) {\n      var x, chars, text, y;\n\n      for (x = 0; x < diffs.length; x++) {\n        chars = diffs[x][1];\n        text = [];\n\n        for (y = 0; y < chars.length; y++) {\n          text[y] = lineArray[chars.charCodeAt(y)];\n        }\n\n        diffs[x][1] = text.join('');\n      }\n    };\n    /**\n     * Reorder and merge like edit sections.  Merge equalities.\n     * Any edit section can move as long as it doesn't cross an equality.\n     * @param {!Array.<!DiffMatchPatch.Diff>} diffs Array of diff tuples.\n     */\n\n\n    DiffMatchPatch.prototype.diffCleanupMerge = function (diffs) {\n      var pointer, countDelete, countInsert, textInsert, textDelete, commonlength, changes, diffPointer, position;\n      diffs.push([DIFF_EQUAL, '']); // Add a dummy entry at the end.\n\n      pointer = 0;\n      countDelete = 0;\n      countInsert = 0;\n      textDelete = '';\n      textInsert = '';\n\n      while (pointer < diffs.length) {\n        switch (diffs[pointer][0]) {\n          case DIFF_INSERT:\n            countInsert++;\n            textInsert += diffs[pointer][1];\n            pointer++;\n            break;\n\n          case DIFF_DELETE:\n            countDelete++;\n            textDelete += diffs[pointer][1];\n            pointer++;\n            break;\n\n          case DIFF_EQUAL:\n            // Upon reaching an equality, check for prior redundancies.\n            if (countDelete + countInsert > 1) {\n              if (countDelete !== 0 && countInsert !== 0) {\n                // Factor out any common prefixes.\n                commonlength = this.diffCommonPrefix(textInsert, textDelete);\n\n                if (commonlength !== 0) {\n                  if (pointer - countDelete - countInsert > 0 && diffs[pointer - countDelete - countInsert - 1][0] === DIFF_EQUAL) {\n                    diffs[pointer - countDelete - countInsert - 1][1] += textInsert.substring(0, commonlength);\n                  } else {\n                    diffs.splice(0, 0, [DIFF_EQUAL, textInsert.substring(0, commonlength)]);\n                    pointer++;\n                  }\n\n                  textInsert = textInsert.substring(commonlength);\n                  textDelete = textDelete.substring(commonlength);\n                } // Factor out any common suffixies.\n\n\n                commonlength = this.diffCommonSuffix(textInsert, textDelete);\n\n                if (commonlength !== 0) {\n                  diffs[pointer][1] = textInsert.substring(textInsert.length - commonlength) + diffs[pointer][1];\n                  textInsert = textInsert.substring(0, textInsert.length - commonlength);\n                  textDelete = textDelete.substring(0, textDelete.length - commonlength);\n                }\n              } // Delete the offending records and add the merged ones.\n\n\n              if (countDelete === 0) {\n                diffs.splice(pointer - countInsert, countDelete + countInsert, [DIFF_INSERT, textInsert]);\n              } else if (countInsert === 0) {\n                diffs.splice(pointer - countDelete, countDelete + countInsert, [DIFF_DELETE, textDelete]);\n              } else {\n                diffs.splice(pointer - countDelete - countInsert, countDelete + countInsert, [DIFF_DELETE, textDelete], [DIFF_INSERT, textInsert]);\n              }\n\n              pointer = pointer - countDelete - countInsert + (countDelete ? 1 : 0) + (countInsert ? 1 : 0) + 1;\n            } else if (pointer !== 0 && diffs[pointer - 1][0] === DIFF_EQUAL) {\n              // Merge this equality with the previous one.\n              diffs[pointer - 1][1] += diffs[pointer][1];\n              diffs.splice(pointer, 1);\n            } else {\n              pointer++;\n            }\n\n            countInsert = 0;\n            countDelete = 0;\n            textDelete = '';\n            textInsert = '';\n            break;\n        }\n      }\n\n      if (diffs[diffs.length - 1][1] === '') {\n        diffs.pop(); // Remove the dummy entry at the end.\n      } // Second pass: look for single edits surrounded on both sides by equalities\n      // which can be shifted sideways to eliminate an equality.\n      // e.g: A<ins>BA</ins>C -> <ins>AB</ins>AC\n\n\n      changes = false;\n      pointer = 1; // Intentionally ignore the first and last element (don't need checking).\n\n      while (pointer < diffs.length - 1) {\n        if (diffs[pointer - 1][0] === DIFF_EQUAL && diffs[pointer + 1][0] === DIFF_EQUAL) {\n          diffPointer = diffs[pointer][1];\n          position = diffPointer.substring(diffPointer.length - diffs[pointer - 1][1].length); // This is a single edit surrounded by equalities.\n\n          if (position === diffs[pointer - 1][1]) {\n            // Shift the edit over the previous equality.\n            diffs[pointer][1] = diffs[pointer - 1][1] + diffs[pointer][1].substring(0, diffs[pointer][1].length - diffs[pointer - 1][1].length);\n            diffs[pointer + 1][1] = diffs[pointer - 1][1] + diffs[pointer + 1][1];\n            diffs.splice(pointer - 1, 1);\n            changes = true;\n          } else if (diffPointer.substring(0, diffs[pointer + 1][1].length) === diffs[pointer + 1][1]) {\n            // Shift the edit over the next equality.\n            diffs[pointer - 1][1] += diffs[pointer + 1][1];\n            diffs[pointer][1] = diffs[pointer][1].substring(diffs[pointer + 1][1].length) + diffs[pointer + 1][1];\n            diffs.splice(pointer + 1, 1);\n            changes = true;\n          }\n        }\n\n        pointer++;\n      } // If shifts were made, the diff needs reordering and another shift sweep.\n\n\n      if (changes) {\n        this.diffCleanupMerge(diffs);\n      }\n    };\n\n    return function (o, n) {\n      var diff, output, text;\n      diff = new DiffMatchPatch();\n      output = diff.DiffMain(o, n);\n      diff.diffCleanupEfficiency(output);\n      text = diff.diffPrettyHtml(output);\n      return text;\n    };\n  }();\n})();\n/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../webpack/buildin/module.js */ \"./node_modules/webpack/buildin/module.js\")(module)))\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/qunit/qunit/qunit.js?");
 
 /***/ }),
 
@@ -10242,7 +11036,7 @@ eval("/* WEBPACK VAR INJECTION */(function(module) {var __WEBPACK_AMD_DEFINE_RES
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-eval("module.exports = function (module) {\n  if (!module.webpackPolyfill) {\n    module.deprecate = function () {};\n\n    module.paths = []; // module.parent = undefined by default\n\n    if (!module.children) module.children = [];\n    Object.defineProperty(module, \"loaded\", {\n      enumerable: true,\n      get: function get() {\n        return module.l;\n      }\n    });\n    Object.defineProperty(module, \"id\", {\n      enumerable: true,\n      get: function get() {\n        return module.i;\n      }\n    });\n    module.webpackPolyfill = 1;\n  }\n\n  return module;\n};\n\n//# sourceURL=webpack://__ember_auto_import__/(webpack)/buildin/module.js?");
+eval("module.exports = function (module) {\n  if (!module.webpackPolyfill) {\n    module.deprecate = function () {};\n\n    module.paths = []; // module.parent = undefined by default\n\n    if (!module.children) module.children = [];\n    Object.defineProperty(module, \"loaded\", {\n      enumerable: true,\n      get: function () {\n        return module.l;\n      }\n    });\n    Object.defineProperty(module, \"id\", {\n      enumerable: true,\n      get: function () {\n        return module.i;\n      }\n    });\n    module.webpackPolyfill = 1;\n  }\n\n  return module;\n};\n\n//# sourceURL=webpack://__ember_auto_import__/(webpack)/buildin/module.js?");
 
 /***/ })
 

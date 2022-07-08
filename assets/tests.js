@@ -3,266 +3,106 @@
 define("dummy/tests/acceptance/drawer-test", ["qunit", "@ember/test-helpers", "ember-qunit"], function (_qunit, _testHelpers, _emberQunit) {
   "use strict";
 
-  function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { Promise.resolve(value).then(_next, _throw); } }
-
-  function _asyncToGenerator(fn) { return function () { var self = this, args = arguments; return new Promise(function (resolve, reject) { var gen = fn.apply(self, args); function _next(value) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value); } function _throw(err) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err); } _next(undefined); }); }; }
-
   (0, _qunit.module)('Acceptance | drawer', function (hooks) {
     (0, _emberQunit.setupApplicationTest)(hooks);
-    (0, _qunit.test)('has drawer', /*#__PURE__*/function () {
-      var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(assert) {
-        return regeneratorRuntime.wrap(function _callee$(_context) {
-          while (1) {
-            switch (_context.prev = _context.next) {
-              case 0:
-                _context.next = 2;
-                return (0, _testHelpers.visit)('/');
-
-              case 2:
-                assert.ok((0, _testHelpers.find)('.site-drawer-component'));
-
-              case 3:
-              case "end":
-                return _context.stop();
-            }
-          }
-        }, _callee);
-      }));
-
-      return function (_x) {
-        return _ref.apply(this, arguments);
-      };
-    }());
-    (0, _qunit.test)('toggle drawer', /*#__PURE__*/function () {
-      var _ref2 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2(assert) {
-        return regeneratorRuntime.wrap(function _callee2$(_context2) {
-          while (1) {
-            switch (_context2.prev = _context2.next) {
-              case 0:
-                _context2.next = 2;
-                return (0, _testHelpers.visit)('/');
-
-              case 2:
-                _context2.next = 4;
-                return (0, _testHelpers.click)('.toggle-drawer-button');
-
-              case 4:
-                assert.ok((0, _testHelpers.find)('.site-drawer-component.opened'));
-                _context2.next = 7;
-                return (0, _testHelpers.click)('.toggle-drawer-button');
-
-              case 7:
-                assert.notOk((0, _testHelpers.find)('.site-drawer-component.opened'));
-
-              case 8:
-              case "end":
-                return _context2.stop();
-            }
-          }
-        }, _callee2);
-      }));
-
-      return function (_x2) {
-        return _ref2.apply(this, arguments);
-      };
-    }());
-    (0, _qunit.test)('open drawer', /*#__PURE__*/function () {
-      var _ref3 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee3(assert) {
-        return regeneratorRuntime.wrap(function _callee3$(_context3) {
-          while (1) {
-            switch (_context3.prev = _context3.next) {
-              case 0:
-                _context3.next = 2;
-                return (0, _testHelpers.visit)('/');
-
-              case 2:
-                _context3.next = 4;
-                return (0, _testHelpers.click)('.open-drawer-button');
-
-              case 4:
-                assert.ok((0, _testHelpers.find)('.site-drawer-component.opened'));
-                _context3.next = 7;
-                return (0, _testHelpers.click)('.open-drawer-button');
-
-              case 7:
-                assert.ok((0, _testHelpers.find)('.site-drawer-component.opened'));
-
-              case 8:
-              case "end":
-                return _context3.stop();
-            }
-          }
-        }, _callee3);
-      }));
-
-      return function (_x3) {
-        return _ref3.apply(this, arguments);
-      };
-    }());
-    (0, _qunit.test)('close drawer', /*#__PURE__*/function () {
-      var _ref4 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee4(assert) {
-        return regeneratorRuntime.wrap(function _callee4$(_context4) {
-          while (1) {
-            switch (_context4.prev = _context4.next) {
-              case 0:
-                _context4.next = 2;
-                return (0, _testHelpers.visit)('/');
-
-              case 2:
-                _context4.next = 4;
-                return (0, _testHelpers.click)('.toggle-drawer-button');
-
-              case 4:
-                _context4.next = 6;
-                return (0, _testHelpers.click)('.close-drawer-button');
-
-              case 6:
-                assert.notOk((0, _testHelpers.find)('.site-drawer-component.opened'));
-
-              case 7:
-              case "end":
-                return _context4.stop();
-            }
-          }
-        }, _callee4);
-      }));
-
-      return function (_x4) {
-        return _ref4.apply(this, arguments);
-      };
-    }());
+    (0, _qunit.test)('has drawer', async function (assert) {
+      await (0, _testHelpers.visit)('/');
+      assert.ok((0, _testHelpers.find)('.drawer-wrapper'));
+    });
+    (0, _qunit.test)('toggle drawer', async function (assert) {
+      await (0, _testHelpers.visit)('/');
+      await (0, _testHelpers.click)('.toggle-drawer-button');
+      assert.ok((0, _testHelpers.find)('.drawer-wrapper.opened'));
+      await (0, _testHelpers.click)('.toggle-drawer-button');
+      assert.notOk((0, _testHelpers.find)('.drawer-wrapper.opened'));
+    });
+    (0, _qunit.test)('open drawer', async function (assert) {
+      await (0, _testHelpers.visit)('/');
+      await (0, _testHelpers.click)('.open-drawer-button');
+      assert.ok((0, _testHelpers.find)('.drawer-wrapper.opened'));
+      await (0, _testHelpers.click)('.open-drawer-button');
+      assert.ok((0, _testHelpers.find)('.drawer-wrapper.opened'));
+    });
+    (0, _qunit.test)('close drawer', async function (assert) {
+      await (0, _testHelpers.visit)('/');
+      await (0, _testHelpers.click)('.toggle-drawer-button');
+      await (0, _testHelpers.click)('.close-drawer-button');
+      assert.notOk((0, _testHelpers.find)('.drawer-wrapper.opened'));
+    });
   });
 });
-define("dummy/tests/integration/components/overlay-test", ["qunit", "ember-qunit", "@ember/test-helpers"], function (_qunit, _emberQunit, _testHelpers) {
+define("dummy/tests/integration/components/overlay-test", ["@ember/template-factory", "qunit", "ember-qunit", "@ember/test-helpers"], function (_templateFactory, _qunit, _emberQunit, _testHelpers) {
   "use strict";
-
-  function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { Promise.resolve(value).then(_next, _throw); } }
-
-  function _asyncToGenerator(fn) { return function () { var self = this, args = arguments; return new Promise(function (resolve, reject) { var gen = fn.apply(self, args); function _next(value) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value); } function _throw(err) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err); } _next(undefined); }); }; }
 
   (0, _qunit.module)('Integration | Component | overlay', function (hooks) {
     (0, _emberQunit.setupRenderingTest)(hooks);
-    (0, _qunit.test)('it renders', /*#__PURE__*/function () {
-      var _ref2 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(assert) {
-        return regeneratorRuntime.wrap(function _callee$(_context) {
-          while (1) {
-            switch (_context.prev = _context.next) {
-              case 0:
-                this.set('toggleDrawer', function () {
-                  return null;
-                });
-                _context.next = 3;
-                return (0, _testHelpers.render)(Ember.HTMLBars.template(
-                /*
-                  <SiteDrawer::Overlay @toggleDrawer={{this.toggleDrawer}} />
-                */
-                {
-                  "id": "sv6bJg/9",
-                  "block": "[[[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],null]],[],false,[\"site-drawer/overlay\"]]",
-                  "moduleName": "(unknown template module)",
-                  "isStrictMode": false
-                }));
-
-              case 3:
-                assert.equal(this.element.textContent.trim(), ''); // Template block usage:
-
-                _context.next = 6;
-                return (0, _testHelpers.render)(Ember.HTMLBars.template(
-                /*
-                  
-                          <SiteDrawer::Overlay @toggleDrawer={{this.toggleDrawer}} >
-                            template block text
-                          </SiteDrawer::Overlay>
-                        
-                */
-                {
-                  "id": "8cc9lNGm",
-                  "block": "[[[1,\"\\n          \"],[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],[[\"default\"],[[[[1,\"\\n            template block text\\n          \"]],[]]]]],[1,\"\\n        \"]],[],false,[\"site-drawer/overlay\"]]",
-                  "moduleName": "(unknown template module)",
-                  "isStrictMode": false
-                }));
-
-              case 6:
-                assert.equal(this.element.textContent.trim(), 'template block text');
-
-              case 7:
-              case "end":
-                return _context.stop();
-            }
-          }
-        }, _callee, this);
+    (0, _qunit.test)('it renders', async function (assert) {
+      this.set('toggleDrawer', () => null);
+      await (0, _testHelpers.render)((0, _templateFactory.createTemplateFactory)(
+      /*
+        <SiteDrawer::Overlay @toggleDrawer={{this.toggleDrawer}} />
+      */
+      {
+        "id": "sv6bJg/9",
+        "block": "[[[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],null]],[],false,[\"site-drawer/overlay\"]]",
+        "moduleName": "(unknown template module)",
+        "isStrictMode": false
       }));
+      assert.equal(this.element.textContent.trim(), ''); // Template block usage:
 
-      return function (_x) {
-        return _ref2.apply(this, arguments);
-      };
-    }());
+      await (0, _testHelpers.render)((0, _templateFactory.createTemplateFactory)(
+      /*
+        
+                <SiteDrawer::Overlay @toggleDrawer={{this.toggleDrawer}} >
+                  template block text
+                </SiteDrawer::Overlay>
+              
+      */
+      {
+        "id": "8cc9lNGm",
+        "block": "[[[1,\"\\n          \"],[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],[[\"default\"],[[[[1,\"\\n            template block text\\n          \"]],[]]]]],[1,\"\\n        \"]],[],false,[\"site-drawer/overlay\"]]",
+        "moduleName": "(unknown template module)",
+        "isStrictMode": false
+      }));
+      assert.equal(this.element.textContent.trim(), 'template block text');
+    });
   });
 });
-define("dummy/tests/integration/components/trigger-test", ["qunit", "ember-qunit", "@ember/test-helpers"], function (_qunit, _emberQunit, _testHelpers) {
+define("dummy/tests/integration/components/trigger-test", ["@ember/template-factory", "qunit", "ember-qunit", "@ember/test-helpers"], function (_templateFactory, _qunit, _emberQunit, _testHelpers) {
   "use strict";
-
-  function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { Promise.resolve(value).then(_next, _throw); } }
-
-  function _asyncToGenerator(fn) { return function () { var self = this, args = arguments; return new Promise(function (resolve, reject) { var gen = fn.apply(self, args); function _next(value) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value); } function _throw(err) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err); } _next(undefined); }); }; }
 
   (0, _qunit.module)('Integration | Component | trigger', function (hooks) {
     (0, _emberQunit.setupRenderingTest)(hooks);
-    (0, _qunit.test)('it renders', /*#__PURE__*/function () {
-      var _ref2 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(assert) {
-        return regeneratorRuntime.wrap(function _callee$(_context) {
-          while (1) {
-            switch (_context.prev = _context.next) {
-              case 0:
-                this.set('toggleDrawer', function () {
-                  return null;
-                });
-                _context.next = 3;
-                return (0, _testHelpers.render)(Ember.HTMLBars.template(
-                /*
-                  <SiteDrawer::Trigger @toggleDrawer={{this.toggleDrawer}} />
-                */
-                {
-                  "id": "cTtztAuL",
-                  "block": "[[[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],null]],[],false,[\"site-drawer/trigger\"]]",
-                  "moduleName": "(unknown template module)",
-                  "isStrictMode": false
-                }));
-
-              case 3:
-                assert.equal(this.element.textContent.trim(), ''); // Template block usage:
-
-                _context.next = 6;
-                return (0, _testHelpers.render)(Ember.HTMLBars.template(
-                /*
-                  
-                          <SiteDrawer::Trigger @toggleDrawer={{this.toggleDrawer}}>
-                            template block text
-                          </SiteDrawer::Trigger>
-                        
-                */
-                {
-                  "id": "GZXH3vSU",
-                  "block": "[[[1,\"\\n          \"],[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],[[\"default\"],[[[[1,\"\\n            template block text\\n          \"]],[]]]]],[1,\"\\n        \"]],[],false,[\"site-drawer/trigger\"]]",
-                  "moduleName": "(unknown template module)",
-                  "isStrictMode": false
-                }));
-
-              case 6:
-                assert.equal(this.element.textContent.trim(), 'template block text');
-
-              case 7:
-              case "end":
-                return _context.stop();
-            }
-          }
-        }, _callee, this);
+    (0, _qunit.test)('it renders', async function (assert) {
+      this.set('toggleDrawer', () => null);
+      await (0, _testHelpers.render)((0, _templateFactory.createTemplateFactory)(
+      /*
+        <SiteDrawer::Trigger @toggleDrawer={{this.toggleDrawer}} />
+      */
+      {
+        "id": "cTtztAuL",
+        "block": "[[[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],null]],[],false,[\"site-drawer/trigger\"]]",
+        "moduleName": "(unknown template module)",
+        "isStrictMode": false
       }));
+      assert.equal(this.element.textContent.trim(), ''); // Template block usage:
 
-      return function (_x) {
-        return _ref2.apply(this, arguments);
-      };
-    }());
+      await (0, _testHelpers.render)((0, _templateFactory.createTemplateFactory)(
+      /*
+        
+                <SiteDrawer::Trigger @toggleDrawer={{this.toggleDrawer}}>
+                  template block text
+                </SiteDrawer::Trigger>
+              
+      */
+      {
+        "id": "GZXH3vSU",
+        "block": "[[[1,\"\\n          \"],[8,[39,0],null,[[\"@toggleDrawer\"],[[30,0,[\"toggleDrawer\"]]]],[[\"default\"],[[[[1,\"\\n            template block text\\n          \"]],[]]]]],[1,\"\\n        \"]],[],false,[\"site-drawer/trigger\"]]",
+        "moduleName": "(unknown template module)",
+        "isStrictMode": false
+      }));
+      assert.equal(this.element.textContent.trim(), 'template block text');
+    });
   });
 });
 define("dummy/tests/lint/app.lint-test", [], function () {

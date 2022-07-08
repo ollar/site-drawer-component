@@ -2,9 +2,7 @@
 
 
 
-;function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
-define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "dummy/config/environment"], function (_exports, _emberResolver, _emberLoadInitializers, _environment) {
+;define("dummy/app", ["exports", "@ember/application", "ember-resolver", "ember-load-initializers", "dummy/config/environment"], function (_exports, _application, _emberResolver, _emberLoadInitializers, _environment) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -12,51 +10,20 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   });
   _exports.default = void 0;
 
-  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-  function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }
-
-  function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
-
-  function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
-
-  function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
-
-  function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
-
-  function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
-
-  function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
-
   function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-  var App = /*#__PURE__*/function (_Ember$Application) {
-    _inherits(App, _Ember$Application);
+  class App extends _application.default {
+    constructor() {
+      super(...arguments);
 
-    var _super = _createSuper(App);
+      _defineProperty(this, "modulePrefix", _environment.default.modulePrefix);
 
-    function App() {
-      var _this;
+      _defineProperty(this, "podModulePrefix", _environment.default.podModulePrefix);
 
-      _classCallCheck(this, App);
-
-      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-        args[_key] = arguments[_key];
-      }
-
-      _this = _super.call.apply(_super, [this].concat(args));
-
-      _defineProperty(_assertThisInitialized(_this), "modulePrefix", _environment.default.modulePrefix);
-
-      _defineProperty(_assertThisInitialized(_this), "podModulePrefix", _environment.default.podModulePrefix);
-
-      _defineProperty(_assertThisInitialized(_this), "Resolver", _emberResolver.default);
-
-      return _this;
+      _defineProperty(this, "Resolver", _emberResolver.default);
     }
 
-    return App;
-  }(Ember.Application);
+  }
 
   _exports.default = App;
   (0, _emberLoadInitializers.default)(App, _environment.default.modulePrefix);
@@ -69,7 +36,7 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   });
   Object.defineProperty(_exports, "default", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _emberComponentManager.default;
     }
   });
@@ -82,7 +49,7 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   });
   Object.defineProperty(_exports, "default", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _siteDrawer.default;
     }
   });
@@ -95,7 +62,7 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   });
   Object.defineProperty(_exports, "default", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _aside.default;
     }
   });
@@ -108,7 +75,7 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   });
   Object.defineProperty(_exports, "default", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _overlay.default;
     }
   });
@@ -121,8 +88,21 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   });
   Object.defineProperty(_exports, "default", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _trigger.default;
+    }
+  });
+});
+;define("dummy/helpers/ensure-safe-component", ["exports", "@embroider/util"], function (_exports, _util) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(_exports, "default", {
+    enumerable: true,
+    get: function () {
+      return _util.EnsureSafeComponentHelper;
     }
   });
 });
@@ -145,15 +125,17 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   _exports.default = void 0;
   var _default = {
     name: 'container-debug-adapter',
-    initialize: function initialize() {
-      var app = arguments[1] || arguments[0];
+
+    initialize() {
+      let app = arguments[1] || arguments[0];
       app.register('container-debug-adapter:main', _containerDebugAdapter.default);
       app.inject('container-debug-adapter:main', 'namespace', 'application:main');
     }
+
   };
   _exports.default = _default;
 });
-;define("dummy/initializers/export-application-global", ["exports", "dummy/config/environment"], function (_exports, _environment) {
+;define("dummy/initializers/export-application-global", ["exports", "ember", "dummy/config/environment"], function (_exports, _ember, _environment) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -185,13 +167,13 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
       if (typeof value === 'string') {
         globalName = value;
       } else {
-        globalName = Ember.String.classify(_environment.default.modulePrefix);
+        globalName = _ember.default.String.classify(_environment.default.modulePrefix);
       }
 
       if (!theGlobal[globalName]) {
         theGlobal[globalName] = application;
         application.reopen({
-          willDestroy: function willDestroy() {
+          willDestroy: function () {
             this._super.apply(this, arguments);
 
             delete theGlobal[globalName];
@@ -207,9 +189,7 @@ define("dummy/app", ["exports", "ember-resolver", "ember-load-initializers", "du
   };
   _exports.default = _default;
 });
-;function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
-
-define("dummy/router", ["exports", "dummy/config/environment"], function (_exports, _environment) {
+;define("dummy/router", ["exports", "@ember/routing/router", "dummy/config/environment"], function (_exports, _router, _environment) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -217,52 +197,34 @@ define("dummy/router", ["exports", "dummy/config/environment"], function (_expor
   });
   _exports.default = void 0;
 
-  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-  function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }
-
-  function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
-
-  function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
-
-  function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
-
-  function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
-
-  function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
-
-  function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
-
   function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-  var Router = /*#__PURE__*/function (_Ember$Router) {
-    _inherits(Router, _Ember$Router);
+  class Router extends _router.default {
+    constructor() {
+      super(...arguments);
 
-    var _super = _createSuper(Router);
+      _defineProperty(this, "location", _environment.default.locationType);
 
-    function Router() {
-      var _this;
-
-      _classCallCheck(this, Router);
-
-      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-        args[_key] = arguments[_key];
-      }
-
-      _this = _super.call.apply(_super, [this].concat(args));
-
-      _defineProperty(_assertThisInitialized(_this), "location", _environment.default.locationType);
-
-      _defineProperty(_assertThisInitialized(_this), "rootURL", _environment.default.rootURL);
-
-      return _this;
+      _defineProperty(this, "rootURL", _environment.default.rootURL);
     }
 
-    return Router;
-  }(Ember.Router);
+  }
 
   _exports.default = Router;
   Router.map(function () {});
+});
+;define("dummy/services/-ensure-registered", ["exports", "@embroider/util/services/ensure-registered"], function (_exports, _ensureRegistered) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(_exports, "default", {
+    enumerable: true,
+    get: function () {
+      return _ensureRegistered.default;
+    }
+  });
 });
 ;define("dummy/services/page-title-list", ["exports", "ember-page-title/services/page-title-list"], function (_exports, _pageTitleList) {
   "use strict";
@@ -272,7 +234,7 @@ define("dummy/router", ["exports", "dummy/config/environment"], function (_expor
   });
   Object.defineProperty(_exports, "default", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _pageTitleList.default;
     }
   });
@@ -285,7 +247,7 @@ define("dummy/router", ["exports", "dummy/config/environment"], function (_expor
   });
   Object.defineProperty(_exports, "default", {
     enumerable: true,
-    get: function get() {
+    get: function () {
       return _pageTitle.default;
     }
   });
@@ -323,7 +285,7 @@ define("dummy/router", ["exports", "dummy/config/environment"], function (_expor
 ;define("dummy/site-drawer-component/tests/templates.template.lint-test", [], function () {
   "use strict";
 });
-;define("dummy/templates/application", ["exports"], function (_exports) {
+;define("dummy/templates/application", ["exports", "@ember/template-factory"], function (_exports, _templateFactory) {
   "use strict";
 
   Object.defineProperty(_exports, "__esModule", {
@@ -331,7 +293,7 @@ define("dummy/router", ["exports", "dummy/config/environment"], function (_expor
   });
   _exports.default = void 0;
 
-  var _default = Ember.HTMLBars.template({
+  var _default = (0, _templateFactory.createTemplateFactory)({
     "id": "o8h9oE2z",
     "block": "[[[1,[28,[35,0],[\"Site Drawer\"],null]],[1,\"\\n\\n\"],[8,[39,1],null,null,[[\"default\"],[[[[1,\"\\n    \"],[8,[30,1,[\"overlay\"]],null,null,null],[1,\"\\n    \"],[8,[30,1,[\"aside\"]],null,null,[[\"default\"],[[[[1,\"\\n        \"],[10,2],[12],[1,\"this is drawer content\"],[13],[1,\"\\n\\n        \"],[11,\"button\"],[24,0,\"close-drawer-button\"],[24,4,\"button\"],[4,[38,2],[\"click\",[30,1,[\"closeDrawer\"]]],null],[12],[1,\"\\n        close drawer\\n        \"],[13],[1,\"\\n    \"]],[]]]]],[1,\"\\n\\n    \"],[11,\"button\"],[24,0,\"open-drawer-button\"],[24,4,\"button\"],[4,[38,2],[\"click\",[30,1,[\"openDrawer\"]]],null],[12],[1,\"\\n        open drawer\\n    \"],[13],[1,\"\\n    \"],[11,\"button\"],[24,0,\"toggle-drawer-button\"],[24,4,\"button\"],[4,[38,2],[\"click\",[30,1,[\"toggleDrawer\"]]],null],[12],[1,\"\\n        toggle drawer\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[8,[30,1,[\"trigger\"]],[[24,0,\"test\"]],null,[[\"default\"],[[[[1,\"\\n        also trigger\\n    \"]],[]]]]],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\\n    \"],[10,2],[12],[1,\"\\n        Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\\n        tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\\n        quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\\n        consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\\n        cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non\\n        proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\\n    \"],[13],[1,\"\\n\"]],[1]]]]],[1,\"\\n\"]],[\"drawer\"],false,[\"page-title\",\"site-drawer\",\"on\"]]",
     "moduleName": "dummy/templates/application.hbs",
