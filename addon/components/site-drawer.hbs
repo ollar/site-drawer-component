@@ -1,12 +1,12 @@
 <div class="drawer-wrapper {{if this.opened 'opened'}}">
     {{yield (hash
-                aside=(component this.asideComponent
+                aside=(component 'site-drawer/aside'
                     toggleDrawer=this.toggleDrawer
                     openDrawer=this.openDrawer
                     closeDrawer=this.closeDrawer
                     opened=this.opened)
-                overlay=(component this.overlayComponent toggleDrawer=this.toggleDrawer)
-                trigger=(component this.triggerComponent toggleDrawer=this.toggleDrawer)
+                overlay=(component 'site-drawer/overlay' toggleDrawer=this.toggleDrawer)
+                trigger=(component 'site-drawer/trigger' toggleDrawer=this.toggleDrawer)
 
                 opened=this.opened
                 toggleDrawer=this.toggleDrawer
